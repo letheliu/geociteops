@@ -1,0 +1,46 @@
+name: 功能建议
+description: 提出新功能或改进想法
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题
+      description: 你想解决什么问题？先说问题，别直接跳到方案
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望的方案
+      description: 怎么解决？如果有几种做法，都列出来
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 考虑过的替代方案
+      render: markdown
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 影响范围
+      options:
+        - 仅后端（API / 业务逻辑）
+        - 仅前端（Vue 界面）
+        - 前后端 + 数据库 schema
+        - 部署 / CI / 文档
+        - 还不确定
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: 约束确认
+      options:
+        - label: 我确认这不需要改动 Prisma schema（若需要请勾选下方说明）
+        - label: 我搜索过 issue，没有重复

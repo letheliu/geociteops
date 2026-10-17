@@ -1,0 +1,90 @@
+name: Docker
+
+# 主分支与版本 tag 构建镜像并推送 ghcr.io。
+# tag 与 release 对齐：vX.Y.Z -> X.Y.Z / latest。
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    paths:
+      - Dockerfile
+      - 'web/Dockerfile'
+      - 'web/nginx.conf'
+      - 'docker-compose.yml'
+      - 'src/**'
+      - 'prisma/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/docker.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    name: build & publish images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # 推 ghcr 需要
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: api
+            context: '.'
+            dockerfile: Dockerfile
+            target: runtime
+          - name: web
+            context: '.'
+            dockerfile: web/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      # ghcr 登录：用 GITHUB_TOKEN，无需另配 secret
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ⚠️ 公开建仓时必须回来钉死 owner：
+      #    镜像名取自 github.repository_owner，**建仓后第一件事**就是确认它与
+      #    预期的 GitHub owner 一致（ghcr.io/<owner>/geociteops-api）。
+      #    npm org 是 geociteops，与 GitHub owner 是两回事，别混用，
+      #    否则镜像名一发布就要返工迁移。
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/geociteops-${{ matrix.name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          # 仅推 main 与 tag；PR 只构建验证，不推
+          push: ${{ github.event_name != 'pull_request' }}
+          target: ${{ matrix.target }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # 规格 §2：只出 linux/amd64，不做多架构
+          platforms: linux/amd64

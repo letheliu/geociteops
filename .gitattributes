@@ -1,0 +1,9 @@
+# 全局 LF：本仓库产物面向 Linux 容器/服务器，Windows 的 autocrlf 会在
+# git archive/检出时注入 CRLF（docker-entrypoint.sh 的 'bash\r' 即此坑）
+* text=auto eol=lf
+
+# 高危文件显式兜底（shebang 对 \r 零容忍）
+*.sh text eol=lf
+Dockerfile text eol=lf
+web/Dockerfile text eol=lf
+web/nginx.conf text eol=lf

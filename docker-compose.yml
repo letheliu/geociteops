@@ -1,0 +1,115 @@
+# geociteops 一键部署栈（规格 §3.1）
+#
+# 四服务：db / migrate / app / web
+# worker 不拆独立容器——citation-scheduler、order-activate、billing-crons、
+# diagnostic-workers 及内联的 session.purge / payment.reconcile 全部与 Fastify
+# 同进程启动（src/server.ts），且 zvec 是进程内嵌入式库、mock 支付渠道是进程内
+# 内存注册表，拆进程会导致向量库双开与"逐调用互不可见"。详见规格 §2 非目标。
+#
+# 使用：
+#   cp .env.example .env   # 至少改 CREDENTIAL_MASTER_KEY 与 PAY_MOCK_SECRET
+#   docker compose up -d
+#   → http://localhost:5170/login
+
+services:
+  # ---------- db：Postgres + pgvector ----------
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-geo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geo_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-geo}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-geo} -d ${POSTGRES_DB:-geo}']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    # 不向宿主机发布 5432：避免与宿主机上已有 Postgres 撞端口（演示站与 zoomer 共存时尤其重要）
+    mem_limit: 512m
+
+  # ---------- migrate：一次性迁移 ----------
+  # 独立成服务而非并入 app 启动流程：schema 未就绪时 pg-boss / worker 抢跑会直接崩。
+  # app 用 condition: service_completed_successfully 严格依赖它成功退出。
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrate
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-geo}:${POSTGRES_PASSWORD:-geo_secret}@db:5432/${POSTGRES_DB:-geo}?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+
+  # ---------- app：API + 全部 worker + zvec ----------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      # compose 内部走服务名 db，不读 .env 里的 DATABASE_URL（那是给本机 pnpm 开发用的）
+      DATABASE_URL: postgresql://${POSTGRES_USER:-geo}:${POSTGRES_PASSWORD:-geo_secret}@db:5432/${POSTGRES_DB:-geo}?schema=public
+
+      # 下面两个是必改项：缺失时 app 直接启动终止（PAY_MOCK_SECRET 为 fail-closed 校验）
+      CREDENTIAL_MASTER_KEY: ${CREDENTIAL_MASTER_KEY:?CREDENTIAL_MASTER_KEY 未设置：生成命令见 .env.example}
+      PAY_MOCK_SECRET: ${PAY_MOCK_SECRET:?PAY_MOCK_SECRET 未设置：缺失时服务 fail-closed 拒绝启动}
+
+      # 向量库与上传目录（挂命名卷，容器重建不丢）
+      ZVEC_DATA_PATH: /app/data/zvec
+      GEO_UPLOAD_DIR: /app/data/uploads
+      ZVEC_DIM: ${ZVEC_DIM:-1024}
+      VECTOR_SIMILARITY_THRESHOLD: ${VECTOR_SIMILARITY_THRESHOLD:-0.85}
+
+      # 会话 Cookie 名。默认 __Host-geo_sid 强制 Secure：
+      # 裸 IP + 纯 http 部署登录会静默失效，须改 GEO_COOKIE_NAME=geo_sid（见 README）
+      GEO_COOKIE_NAME: ${GEO_COOKIE_NAME:-__Host-geo_sid}
+      SESSION_IDLE_PLATFORM_HOURS: ${SESSION_IDLE_PLATFORM_HOURS:-8}
+      BILLING_ENFORCEMENT: ${BILLING_ENFORCEMENT:-off}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      PAYMENT_BANK_INFO: ${PAYMENT_BANK_INFO:-}
+
+      # LLM 与监测平台凭证（留空即不启用对应平台；演示站只读浏览不需要）
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://open.bigapi.cn/api/paas/v4}
+      OPENAI_SEARCH_MODEL: ${OPENAI_SEARCH_MODEL:-gpt-4o-search-preview}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-embedding-3}
+      CHAT_MODEL: ${CHAT_MODEL:-glm-4-flash}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}
+      PERPLEXITY_MODEL: ${PERPLEXITY_MODEL:-sonar}
+      FUZZY_MATCH_THRESHOLD: ${FUZZY_MATCH_THRESHOLD:--50}
+    volumes:
+      # zvec 是进程内嵌入式库，落盘目录不挂卷 → 容器重建向量库清零
+      - zvec-data:/app/data/zvec
+      # 回单 / 发票 PDF 落盘
+      - uploads:/app/data/uploads
+    mem_limit: 768m
+
+  # ---------- web：nginx 托管前端静态产物 + 反代后端 ----------
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - '${WEB_PORT:-5170}:80'
+    mem_limit: 128m
+
+volumes:
+  pgdata:
+  zvec-data:
+  uploads:

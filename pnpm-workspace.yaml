@@ -1,0 +1,11 @@
+packages:
+  - "sdk"
+  - "web"
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  '@zvec/zvec': true
+  esbuild: true
+  prisma: true
+  vue-demi: true
+  vue-echarts: true

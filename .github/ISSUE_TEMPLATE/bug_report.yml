@@ -1,0 +1,64 @@
+name: Bug 报告
+description: 报告一个可复现的缺陷
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请先确认搜过 open issue 是否已有同类问题。
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 发生了什么，你期望发生什么
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: |
+        1.
+        2.
+        3.
+      render: markdown
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / 部署方式
+      description: docker compose 还是 pnpm 本地开发？commit hash 或镜像 tag
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deploy
+    attributes:
+      label: 部署方式
+      options:
+        - docker compose（四服务栈）
+        - 本地 pnpm 开发
+        - 演示站（只读）
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      description: |
+        `docker compose logs app` 或测试输出。
+        **请先自行移除其中的密钥、Cookie、内网地址。**
+      render: shell
+
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境
+      description: Node 版本、操作系统、Postgres 版本
+      render: yaml

@@ -1,0 +1,39 @@
+# 构建上下文裁剪：不进镜像，也避免本机 win32 原生绑定污染 linux 构建
+# 注意：pnpm-lock.yaml / pnpm-workspace.yaml 必须在上下文内——
+# 构建全程 pnpm install --frozen-lockfile，缺 lockfile 直接构建失败。
+
+# 依赖与产物
+node_modules/
+**/node_modules/
+dist/
+web/dist/
+*.tsbuildinfo
+
+# 版本控制与编辑器
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# 环境与日志（镜像内一律用运行时环境变量注入）
+.env
+.env.*
+!.env.example
+*.log
+
+# 本地数据（容器内改用命名卷）
+data/
+
+# 内部/私有内容（对应 .gitignore 清理清单，构建产物不含）
+.agents/
+.codex/
+.opencode/
+.qwen/
+.trae/
+QWEN.md
+.workbuddy/
+docs/
+tests/
+*.md
+!README.md
+

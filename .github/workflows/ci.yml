@@ -1,0 +1,134 @@
+name: CI
+
+# push 与 PR 都跑。main 的 push 额外作为发布前闸门（镜像发布由 docker.yml 负责）。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# 同一分支的新 push 取消旧跑，节省 CI 配额
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PNPM_VERSION: '11.22.0'
+
+jobs:
+  # ------------------------------------------------------------------
+  # 类型闸门：不需要数据库，PR 上最快给反馈
+  #
+  # 顺序有讲究，且是踩过坑的：
+  #   prisma generate 必须排在 tsc 之前。
+  #   @prisma/client 的类型（Prisma.InputJsonValue 等）由 generate 产到
+  #   node_modules/.prisma，缺失时 tsc 会报 200+ 个假错
+  #   （local checkout 里就见过 240 个 error TS2694/TS7006，全是这个原因）。
+  #   CI 每次都是干净安装，不 generate 必然全红。
+  # ------------------------------------------------------------------
+  typecheck:
+    name: typecheck (backend + web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      # 锁文件已纳入版本控制，CI 一律 frozen，杜绝解析漂移
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      # 说明：这里用 `-p tsconfig.build.json --noEmit` 而不是裸 `tsc --noEmit`。
+      # 裸 --noEmit 会把 **tests/** 一并纳入类型检查，而本仓库的测试文件从未做过
+      # 类型收敛（vitest 走 esbuild 只转译不查类型，所以运行时全绿）：
+      # 实测存量 333 个类型错误、分布 32 个 *.test.ts，外加 3 个被测试间接引入的
+      # scripts/migrate-tob-p0.ts。出货代码（src 非测试部分）本身是干净的。
+      # tsconfig.build.json 正是本仓库用来界定「出货代码」的配置
+      # （排除 tests 与 **/*.test.ts），用它做闸门才是「后端类型回归」的本来意图。
+      # 若日后要把测试也纳入类型收敛，那是独立的一次重构，不属于本里程碑。
+      - name: Backend typecheck (production source)
+        run: pnpm exec tsc -p tsconfig.build.json --noEmit
+
+      # 前端类型回归：没有这一步，web 的类型错误要等 docker 构建阶段才炸
+      - name: Web typecheck (vue-tsc)
+        run: pnpm --filter geo-web exec vue-tsc -b
+
+      - name: Backend production build
+        run: pnpm exec tsc -p tsconfig.build.json
+
+      # SDK 发布前体检：跑 prepublishOnly 类型闸门并列出将被打包的文件。
+      # dry-run 不需要 registry 凭据，也不会真的发布。
+      - name: SDK publish dry-run
+        working-directory: sdk
+        run: npm publish --dry-run
+
+  # ------------------------------------------------------------------
+  # 测试：需要真实 Postgres（pgvector）
+  #
+  # ⚠️ 专用测试库，不可指向任何存量库：
+  # tests/e2e-citation-flow.test.ts 在 beforeAll 里 deleteMany 清库
+  # （citationEvent / citationQuery / workspace 全表），
+  # DATABASE_URL 指错库 = 直接抹掉数据，绝不可复用开发/演示库。
+  # ------------------------------------------------------------------
+  test:
+    name: test (vitest + pgvector)
+    runs-on: ubuntu-latest
+    needs: typecheck
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: geo
+          POSTGRES_PASSWORD: geo_secret
+          POSTGRES_DB: geociteops_test
+        ports:
+          - '5432:5432'
+        options: >-
+          --health-cmd "pg_isready -U geo -d geociteops_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # 专用测试库，与 compose 的 geo 库、开发库物理隔离
+      DATABASE_URL: postgresql://geo:geo_secret@localhost:5432/geociteops_test?schema=public
+      # 测试用假密钥即可：值本身不参与断言，只要求存在且格式合法
+      # （部分测试文件自带 ||='test-mock-secret' 兜底，这里做全局保底）
+      CREDENTIAL_MASTER_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+      PAY_MOCK_SECRET: 'ci-test-mock-secret'
+      # zvec 落盘到临时目录，避免污染仓库（测试用 mkdtemp，不依赖此项）
+      ZVEC_DATA_PATH: /tmp/geociteops-ci-zvec
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      # 先迁移建表，再跑测试：vitest 里不少用例会直接读写库，
+      # 不先 migrate 的话 schema 缺失，报错伪装成「测试挂了」
+      - name: Migrate test database
+        run: pnpm exec prisma migrate deploy
+
+      - name: Run vitest
+        run: pnpm test

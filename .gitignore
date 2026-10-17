@@ -1,0 +1,38 @@
+node_modules/
+dist/
+.env
+*.log
+prisma/migrations/dev.db*
+.worktrees/
+.pnpm-store/
+# Zvec 进程内向量库落盘数据
+data/zvec/
+# vue-tsc 构建产物
+*.tsbuildinfo
+# tsc 意外就地发射的编译产物（src 与 web 的 .ts 旁不该出现 .js/.d.ts）
+src/**/*.js
+src/**/*.d.ts
+src/**/*.map
+web/src/**/*.js
+web/vite.config.js
+web/vite.config.d.ts
+
+# superpowers SDD 工作区
+.superpowers/
+data/uploads/
+
+# ===== 公开仓库清理清单（M1 开源可信度）=====
+# AI 工作流技能拷贝（五份重复拷贝）
+.agents/
+.codex/
+.opencode/
+.qwen/
+.trae/
+QWEN.md
+# 内部开发记录
+.workbuddy/
+docs/superpowers/
+# 版权灰区：第三方内容摘编，不进 MIT 仓库
+docs/claude-seo-reference/
+# 私有规格（含服务器信息与商业策略，不提交公开仓库）
+docs/specs/

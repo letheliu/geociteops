@@ -1,0 +1,978 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Workspace {
+  id                 String              @id @default(cuid())
+  name               String
+  domain             String?
+  llmsTxtUrl         String?
+  defaultBrandName   String
+  platformConfig     Json                @default("{}")
+  publicationConfig  Json                @default("{}")
+  status             WorkspaceStatus     @default(ACTIVE)
+  suspendReason      String?
+  organizationId     String
+  archivedAt         DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  organization       Organization         @relation(fields: [organizationId], references: [id])
+  events             CitationEvent[]
+  queries            CitationQuery[]
+  pages              ContentPage[]
+  entities           KgEntity[]
+  tasks              OptimizationTask[]
+  schemas            SchemaRecord[]
+  publicationRecords PublicationRecord[]
+
+  diagnosticProjects DiagnosticProject[]
+  diagnosticRuns     DiagnosticRun[]
+  diagnosticSamples  DiagnosticSample[]
+  diagnosticFindings DiagnosticFinding[]
+  diagnosticActions  DiagnosticAction[]
+
+  orderItems        OrderItem[]
+  serviceDeliveries ServiceDelivery[]
+
+  @@index([status])
+}
+
+model DiagnosticProject {
+  id              String                  @id @default(cuid())
+  workspaceId     String
+  name            String
+  brandName       String
+  brandAliases    Json                    @default("[]")
+  brandDomain     String?
+  targetAudiences Json                    @default("[]")
+  coreScenarios   Json                    @default("[]")
+  competitors     Json                    @default("[]")
+  status          DiagnosticProjectStatus @default(DRAFT)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  workspace       Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  queries         DiagnosticQuery[]
+  runs            DiagnosticRun[]
+
+  @@index([workspaceId, status])
+}
+
+model DiagnosticQuery {
+  id             String                @id @default(cuid())
+  projectId      String
+  queryText      String
+  normalizedText String
+  queryType      DiagnosticQueryType
+  intentLabel    String?
+  targetAudience String?
+  mappedPageUrl  String?
+  priority       Int                   @default(3)
+  source         DiagnosticQuerySource
+  status         DiagnosticQueryStatus @default(DRAFT)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  project        DiagnosticProject     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, normalizedText])
+  @@index([projectId, status, queryType])
+}
+
+model DiagnosticRun {
+  id                 String                   @id @default(cuid())
+  workspaceId        String
+  projectId          String
+  baselineRunId      String?
+  runType            DiagnosticRunType        @default(BASELINE)
+  status             DiagnosticRunStatus      @default(DRAFT)
+  draftConfig        Json?
+  brandSnapshot      Json?
+  competitorSnapshot Json?
+  platformSnapshot   Json?
+  samplingSnapshot   Json?
+  scopeDiff          Json?
+  dispatchStatus     DiagnosticDispatchStatus @default(NOT_STARTED)
+  dispatchError      String?
+  totalUnits         Int                      @default(0)
+  completedUnits     Int                      @default(0)
+  failedUnits        Int                      @default(0)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  workspace          Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project            DiagnosticProject        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  baselineRun        DiagnosticRun?           @relation("DiagnosticRetest", fields: [baselineRunId], references: [id])
+  retests            DiagnosticRun[]          @relation("DiagnosticRetest")
+  runQueries         DiagnosticRunQuery[]
+  samples            DiagnosticSample[]
+  findings           DiagnosticFinding[]
+  actions            DiagnosticAction[]
+  reportCaches       DiagnosticReportCache[]
+
+  @@index([workspaceId, projectId, status, createdAt])
+}
+
+model DiagnosticRunQuery {
+  id             String              @id @default(cuid())
+  runId          String
+  sourceQueryId  String?
+  queryText      String
+  queryType      DiagnosticQueryType
+  intentLabel    String?
+  targetAudience String?
+  mappedPageUrl  String?
+  priority       Int                 @default(3)
+  orderIndex     Int
+  run            DiagnosticRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  samples        DiagnosticSample[]
+
+  @@index([runId, queryType, orderIndex])
+}
+
+model DiagnosticSample {
+  id                 String                 @id @default(cuid())
+  workspaceId        String
+  runId              String
+  runQueryId         String
+  platform           String
+  sampleIndex        Int
+  status             DiagnosticSampleStatus @default(PENDING)
+  model              String?
+  requestStartedAt   DateTime?
+  requestCompletedAt DateTime?
+  latencyMs          Int?
+  rawAnswer          String?
+  sourceCitations    Json                   @default("[]")
+  groundingSources   Json                   @default("[]")
+  analysis           Json?
+  errorCode          String?
+  errorMessage       String?
+  attemptCount       Int                    @default(0)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  workspace          Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  run                DiagnosticRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runQuery           DiagnosticRunQuery     @relation(fields: [runQueryId], references: [id], onDelete: Cascade)
+
+  @@unique([runQueryId, platform, sampleIndex])
+  @@index([workspaceId, runId, status])
+}
+
+model DiagnosticFinding {
+  id                String                    @id @default(cuid())
+  workspaceId       String
+  runId             String
+  type              DiagnosticFindingType
+  severity          DiagnosticSeverity
+  title             String
+  summary           String
+  metric            Json
+  evidenceSampleIds Json                      @default("[]")
+  createdAt         DateTime                  @default(now())
+  workspace         Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  run               DiagnosticRun             @relation(fields: [runId], references: [id], onDelete: Cascade)
+  actionLinks       DiagnosticFindingAction[]
+
+  @@index([workspaceId, runId, severity])
+}
+
+model DiagnosticAction {
+  id                 String                    @id @default(cuid())
+  workspaceId        String
+  runId              String
+  horizon            DiagnosticActionHorizon
+  actionType         DiagnosticActionType
+  title              String
+  description        String
+  priority           Int                       @default(3)
+  targetRunQueryIds  Json                      @default("[]")
+  targetPageUrl      String?
+  status             DiagnosticActionStatus    @default(PROPOSED)
+  dismissReason      String?
+  optimizationTaskId String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  workspace          Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  run                DiagnosticRun             @relation(fields: [runId], references: [id], onDelete: Cascade)
+  findingLinks       DiagnosticFindingAction[]
+
+  @@index([workspaceId, runId, status, horizon])
+}
+
+model DiagnosticFindingAction {
+  findingId String
+  actionId  String
+  finding   DiagnosticFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  action    DiagnosticAction  @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@id([findingId, actionId])
+}
+
+model DiagnosticReportCache {
+  id                    String        @id @default(cuid())
+  runId                 String
+  reportVersion         Int           @default(1)
+  generatedAt           DateTime      @default(now())
+  sourceSampleUpdatedAt DateTime
+  content               Json
+  run                   DiagnosticRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, reportVersion])
+}
+
+model CitationQuery {
+  id            String             @id @default(cuid())
+  workspaceId   String
+  queryText     String
+  intent        Json               @default("{}")
+  intentType    String?
+  cluster       String?
+  mappedPageUrl String?
+  priority      Int                @default(3)
+  lastRunAt     DateTime?
+  source        QuerySource
+  status        QueryStatus        @default(ACTIVE)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  events        CitationEvent[]
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks         OptimizationTask[]
+
+  @@index([workspaceId, status])
+}
+
+model CitationEvent {
+  id               String        @id @default(cuid())
+  workspaceId      String
+  queryId          String
+  platform         String
+  brandMentioned   Boolean
+  brandSourceCited Boolean       @default(false)
+  rankInAnswer     Int?
+  sourceRank       Int?
+  citedUrls        Json          @default("[]")
+  sourceCitations  Json          @default("[]")
+  groundingSources Json          @default("[]")
+  analysis         Json          @default("{}")
+  competitors      Json          @default("[]")
+  rawAnswer        String
+  sovScore         Float?
+  capturedAt       DateTime      @default(now())
+  query            CitationQuery @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, platform, capturedAt])
+  @@index([queryId, capturedAt])
+}
+
+model ContentPage {
+  id                String             @id @default(cuid())
+  workspaceId       String
+  url               String
+  pageType          String
+  currentContent    String
+  optimizedContent  String?
+  publishedContent  String?
+  lastPublishedAt   DateTime?
+  optimizationScore Float?
+  eeatScore         Float?
+  citabilityScore   Float?
+  status            ContentStatus      @default(DRAFT)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks             OptimizationTask[]
+  atoms             ContentAtom[]
+
+  @@unique([workspaceId, url])
+  @@index([workspaceId, status])
+}
+
+/// 内容原子单元：atomizer 切分出的语义块，向量化后支持跨页语义检索/去重。
+/// embedding 存于 Zvec（atoms collection），PG 仅存业务字段与业务 ID 供关联。
+model ContentAtom {
+  id          String      @id @default(cuid())
+  workspaceId String
+  pageId      String
+  atomText    String
+  subject     String?
+  predicate   String?
+  objectValue String?     @map("object")
+  score       Float?
+  createdAt   DateTime    @default(now())
+  page        ContentPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, pageId])
+}
+
+model OptimizationTask {
+  id                  String         @id @default(cuid())
+  workspaceId         String
+  type                TaskType
+  queryId             String?
+  pageId              String?
+  status              TaskStatus     @default(PENDING)
+  beforeScore         Float?
+  afterScore          Float?
+  result              Json?
+  reviewNote          String?
+  extractionProposals Json?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  page                ContentPage?   @relation(fields: [pageId], references: [id])
+  query               CitationQuery? @relation(fields: [queryId], references: [id])
+  workspace           Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status])
+}
+
+model SchemaRecord {
+  id             String       @id @default(cuid())
+  workspaceId    String
+  pageUrl        String
+  schemaType     String
+  content        Json
+  llmsTxtSection String?
+  status         SchemaStatus @default(ACTIVE)
+  version        Int          @default(1)
+  createdAt      DateTime     @default(now())
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, pageUrl])
+  @@index([workspaceId, schemaType])
+  @@index([workspaceId, status])
+}
+
+model KgEntity {
+  id            String       @id @default(cuid())
+  workspaceId   String
+  name          String
+  type          String
+  properties    Json         @default("{}")
+  sourceUrl     String?
+  createdAt     DateTime     @default(now())
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  relationsFrom KgRelation[] @relation("RelationFrom")
+  relationsTo   KgRelation[] @relation("RelationTo")
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, type])
+}
+
+model KgRelation {
+  id           String   @id @default(cuid())
+  fromEntityId String
+  toEntityId   String
+  relationType String
+  properties   Json     @default("{}")
+  createdAt    DateTime @default(now())
+  fromEntity   KgEntity @relation("RelationFrom", fields: [fromEntityId], references: [id], onDelete: Cascade)
+  toEntity     KgEntity @relation("RelationTo", fields: [toEntityId], references: [id], onDelete: Cascade)
+
+  @@index([fromEntityId])
+  @@index([toEntityId])
+}
+
+enum WorkspaceStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum QuerySource {
+  GOOGLE_SUGGEST
+  LLM_GENERATED
+  PAA
+  MANUAL
+  COMPETITOR
+}
+
+enum QueryStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum ContentStatus {
+  DRAFT
+  REVIEWED
+  PUBLISHED
+}
+
+enum TaskType {
+  OPTIMIZE_FOR_QUERY
+  REWRITE_CONTENT
+  GENERATE_SCHEMA
+  UPDATE_KG
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  REVIEWED
+  PUBLISHED
+  FAILED
+}
+
+enum SchemaStatus {
+  ACTIVE
+  DEPRECATED
+  NO_RICH_RESULTS
+}
+
+model PublicationRecord {
+  id          String            @id @default(cuid())
+  workspaceId String
+  taskId      String?
+  pageUrl     String
+  targetType  String
+  status      PublicationStatus @default(PENDING)
+  payload     Json
+  response    Json?
+  error       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, pageUrl])
+}
+
+enum PublicationStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum DiagnosticProjectStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum DiagnosticQueryType {
+  BRAND
+  CATEGORY
+  SCENARIO
+  COMPARISON
+}
+
+enum DiagnosticQuerySource {
+  MANUAL
+  LLM_GENERATED
+  IMPORTED
+}
+
+enum DiagnosticQueryStatus {
+  DRAFT
+  CONFIRMED
+  DISABLED
+}
+
+enum DiagnosticRunType {
+  BASELINE
+  RETEST
+}
+
+enum DiagnosticRunStatus {
+  DRAFT
+  READY
+  RUNNING
+  PARTIAL
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum DiagnosticDispatchStatus {
+  NOT_STARTED
+  PENDING
+  QUEUED
+  FAILED
+}
+
+enum DiagnosticSampleStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum DiagnosticFindingType {
+  LOW_VISIBILITY
+  LOW_SOURCE_CITATION
+  LOW_RANK
+  COMPETITOR_DOMINANCE
+  QUERY_COVERAGE_GAP
+  PLATFORM_GAP
+  INSUFFICIENT_SAMPLE
+}
+
+enum DiagnosticSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum DiagnosticActionHorizon {
+  DAYS_30
+  DAYS_60
+  DAYS_90
+}
+
+enum DiagnosticActionType {
+  FIX_BRAND_BASICS
+  CREATE_CATEGORY_PAGE
+  CREATE_SCENARIO_PAGE
+  CREATE_COMPARISON_PAGE
+  OPTIMIZE_EXISTING_PAGE
+  ADD_STRUCTURED_DATA
+  BUILD_EXTERNAL_SOURCES
+  RETEST
+}
+
+enum DiagnosticActionStatus {
+  PROPOSED
+  ACCEPTED
+  CONVERTED
+  DISMISSED
+}
+
+// ---------------------------------------------------------------------------
+// ToB 平台 P0：身份与租户（Organization / User / Session / Workspace 授权 / API 凭证 / 审计）
+// ---------------------------------------------------------------------------
+
+/// 企业（租户根）：承载成员、Workspace 归属、合同与开票信息。
+model Organization {
+  id              String             @id @default(cuid())
+  name            String
+  creditCode      String? // 统一社会信用代码
+  industry        String?
+  status          OrganizationStatus @default(ACTIVE)
+  billingProfile  Json               @default("{}") // 开票抬头、税号、地址电话、开户行
+  ownerOperatorId String? // 客户经理（平台员工）
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  workspaces      Workspace[]
+  users           User[]
+  orders          Order[]
+  subscriptions   Subscription[]
+  entitlement     OrganizationEntitlement?
+  invoices        Invoice[]
+}
+
+/// 自然人账号：平台员工与客户用户同表，以 userType 区分。
+model User {
+  id                 String        @id @default(cuid())
+  username           String        @unique
+  displayName        String
+  email              String?       @unique
+  phone              String?
+  passwordHash       String
+  userType           UserType // PLATFORM | CUSTOMER
+  platformRole       PlatformRole? // SUPER_ADMIN | OPERATOR | FINANCE | SUPPORT
+  organizationId     String?
+  orgRole            OrgRole? // ORG_OWNER | ORG_MEMBER | ORG_VIEWER
+  status             UserStatus    @default(ACTIVE)
+  mustChangePassword Boolean       @default(true)
+  failedLoginCount   Int           @default(0)
+  lockedUntil        DateTime?
+  lastLoginAt        DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  organization       Organization? @relation(fields: [organizationId], references: [id])
+  sessions           Session[]
+
+  @@index([organizationId])
+}
+
+/// 服务端会话：库内只存 token 的 SHA-256 哈希；用户删除时级联清理。
+model Session {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  ip         String?
+  userAgent  String?
+  lastSeenAt DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Workspace 授权（企业成员 / 平台顾问统一一张表，不设 WorkspaceAssignment）。
+model WorkspaceMember {
+  workspaceId String
+  userId      String
+  access      WorkspaceAccess // MANAGE | OPERATE | VIEW
+  isPrimary   Boolean         @default(false) // 平台顾问"负责顾问"标记
+  createdAt   DateTime        @default(now())
+
+  @@id([workspaceId, userId])
+  @@index([userId])
+}
+
+/// 程序接入凭证（SDK 通道）：明文仅签发时可见，库内只存哈希；迁移来的存量 Key 无前缀。
+model ApiCredential {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  keyPrefix   String? // 用于展示 geo_ab12••••
+  keyHash     String    @unique
+  scopes      Json      @default("[\"*\"]")
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+}
+
+/// 审计日志：谁（actor）在何时对什么（target）做了什么（action）；只追加不修改。
+model AuditLog {
+  id             String   @id @default(cuid())
+  actorId        String?
+  actorType      String
+  organizationId String?
+  workspaceId    String?
+  action         String
+  target         String?
+  diff           Json?
+  ip             String?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([workspaceId, createdAt])
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum UserType {
+  PLATFORM
+  CUSTOMER
+}
+
+enum PlatformRole {
+  SUPER_ADMIN
+  OPERATOR
+  FINANCE
+  SUPPORT
+}
+
+enum OrgRole {
+  ORG_OWNER
+  ORG_MEMBER
+  ORG_VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum WorkspaceAccess {
+  MANAGE
+  OPERATE
+  VIEW
+}
+
+// ---------------------------------------------------------------------------
+// ToB 平台 P2：商品 / 订单 / 支付 / 退款 / 订阅 / 配额 / 计量 / 交付 / 发票
+// ---------------------------------------------------------------------------
+
+/// 商品目录：订阅 / 专业服务 / 加购包。
+model Product {
+  id          String       @id @default(cuid())
+  code        String       @unique
+  name        String
+  kind        ProductKind
+  description String       @default("")
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  plans       ProductPlan[]
+}
+
+/// 售卖套餐：价格、计费周期、配额 entitlements 与交付模板 deliverables。
+model ProductPlan {
+  id            String         @id @default(cuid())
+  productId     String
+  name          String
+  priceCents    Int
+  billingPeriod BillingPeriod? // MONTH | YEAR | null（一次性）
+  entitlements  Json // { maxWorkspaces, maxQueries, allowedPlatforms, ... }
+  deliverables  Json           @default("[]") // 专业服务的里程碑模板
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  product       Product        @relation(fields: [productId], references: [id])
+  orderItems    OrderItem[]
+  subscriptions Subscription[]
+
+  @@index([productId])
+}
+
+/// 订单（状态机见规格 §6.2）。
+model Order {
+  id             String              @id @default(cuid())
+  orderNo        String              @unique
+  organizationId String
+  status         OrderStatus
+  totalCents     Int
+  discountCents  Int                 @default(0)
+  payableCents   Int
+  refundedCents  Int                 @default(0)
+  currency       String              @default("CNY") // 币种预留，默认 CNY
+  paymentMethod  PaymentMethod?
+  dueAt          DateTime?
+  paidAt         DateTime?
+  remark         String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  organization   Organization        @relation(fields: [organizationId], references: [id])
+  items          OrderItem[]
+  events         OrderEvent[]
+  payments       PaymentTransaction[]
+  refunds        RefundTransaction[]
+  subscriptions  Subscription[]
+
+  @@index([organizationId, status])
+  @@index([status, createdAt])
+}
+
+/// 订单行：planSnapshot 固化下单时套餐快照；workspaceId 为加购包/专业服务目标。
+model OrderItem {
+  id              String          @id @default(cuid())
+  orderId         String
+  planId          String
+  workspaceId     String?
+  quantity        Int             @default(1)
+  unitPriceCents  Int
+  planSnapshot    Json
+  order           Order           @relation(fields: [orderId], references: [id])
+  plan            ProductPlan     @relation(fields: [planId], references: [id])
+  workspace       Workspace?      @relation(fields: [workspaceId], references: [id])
+  serviceDelivery ServiceDelivery?
+
+  @@index([orderId])
+}
+
+/// 订单状态流转事件：event 记录事件名，actorId 为操作者（平台员工或客户用户 ID）。
+///
+/// 手工管理的部分唯一索引（遗留 A3，Prisma 5 无法在 schema 声明 WHERE 子句）：
+/// 存在迁移 20261015070000_tob_p2_order_event_extend_unique 建立的
+/// UNIQUE INDEX "OrderEvent_orderId_event_ext" ON ("orderId","event")
+/// WHERE event='subscription.extend'（续费延长标记闸的并发双写兜底）。
+/// 后续任何 migrate diff 产物必须人工核对：不得 DROP 该索引（schema 无此声明，
+/// diff 会想删它）——发现 DROP 时手工剔除该语句；需要删时走显式迁移并同步本注释。
+model OrderEvent {
+  id         String       @id @default(cuid())
+  orderId    String
+  event      String
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  actorId    String?
+  note       String?
+  createdAt  DateTime     @default(now())
+  order      Order        @relation(fields: [orderId], references: [id])
+
+  @@index([orderId, createdAt])
+}
+
+/// 支付流水：channelTxnNo 回调幂等锚，channelOrderNo 渠道侧订单号（每日主动查单对账）。
+model PaymentTransaction {
+  id             String        @id @default(cuid())
+  orderId        String
+  method         PaymentMethod
+  amountCents    Int
+  currency       String        @default("CNY")
+  status         PaymentStatus
+  channelTxnNo   String?       @unique
+  channelOrderNo String?       @unique
+  voucherFileKey String? // 对公转账回单（files service key）
+  confirmedById  String?
+  rawPayload     Json?
+  createdAt       DateTime            @default(now())
+  order           Order               @relation(fields: [orderId], references: [id])
+  refunds         RefundTransaction[]
+
+  @@index([orderId])
+}
+
+/// 退款流水（部分退款对账与配额回收依据）。
+model RefundTransaction {
+  id              String              @id @default(cuid())
+  orderId         String
+  paymentId       String // 原支付流水
+  amountCents     Int // 本次退款金额
+  currency        String              @default("CNY")
+  reason          String?
+  status          RefundStatus
+  requestedById   String
+  approvedById    String?
+  channelRefundNo String?             @unique // 渠道退款单号（线上退款回调幂等）
+  executedAt      DateTime?
+  createdAt       DateTime            @default(now())
+  order           Order               @relation(fields: [orderId], references: [id])
+  payment         PaymentTransaction  @relation(fields: [paymentId], references: [id])
+
+  @@index([orderId])
+}
+
+/// 订阅开通记录：@@unique([sourceOrderId, planId]) 为开通 worker 幂等锚。
+model Subscription {
+  id             String             @id @default(cuid())
+  organizationId String
+  planId         String
+  sourceOrderId  String
+  startAt        DateTime
+  endAt          DateTime
+  status         SubscriptionStatus
+  entitlements   Json
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  plan           ProductPlan        @relation(fields: [planId], references: [id])
+  sourceOrder    Order              @relation(fields: [sourceOrderId], references: [id])
+
+  @@unique([sourceOrderId, planId])
+  @@index([organizationId, status])
+  @@index([organizationId, planId, status])
+}
+
+/// 企业当前生效配额汇总（开通/到期/退款时行锁事务内重算，规则见规格 §6.4）。
+model OrganizationEntitlement {
+  organizationId String       @id
+  limits         Json
+  periodStart    DateTime // 当前月度统计窗口（自然月）
+  periodEnd      DateTime
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+}
+
+/// 用量计量流水：只追加；kind 如 AI_PLATFORM_CALL | LLM_CALL | DIAGNOSTIC_SAMPLE。
+model UsageRecord {
+  id             String   @id @default(cuid())
+  organizationId String
+  workspaceId    String
+  kind           String
+  platform       String?
+  quantity       Int      @default(1)
+  tokens         Int?
+  costMicros     BigInt?
+  occurredAt     DateTime @default(now())
+
+  @@index([organizationId, kind, occurredAt])
+  @@index([workspaceId, occurredAt])
+}
+
+/// 专业服务交付单：一订单行一交付，orderItemId 唯一即幂等锚；milestones 为里程碑数组。
+model ServiceDelivery {
+  id          String                @id @default(cuid())
+  orderItemId String                @unique
+  workspaceId String?
+  assigneeId  String?
+  status      ServiceDeliveryStatus @default(PENDING_ASSIGN)
+  milestones  Json                  @default("[]")
+  acceptedAt  DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  orderItem   OrderItem             @relation(fields: [orderItemId], references: [id])
+  workspace   Workspace?            @relation(fields: [workspaceId], references: [id])
+
+  @@index([status])
+}
+
+/// 发票：orderIds 为订单 ID 的 Json 字符串数组；文件存 fileKey（files service key）。
+model Invoice {
+  id             String        @id @default(cuid())
+  organizationId String
+  orderIds       Json
+  titleSnapshot  Json // 开票抬头快照
+  amountCents    Int
+  currency       String        @default("CNY")
+  status         InvoiceStatus @default(PENDING)
+  invoiceNo      String?       @unique
+  fileKey        String?
+  requestedById  String
+  issuedById     String?
+  remark         String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, status])
+}
+
+enum ProductKind {
+  SUBSCRIPTION
+  SERVICE
+  ADDON
+}
+
+enum BillingPeriod {
+  MONTH
+  YEAR
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PENDING_CONFIRMATION
+  PAID
+  FULFILLING
+  COMPLETED
+  CANCELLED
+  REFUNDING
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CONTRACT_CREDIT
+  WECHAT
+  ALIPAY
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum RefundStatus {
+  PENDING
+  EXECUTED
+  REJECTED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  GRACE
+  EXPIRED
+  CANCELLED
+}
+
+enum ServiceDeliveryStatus {
+  PENDING_ASSIGN
+  IN_PROGRESS
+  PENDING_ACCEPTANCE
+  ACCEPTED
+}
+
+enum InvoiceStatus {
+  PENDING
+  ISSUED
+  REJECTED
+}

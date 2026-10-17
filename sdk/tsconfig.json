@@ -1,0 +1,20 @@
+{
+  // SDK 的 tRPC 客户端类型是从服务端路由推导的（src/types.ts → ../../src/router.js），
+  // 因此整个后端路由树都会进入本 program。
+  //
+  // 所以这里**不能设 rootDir**：sdk/src 装不下 ../src，tsc 会报 TS6059
+  // （"not under rootDir"），--noEmit 也照样报。
+  //
+  // 0.1.0 的发布形态是**直接发 TypeScript 源码**（package.json 的 main/types 指向
+  // src/index.ts），不产出 dist：SDK 的类型价值恰恰在于"与服务端路由严格一致"，
+  // 编译成 JS 反而会丢掉这层推导。因此这里只做类型闸门，不做产物构建。
+  // 若将来要发编译产物，需另行设计声明文件如何携带服务端类型图（不在本里程碑范围）。
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["src"]
+}
