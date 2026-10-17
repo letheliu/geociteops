@@ -21,7 +21,7 @@ describe('DeepSeekAdapter', () => {
     const adapter = new DeepSeekAdapter()
     const result = await adapter.query('AI工具', { DEEPSEEK_API_KEY: 'ds-test' })
     expect(result.answer).toContain('zoomer AI')
-    expect(result.citations[0].url).toBe('https://zoomer.top')
+    expect(result.sourceCitations[0].url).toBe('https://zoomer.top')
   })
 
   it('使用 DeepSeek base url', async () => {

@@ -26,6 +26,6 @@ describe('AnthropicAdapter', () => {
   it('从文本提取 URL', async () => {
     const adapter = new AnthropicAdapter()
     const result = await adapter.query('AI工具', { ANTHROPIC_API_KEY: 'sk-ant-test' })
-    expect(result.citations[0].url).toBe('https://zoomer.top')
+    expect(result.sourceCitations[0].url).toBe('https://zoomer.top')
   })
 })
