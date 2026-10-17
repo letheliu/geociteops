@@ -232,10 +232,10 @@ npm view @geociteops/sdk version   # expect 0.1.0
 
 ## 7. Public release sequence
 
-> Executed 2026-10-18: public repo created from a single fresh commit, CI green on
-> `main`, images built and pushed to ghcr.io by the Docker workflow. Remaining manual
-> steps: make the two ghcr packages public (package page → settings → visibility) and
-> protect `main` with required CI checks.
+> Executed 2026-10-18: public repo created from a single fresh commit; CI green on `main`;
+> images published to ghcr.io and made public; `main` protected (PR flow + required CI checks
+> + no bypass). Deferred by owner decision (2026-10-18): npm publish of `@geociteops/sdk`,
+> the `v0.1.0` tag, and the demo-site deployment — resume with §3–§6 above whenever ready.
 
 Per the M1 spec, history is **not** rewritten in place. The existing history stays in a private
 backup; the public repository starts from a clean initial commit.
