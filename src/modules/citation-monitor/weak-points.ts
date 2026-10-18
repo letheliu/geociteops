@@ -100,11 +100,26 @@ export function pickTopCompetitor(
   return { name: passed[0][0], rate: passed[0][1] }
 }
 
+/** 一个查询的基线：查询级指标 + 命中它的 Run（§5 规则下"最近一个有效 Run"） */
+export interface QueryBaseline {
+  queryId: string
+  queryText: string
+  mappedPageUrl: string | null
+  runId: string
+  finishedAt: string
+  level: QueryLevelAgg
+}
+
 /**
- * 取薄弱点列表。数据通道与趋势读路径**独立**（不省列也不共享 select），
- * 但口径函数全部复用 aggregate.ts——竞品分母与品牌指标同源由 groupAggregate 保证。
+ * 取范围内每个 ACTIVE 查询的**最近一个有效 Run**（规格 §5 规则，§6/§7 的基线同源）：
+ * 含该查询 + COMPLETED/PARTIAL + 已收尾 + 该查询至少一组 validSamples>0，
+ * 按 finishedAt 降序取最新。注意：不因"未命中薄弱阈值"而回退到更早的 Run——
+ * 基线就是最近一次有数据的运行。
  */
-export async function loadWeakPoints(prisma: PrismaClient, input: WeakPointsInput): Promise<WeakPoint[]> {
+export async function loadQueryBaselines(
+  prisma: PrismaClient,
+  input: WeakPointsInput,
+): Promise<Map<string, QueryBaseline>> {
   const { workspaceId, fromDay, toDay } = input
   const from = dayStart(fromDay)
   const toExclusive = new Date(dayStart(toDay).getTime() + 86_400_000)
@@ -113,9 +128,10 @@ export async function loadWeakPoints(prisma: PrismaClient, input: WeakPointsInpu
     where: { workspaceId, status: 'ACTIVE' },
     select: { id: true, queryText: true, mappedPageUrl: true },
   })
-  if (queries.length === 0) return []
+  const baselines = new Map<string, QueryBaseline>()
+  if (queries.length === 0) return baselines
 
-  // 候选 Run：范围内 + COMPLETED/PARTIAL + 已收尾（finishedAt 排序取最近）
+  // 候选 Run：范围内 + COMPLETED/PARTIAL + 已收尾（finishedAt 降序 = 最近优先）
   const runs = await prisma.citationRun.findMany({
     where: {
       workspaceId,
@@ -126,13 +142,12 @@ export async function loadWeakPoints(prisma: PrismaClient, input: WeakPointsInpu
     orderBy: { finishedAt: 'desc' },
     select: { id: true, finishedAt: true },
   })
-  if (runs.length === 0) return []
+  if (runs.length === 0) return baselines
 
-  const runIds = runs.map((r) => r.id)
   const events = (await prisma.citationEvent.findMany({
     where: {
       workspaceId,
-      runId: { in: runIds },
+      runId: { in: runs.map((r) => r.id) },
       // 唯一过滤点：FAILED 行不进任何指标（与趋势同源）
       ...okEventsWhere(),
       queryId: { in: queries.map((q) => q.id) },
@@ -152,7 +167,6 @@ export async function loadWeakPoints(prisma: PrismaClient, input: WeakPointsInpu
     },
   })) as unknown as AggregateEvent[]
 
-  // (runId × queryId) → 各组 → 查询级聚合
   const byRunQuery = new Map<string, AggregateEvent[]>()
   for (const e of events) {
     const key = `${e.runId}::${e.queryId}`
@@ -161,41 +175,53 @@ export async function loadWeakPoints(prisma: PrismaClient, input: WeakPointsInpu
     else byRunQuery.set(key, [e])
   }
 
-  const weakPoints: WeakPoint[] = []
-  // 已确定基线 Run 的查询：一旦取到"最近的有效 Run"就锁定，
-  // 不再回退到更早的 run（否则最近一次表现转好的查询会被旧数据误判为薄弱点）
-  const resolved = new Set<string>()
-
-  // runs 已按 finishedAt 降序：首个满足条件的 Run 即"最近一个有效 Run"
   for (const run of runs) {
     for (const query of queries) {
-      if (resolved.has(query.id)) continue
+      if (baselines.has(query.id)) continue
       const bucket = byRunQuery.get(`${run.id}::${query.id}`)
       if (!bucket || bucket.length === 0) continue
       const level = queryLevelAggregate(run.id, [...groupEventsByKey(bucket).values()].map(groupAggregate))
       // 该查询在本次 run 至少一组 validSamples>0 才算有效基线；否则继续往更早的 run 找
       if (!level) continue
-      resolved.add(query.id)
-
-      // 阈值判定针对**这一个**最近有效 Run，不因不命中而改用更早的 Run
-      if (level.brandMentionRate >= WEAK_BRAND_MENTION_RATE) continue
-      const top = pickTopCompetitor(level.competitorMentionRates)
-      if (!top) continue
-
-      weakPoints.push({
+      baselines.set(query.id, {
         queryId: query.id,
         queryText: query.queryText,
         mappedPageUrl: query.mappedPageUrl ?? null,
         runId: run.id,
         finishedAt: run.finishedAt!.toISOString(),
-        sovMean: level.sovMean,
-        brandMentionRate: level.brandMentionRate,
-        validSamples: level.validSamples,
-        topCompetitor: top.name,
-        topCompetitorMentionRate: top.rate,
+        level,
       })
     }
-    if (resolved.size === queries.length) break
+    if (baselines.size === queries.length) break
+  }
+
+  return baselines
+}
+
+/**
+ * 取薄弱点列表。数据通道与趋势读路径**独立**（不共享 select），
+ * 但口径函数全部复用 aggregate.ts——竞品分母与品牌指标同源由 groupAggregate 保证。
+ */
+export async function loadWeakPoints(prisma: PrismaClient, input: WeakPointsInput): Promise<WeakPoint[]> {
+  const baselines = await loadQueryBaselines(prisma, input)
+  const weakPoints: WeakPoint[] = []
+
+  for (const baseline of baselines.values()) {
+    if (baseline.level.brandMentionRate >= WEAK_BRAND_MENTION_RATE) continue
+    const top = pickTopCompetitor(baseline.level.competitorMentionRates)
+    if (!top) continue
+    weakPoints.push({
+      queryId: baseline.queryId,
+      queryText: baseline.queryText,
+      mappedPageUrl: baseline.mappedPageUrl,
+      runId: baseline.runId,
+      finishedAt: baseline.finishedAt,
+      sovMean: baseline.level.sovMean,
+      brandMentionRate: baseline.level.brandMentionRate,
+      validSamples: baseline.level.validSamples,
+      topCompetitor: top.name,
+      topCompetitorMentionRate: top.rate,
+    })
   }
 
   return weakPoints

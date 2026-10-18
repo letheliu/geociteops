@@ -16,6 +16,7 @@ import {
   workspaceOptimizationsAllowed,
 } from '../../platform/billing/entitlement-guard.js'
 import { loadWeakPoints } from './weak-points.js'
+import { QueryNotOptimizableError } from './closed-loop-service.js'
 
 /**
  * 监测读路径（规格 §5）。
@@ -389,18 +390,25 @@ export const citationRouter = router({
     }),
 
   /**
-   * M2 §3.3 薄弱点一键优化（规格 §5/§6）。
-   * 本任务先落门禁前置断言（规格 §4 六入口之一，任务 5 实装建议生成全流程）：
-   * 门禁必须在任何 LLM 调用与写库之前，因此它先于业务逻辑执行。
+   * M2 §3.3 薄弱点一键优化（规格 §5/§6）——建议生成的**唯一入口**。
+   * 门禁在此前置断言：它必须早于 closedLoop 内部的 LLM 调用与写库。
    */
   optimizeFromWeakPoint: protectedProcedure
     .input(z.object({ queryId: z.string().min(1) }))
-    .mutation(async ({ ctx }) => {
+    .mutation(async ({ ctx, input }) => {
       await assertWorkspaceOptimizationsAllowed(ctx)
-      throw new TRPCError({
-        code: 'NOT_IMPLEMENTED',
-        message: '薄弱点一键优化将在闭环建议生成任务实装',
-      })
+      try {
+        return await ctx.services.closedLoop.optimizeFromWeakPoint({
+          workspaceId: ctx.workspace.id,
+          queryId: input.queryId,
+          brand: ctx.workspace.defaultBrandName ?? '',
+        })
+      } catch (err) {
+        if (err instanceof QueryNotOptimizableError) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: err.message })
+        }
+        throw err
+      }
     }),
 
   // query 库管理

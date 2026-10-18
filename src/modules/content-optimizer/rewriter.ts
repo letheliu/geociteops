@@ -47,12 +47,48 @@ function parseRewritten(raw: string): Partial<Atom> | null {
 export interface RewriterService {
   rewrite(atom: Atom, score: AtomScore): Promise<Atom>
   rewriteBatch(atoms: ScoredAtom[], threshold?: number): Promise<ScoredAtom[]>
+  /**
+   * M2 §3.3 整页改写（规格 §6.1 钉死签名）：以目标查询为上下文重写整页，
+   * 返回**纯文本建议稿**（不是 JSON 原子）——发布事务直接把它写回 currentContent。
+   * 现有 rewrite/rewriteBatch 保持原状，二者并存互不影响。
+   */
+  rewriteForQuery(pageContent: string, queryText: string, brand: string): Promise<string>
+}
+
+/** 整页改写的系统提示：显式要求纯文本，禁止 JSON/解释性前后缀 */
+const PAGE_SYSTEM_PROMPT = `你是一个 GEO 优化专家。用户给出一个内容页面和目标查询，请重写整页正文，使其在 AI 搜索引擎回答「目标查询」时更容易被引用。
+
+要求：
+1. 在开头 30% 的篇幅内正面回答目标查询，必要时给出定义句（"X 是 Y" 格式）
+2. 补充具体数字、时间、统计数据与机构名等实体锚点
+3. 每段可独立理解（包含明确主语），保持原有事实与语气，不得杜撰数据
+4. 保持整页结构与篇幅量级，不要删减主要内容
+
+只输出改写后的完整正文纯文本，不要输出 JSON、Markdown 代码块或任何解释。`
+
+function buildPageUserPrompt(pageContent: string, queryText: string, brand: string): string {
+  return `品牌：${brand}
+目标查询：${queryText}
+
+待改写页面正文：
+${pageContent}`
 }
 
 export function createRewriter(llm: LlmProvider): RewriterService {
   const scoring = createScoringEngine()
 
   return {
+    async rewriteForQuery(pageContent, queryText, brand) {
+      const res = await llm.chat(
+        [
+          { role: 'system', content: PAGE_SYSTEM_PROMPT },
+          { role: 'user', content: buildPageUserPrompt(pageContent, queryText, brand) },
+        ],
+        { temperature: 0.3 },
+      )
+      return res.text
+    },
+
     async rewrite(atom, score) {
       const res = await llm.chat(
         [

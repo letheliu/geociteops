@@ -121,3 +121,48 @@ describe('LlmRewriter', () => {
     expect(result.text).toBe('原始')
   })
 })
+
+// ---------------------------------------------------------------------------
+// M2 §3.3 rewriteForQuery：整页改写（带查询上下文），返回纯文本建议稿。
+// 与 rewrite/rewriteBatch（JSON 原子输出）并存，互不影响。
+// ---------------------------------------------------------------------------
+
+describe('rewriteForQuery（M2 §3.3 整页改写）', () => {
+  it('prompt 带 queryText 与 brand，并要求输出纯文本正文', async () => {
+    const llm = mockLlm('这是改写后的整页正文')
+    const rewriter = createRewriter(llm)
+
+    const out = await rewriter.rewriteForQuery('原始整页内容', 'AI 设计工具哪个好', 'zoomer AI')
+    expect(out).toBe('这是改写后的整页正文')
+
+    const messages = (llm.chat as any).mock.calls[0][0]
+    const prompt = messages.map((m: any) => m.content).join('\n')
+    expect(prompt).toContain('AI 设计工具哪个好')
+    expect(prompt).toContain('zoomer AI')
+    expect(prompt).toContain('原始整页内容')
+  })
+
+  it('返回纯文本原样（不解析 JSON、不裁剪）', async () => {
+    const llm = mockLlm('  多段\n\n正文  ')
+    const rewriter = createRewriter(llm)
+    const out = await rewriter.rewriteForQuery('原文', '查询', 'brand')
+    expect(out).toBe('  多段\n\n正文  ')
+  })
+
+  it('LLM 抛错时向上抛（调用方捕获并把任务置 FAILED，不留半态）', async () => {
+    const llm: any = {
+      name: 'mock',
+      chat: vi.fn().mockRejectedValue(new Error('LLM 503')),
+      embed: vi.fn(),
+    }
+    const rewriter = createRewriter(llm as LlmProvider)
+    await expect(rewriter.rewriteForQuery('原文', '查询', 'brand')).rejects.toThrow('LLM 503')
+  })
+
+  it('不影响既有 rewrite/rewriteBatch 接口', async () => {
+    const llm = mockLlm(JSON.stringify({ text: 't', subject: 's', predicate: 'p', object: 'o', anchors: [] }))
+    const rewriter = createRewriter(llm)
+    expect(typeof rewriter.rewrite).toBe('function')
+    expect(typeof rewriter.rewriteBatch).toBe('function')
+  })
+})

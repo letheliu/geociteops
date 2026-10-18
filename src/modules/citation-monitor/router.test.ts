@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { citationRouter } from './router.js'
 import { QuotaExceededError, OptimizationsNotAllowedError, OPTIMIZATIONS_DENIED_MESSAGE } from '../../platform/billing/entitlement-guard.js'
+import { QueryNotOptimizableError } from './closed-loop-service.js'
 
 function createCaller(ctx: any) {
   return citationRouter.createCaller(ctx)
@@ -650,29 +651,44 @@ describe('citation router 优化门禁（M2 §3.3）', () => {
         if (deny) throw new OptimizationsNotAllowedError('org-trial')
       }),
     }
+    const closedLoop = { optimizeFromWeakPoint: vi.fn(async () => ({ task: { id: 'task-1' }, suggestion: 'S' })) }
     const ctx: any = {
       workspace: { id: 'w1', organizationId: 'org-trial', status: 'ACTIVE' },
       actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
       requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
-      services: { prisma: makeDb(), queryLibrary: {}, monitor: {}, billing: { guard, meter: {} } },
+      services: { prisma: makeDb(), queryLibrary: {}, monitor: {}, closedLoop, billing: { guard, meter: {} } },
     }
-    return { ctx, guard }
+    return { ctx, guard, closedLoop }
   }
 
-  it('被拒：门禁抛错且不进入业务逻辑', async () => {
-    const { ctx, guard } = makeGateCtx(true)
+  it('被拒：门禁抛错且 LLM/写库零发生', async () => {
+    const { ctx, guard, closedLoop } = makeGateCtx(true)
     await expect(createCaller(ctx).optimizeFromWeakPoint({ queryId: 'q1' })).rejects.toThrow(
       OPTIMIZATIONS_DENIED_MESSAGE,
     )
     expect(guard.assertOptimizationsAllowed).toHaveBeenCalledWith('org-trial')
+    expect(closedLoop.optimizeFromWeakPoint).not.toHaveBeenCalled()
   })
 
-  it('放行：门禁放行后才进入业务逻辑（此时为占位实现）', async () => {
-    const { ctx, guard } = makeGateCtx(false)
-    await expect(createCaller(ctx).optimizeFromWeakPoint({ queryId: 'q1' })).rejects.toMatchObject({
-      code: 'NOT_IMPLEMENTED',
+  it('放行：门禁放行后才调用闭环服务（建议生成）', async () => {
+    const { ctx, closedLoop } = makeGateCtx(false)
+    await createCaller(ctx).optimizeFromWeakPoint({ queryId: 'q1' })
+    expect(closedLoop.optimizeFromWeakPoint).toHaveBeenCalledWith({
+      workspaceId: 'w1',
+      queryId: 'q1',
+      brand: '',
     })
-    expect(guard.assertOptimizationsAllowed).toHaveBeenCalledWith('org-trial')
+  })
+
+  it('业务错误（映射失效/重复任务等）→ BAD_REQUEST 且原文案透出', async () => {
+    const { ctx, closedLoop } = makeGateCtx(false)
+    closedLoop.optimizeFromWeakPoint.mockRejectedValueOnce(
+      new QueryNotOptimizableError('映射页面不存在，请重新关联'),
+    )
+    await expect(createCaller(ctx).optimizeFromWeakPoint({ queryId: 'q1' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: '映射页面不存在，请重新关联',
+    })
   })
 })
 
