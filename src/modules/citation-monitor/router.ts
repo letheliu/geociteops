@@ -9,7 +9,14 @@ import {
   type RunListRow,
 } from './trend-query.js'
 import { MAX_SAMPLE_COUNT, MIN_SAMPLE_COUNT } from './monitor.js'
-import { QuotaExceededError, resolveWorkspaceOrganization } from '../../platform/billing/entitlement-guard.js'
+import {
+  QuotaExceededError,
+  assertWorkspaceOptimizationsAllowed,
+  resolveWorkspaceOrganization,
+  workspaceOptimizationsAllowed,
+} from '../../platform/billing/entitlement-guard.js'
+import { loadWeakPoints } from './weak-points.js'
+import { QueryNotOptimizableError } from './closed-loop-service.js'
 
 /**
  * 监测读路径（规格 §5）。
@@ -366,6 +373,126 @@ export const citationRouter = router({
       return run
     }),
 
+  /**
+   * 薄弱点列表（M2 §3.3 规格 §5/§8）：Reports 页"薄弱查询"卡的数据源。
+   * 响应携带 optimizationsAllowed——与 assertOptimizationsAllowed 同源算出，
+   * 前端一键优化的禁用态因此不会与后端硬拒绝漂移。
+   */
+  weakPoints: protectedProcedure
+    .input(z.object({ dateRange: dateRangeInput }))
+    .query(async ({ ctx, input }) => {
+      const { fromDay, toDay } = resolveRange(input.dateRange)
+      const [weakPoints, optimizationsAllowed] = await Promise.all([
+        loadWeakPoints(ctx.services.prisma, { workspaceId: ctx.workspace.id, fromDay, toDay }),
+        workspaceOptimizationsAllowed(ctx),
+      ])
+      return { weakPoints, optimizationsAllowed }
+    }),
+
+  /**
+   * 闭环看板（M2 §3.3 规格 §8）：AWAITING_VERIFICATION + VERIFIED 两态全量，
+   * 以 ctx.workspace.id 限定。Δ 为「发布后首个有效 run 的观测值」之差，
+   * **非因果效应**——UI 必须同口径提示（validSamples tooltip）。
+   */
+  loopBoard: protectedProcedure
+    .input(z.object({}).optional())
+    .query(async ({ ctx }) => {
+      const tasks = await ctx.services.prisma.optimizationTask.findMany({
+        where: { workspaceId: ctx.workspace.id, status: { in: ['AWAITING_VERIFICATION', 'VERIFIED'] } },
+        orderBy: { publishedAt: 'desc' },
+        select: {
+          id: true,
+          type: true,
+          queryId: true,
+          pageId: true,
+          status: true,
+          publishedAt: true,
+          verifiedAt: true,
+          baselineRunId: true,
+          verifiedRunId: true,
+          baselineSovMean: true,
+          verifiedSovMean: true,
+          baselineMentionRate: true,
+          verifiedMentionRate: true,
+          baselineValidSamples: true,
+          verifiedValidSamples: true,
+        },
+      })
+
+      // 查询文本与状态：queryId 可能为 null（查询已删）——呈现"查询已删除"
+      const queryIds = [
+        ...new Set(tasks.map((t: { queryId: string | null }) => t.queryId).filter((q: string | null): q is string => !!q)),
+      ]
+      const queries = queryIds.length > 0
+        ? await ctx.services.prisma.citationQuery.findMany({
+            where: { id: { in: queryIds }, workspaceId: ctx.workspace.id },
+            select: { id: true, queryText: true, status: true, scheduled: true },
+          })
+        : []
+      const queryById = new Map<string, { queryText: string; status: string; scheduled: boolean }>(
+        (queries as Array<{ id: string; queryText: string; status: string; scheduled: boolean }>).map((q) => [q.id, q]),
+      )
+
+      const delta = (a: number | null, b: number | null): number | null =>
+        a === null || b === null ? null : b - a
+
+      const rows = tasks.map((t: any) => {
+        const query = t.queryId ? queryById.get(t.queryId) : null
+        // 状态文案三分（规格 §7）：PAUSED > scheduled=false > 正常
+        let queryStateNote: string | null = null
+        if (!t.queryId) queryStateNote = '查询已删除'
+        else if (!query) queryStateNote = '查询已删除'
+        else if (query.status === 'PAUSED') queryStateNote = '查询已暂停，恢复监测后完成验证'
+        else if (query.scheduled === false) queryStateNote = '查询已退出定时监测'
+
+        return {
+          taskId: t.id,
+          type: t.type,
+          status: t.status,
+          queryId: t.queryId ?? null,
+          queryText: query ? query.queryText : null,
+          queryStateNote,
+          pageId: t.pageId ?? null,
+          publishedAt: t.publishedAt,
+          verifiedAt: t.verifiedAt,
+          baselineRunId: t.baselineRunId,
+          verifiedRunId: t.verifiedRunId,
+          baselineSovMean: t.baselineSovMean,
+          verifiedSovMean: t.verifiedSovMean,
+          baselineMentionRate: t.baselineMentionRate,
+          verifiedMentionRate: t.verifiedMentionRate,
+          baselineValidSamples: t.baselineValidSamples,
+          verifiedValidSamples: t.verifiedValidSamples,
+          deltaSovMean: delta(t.baselineSovMean, t.verifiedSovMean),
+          deltaMentionRate: delta(t.baselineMentionRate, t.verifiedMentionRate),
+        }
+      })
+
+      return { rows, optimizationsAllowed: await workspaceOptimizationsAllowed(ctx) }
+    }),
+
+  /**
+   * M2 §3.3 薄弱点一键优化（规格 §5/§6）——建议生成的**唯一入口**。
+   * 门禁在此前置断言：它必须早于 closedLoop 内部的 LLM 调用与写库。
+   */
+  optimizeFromWeakPoint: protectedProcedure
+    .input(z.object({ queryId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertWorkspaceOptimizationsAllowed(ctx)
+      try {
+        return await ctx.services.closedLoop.optimizeFromWeakPoint({
+          workspaceId: ctx.workspace.id,
+          queryId: input.queryId,
+          brand: ctx.workspace.defaultBrandName ?? '',
+        })
+      } catch (err) {
+        if (err instanceof QueryNotOptimizableError) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: err.message })
+        }
+        throw err
+      }
+    }),
+
   // query 库管理
   queries: router({
     list: protectedProcedure
@@ -374,20 +501,64 @@ export const citationRouter = router({
         return ctx.services.queryLibrary.listActive(ctx.workspace.id)
       }),
 
+    /**
+     * 新增查询。pageId 可选——关联页面一律 **pageId 下拉制**，服务端写 mappedPageUrl=page.url，
+     * 不收自由 URL（规格 §5）：否则查询可被指向任意站点，改写建议稿会写到不属于自己的页面上。
+     */
     add: protectedProcedure
       .input(
         z.object({
           queryText: z.string(),
           source: z.enum(['manual', 'google_suggest', 'llm_generated', 'paa', 'competitor']),
           intent: z.record(z.unknown()).optional(),
+          pageId: z.string().optional(),
         }),
       )
       .mutation(async ({ ctx, input }) => {
+        let mappedPageUrl: string | undefined
+        if (input.pageId) {
+          const page = await ctx.services.prisma.contentPage.findFirst({
+            where: { id: input.pageId, workspaceId: ctx.workspace.id },
+            select: { url: true },
+          })
+          if (!page) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: '关联页面不存在或不属于当前工作区' })
+          }
+          mappedPageUrl = page.url
+        }
         return ctx.services.queryLibrary.addQuery({
           workspaceId: ctx.workspace.id,
           queryText: input.queryText,
           source: input.source.toUpperCase() as any,
           intent: input.intent,
+          mappedPageUrl,
+        })
+      }),
+
+    /**
+     * 关联/改关联页面（QueryLibrary 行操作）。双归属校验：query 与 page 都必须落在
+     * ctx.workspace.id 内——只校验一侧会让"改他人查询的映射"或"指向他人页面"成为可能。
+     */
+    setPageMapping: protectedProcedure
+      .input(z.object({ queryId: z.string().min(1), pageId: z.string().min(1) }))
+      .mutation(async ({ ctx, input }) => {
+        const query = await ctx.services.prisma.citationQuery.findFirst({
+          where: { id: input.queryId, workspaceId: ctx.workspace.id },
+          select: { id: true },
+        })
+        if (!query) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: '查询不存在' })
+        }
+        const page = await ctx.services.prisma.contentPage.findFirst({
+          where: { id: input.pageId, workspaceId: ctx.workspace.id },
+          select: { url: true },
+        })
+        if (!page) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: '关联页面不存在或不属于当前工作区' })
+        }
+        return ctx.services.prisma.citationQuery.update({
+          where: { id: input.queryId },
+          data: { mappedPageUrl: page.url },
         })
       }),
 

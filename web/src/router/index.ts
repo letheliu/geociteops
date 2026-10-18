@@ -202,6 +202,12 @@ export const router = createRouter({
               name: 'citation-effect',
               component: () => import('../views/citation/EffectComparison.vue'),
             },
+            // M2 §3.3 闭环看板：薄弱点 → 建议 → 发布 → 回填 → Δ
+            {
+              path: 'loop',
+              name: 'citation-loop',
+              component: () => import('../views/citation/LoopBoard.vue'),
+            },
             {
               path: 'content/pages',
               name: 'content-pages',
@@ -371,6 +377,7 @@ const TITLE_MAP: Record<string, string> = {
   'citation-reports': '引用报告',
   'citation-sov': 'SOV 分析',
   'citation-effect': '效果对比',
+  'citation-loop': '闭环看板',
   'content-pages': '内容页面',
   'content-page-detail': '内容详情',
   'content-tasks': '优化任务',

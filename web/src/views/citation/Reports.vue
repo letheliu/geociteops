@@ -37,6 +37,128 @@ const detail = ref<any>(null)
 const detailSamples = ref<any[]>([])
 const expanded = ref<string[]>([])
 
+// ===== M2 §3.3 薄弱查询卡（weakPoints）=====
+const weakLoading = ref(false)
+const weakPoints = ref<any[]>([])
+const optimizationsAllowed = ref(true)
+const optimizingId = ref<string | null>(null)
+
+async function loadWeakPoints() {
+  weakLoading.value = true
+  try {
+    const result = await trpc.citation.weakPoints.query({
+      dateRange: {
+        start: new Date(dateRange.value[0]).toISOString(),
+        end: new Date(dateRange.value[1]).toISOString(),
+      },
+    })
+    weakPoints.value = result.weakPoints as any[]
+    optimizationsAllowed.value = result.optimizationsAllowed
+  } catch (e: any) {
+    message.error(e?.message || '加载薄弱查询失败')
+  } finally {
+    weakLoading.value = false
+  }
+}
+
+/** 未映射 / 映射失效（服务端拒"映射页面不存在，请重新关联"）→ 引导去查询库关联 */
+async function handleOptimize(row: any) {
+  optimizingId.value = row.queryId
+  try {
+    await trpc.citation.optimizeFromWeakPoint.mutate({ queryId: row.queryId })
+    message.success('已生成改写建议，去「优化任务」审核并发布')
+  } catch (e: any) {
+    const msg = e?.message || '生成失败'
+    if (msg.includes('映射页面') || msg.includes('尚未关联')) {
+      message.warning(`${msg}：请到「查询库」为该查询关联内容页`)
+    } else {
+      message.error(msg)
+    }
+    await loadWeakPoints()
+  } finally {
+    optimizingId.value = null
+  }
+}
+
+const weakColumns: DataTableColumns<any> = [
+  {
+    title: '薄弱查询',
+    key: 'queryText',
+    ellipsis: { tooltip: true },
+    render(row) {
+      return h(NSpace, { size: 4 }, {
+        default: () => [
+          h('span', {}, { default: () => row.queryText }),
+          row.mappedPageUrl
+            ? null
+            : h(NTag, { size: 'tiny', type: 'warning' }, { default: () => '未映射页面' }),
+        ],
+      })
+    },
+  },
+  {
+    title: '品牌提及率',
+    key: 'brandMentionRate',
+    width: 110,
+    render(row) {
+      return h('span', { style: { color: '#d03050' } }, {
+        default: () => `${(row.brandMentionRate * 100).toFixed(0)}%`,
+      })
+    },
+  },
+  {
+    title: '主要竞品',
+    key: 'topCompetitor',
+    width: 150,
+    render(row) {
+      return h('span', {}, {
+        default: () => `${row.topCompetitor}（${(row.topCompetitorMentionRate * 100).toFixed(0)}%）`,
+      })
+    },
+  },
+  {
+    title: '样本',
+    key: 'validSamples',
+    width: 80,
+    render(row) {
+      return h(
+        NTooltip,
+        {},
+        {
+          trigger: () => h('span', {}, { default: () => row.validSamples }),
+          default: () => '有效样本数（OK 且有 SOV 分数）。样本越少指标越不稳定。',
+        },
+      )
+    },
+  },
+  {
+    title: '',
+    key: 'action',
+    width: 150,
+    render(row) {
+      return h(
+        NTooltip,
+        { disabled: optimizationsAllowed.value },
+        {
+          trigger: () =>
+            h(
+              NButton,
+              {
+                size: 'small',
+                type: 'primary',
+                disabled: !optimizationsAllowed.value,
+                loading: optimizingId.value === row.queryId,
+                onClick: () => handleOptimize(row),
+              },
+              { default: () => '一键优化' },
+            ),
+          default: () => '当前套餐不含内容优化，请联系开通',
+        },
+      )
+    },
+  },
+]
+
 const platformCheckbox = [
   { label: 'DeepSeek', value: 'deepseek' },
   { label: '豆包', value: 'doubao' },
@@ -61,7 +183,11 @@ async function loadData() {
   }
 }
 
-onMounted(loadData)
+onMounted(() => {
+  loadData()
+  // M2 §3.3：薄弱查询卡与运行列表共用同一时间范围
+  loadWeakPoints()
+})
 
 async function handleTrack() {
   if (trackPlatforms.value.length === 0) {
@@ -217,6 +343,21 @@ const columns: DataTableColumns<any> = [
       </NSpace>
       <NButton type="primary" @click="showTrackModal = true">📡 触发监测</NButton>
     </NSpace>
+
+    <NCard title="薄弱查询" style="margin-bottom: 16px">
+      <template #header-extra>
+        <NSpace>
+          <NButton size="small" @click="loadWeakPoints">刷新</NButton>
+        </NSpace>
+      </template>
+      <NDataTable
+        :columns="weakColumns"
+        :data="weakPoints"
+        :loading="weakLoading"
+        :bordered="false"
+        :row-key="(row: any) => row.queryId"
+      />
+    </NCard>
 
     <NCard>
       <NDataTable

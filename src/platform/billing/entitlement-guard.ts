@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server'
 import type { Prisma, PrismaClient } from '@prisma/client'
 import { Prisma as PrismaNamespace } from '@prisma/client'
 import type { AuditService } from '../audit/service.js'
@@ -36,6 +37,30 @@ export type SoftCheckKey =
   | 'diagnosticRunsPerMonth'
   | 'maxPages'
   | 'optimizationsPerMonth'
+
+/** 优化门禁拒绝文案（M2 §3.3 规格 §4：调用方不得另立说法） */
+export const OPTIMIZATIONS_DENIED_MESSAGE = '当前套餐不含内容优化，请联系开通'
+
+/**
+ * 优化门禁纯函数判定（规格 §4，单一来源）：
+ * 仅当**内部标记 `_optimizationsDisabled === true` 且合并后配额 `optimizationsPerMonth === 0`**
+ * 才拒绝。`merged.optimizationsPerMonth > 0` 恒放行——转化客户同时持有旧 TRIAL 与
+ * 付费订阅时，内部键"首个声明者胜出"的顺序不确定性由此兜底消解。
+ * 未声明 marker 的正式租户（即使 OE 全 0）也放行：回归既有计量语义。
+ */
+export function isOptimizationsAllowed(limits: MergedEntitlements): boolean {
+  return !(limits._optimizationsDisabled === true && limits.optimizationsPerMonth === 0)
+}
+
+/** 优化门禁拒绝（抛错语义，独立于配额超限以便前端/审计区分） */
+export class OptimizationsNotAllowedError extends Error {
+  readonly organizationId: string
+  constructor(organizationId: string) {
+    super(`${OPTIMIZATIONS_DENIED_MESSAGE}（企业 ${organizationId}）`)
+    this.name = 'OPTIMIZATIONS_NOT_ALLOWED'
+    this.organizationId = organizationId
+  }
+}
 
 /** 容量硬限超额（硬语义：抛错拒绝动作） */
 export class QuotaExceededError extends Error {
@@ -141,6 +166,18 @@ export interface EntitlementGuard {
    * 键缺失 = 不限（正式租户未声明该键时全量放行）。enforcement off → 放行。
    */
   checkMonitorSampleCountMax(organizationId: string, requested: number): Promise<void>
+  /**
+   * 优化门禁 org 级判定（M2 §3.3 规格 §4）：与 assertOptimizationsAllowed 共用同一实现
+   * （纯函数 isOptimizationsAllowed + enforcement 判定），供 weakPoints/loopBoard 响应携带
+   * `optimizationsAllowed` 布尔——前端禁用态与后端硬拒绝同源，杜绝前后端判定漂移。
+   * enforcement off → 放行（此时门禁 no-op，依赖 §3.0 双开关部署约束）。
+   */
+  isOptimizationsAllowed(organizationId: string): Promise<boolean>
+  /**
+   * 优化门禁硬检查（M2 §3.3 规格 §4）：拒绝时抛 OptimizationsNotAllowedError 并记一条
+   * `optimizations.denied` 审计（便于排查绕过尝试）。enforcement off → 放行。
+   */
+  assertOptimizationsAllowed(organizationId: string): Promise<void>
 }
 
 export interface EntitlementGuardDeps {
@@ -345,6 +382,25 @@ export function createEntitlementGuard(deps: EntitlementGuardDeps): EntitlementG
         })
       }
     },
+
+    // M2 §3.3 优化门禁：判定（isOptimizationsAllowed）与硬检查（assertOptimizationsAllowed）
+    // 共用同一纯函数实现，二者不会漂移。
+    async isOptimizationsAllowed(organizationId) {
+      if (!enforcement()) return true
+      return isOptimizationsAllowed(await readLimits(organizationId))
+    },
+
+    async assertOptimizationsAllowed(organizationId) {
+      if (!enforcement()) return
+      if (isOptimizationsAllowed(await readLimits(organizationId))) return
+      await audit.record({
+        actorType: 'SYSTEM',
+        action: 'optimizations.denied',
+        organizationId,
+        diff: { organizationId },
+      })
+      throw new OptimizationsNotAllowedError(organizationId)
+    },
   }
 }
 
@@ -371,4 +427,40 @@ export async function resolveWorkspaceOrganization(
     select: { organizationId: true },
   })
   return workspace?.organizationId ?? null
+}
+
+/** 门禁入口所需的最小 ctx 形状（tRPC Context 的结构化子集，便于测试注入） */
+export interface OptimizationsGateContext {
+  workspace?: { organizationId?: string | null } | null
+  services?: { billing?: BillingCheckpoints } | null
+}
+
+/**
+ * 优化门禁的入口前置断言（规格 §4 六入口统一调用点）：
+ * - ctx.services.billing 缺失（无计费装配/测试上下文）→ no-op 放行，与
+ *   enforcement off 同一语义——门禁只在计费机器在场时才有意义；
+ * - ctx.workspace.organizationId 缺失 → no-op 放行（workspace 归属由 middleware 保证）。
+ * 必须在任何 LLM 调用与写库之前调用。
+ */
+export async function assertWorkspaceOptimizationsAllowed(ctx: OptimizationsGateContext): Promise<void> {
+  const guard = ctx.services?.billing?.guard
+  const organizationId = ctx.workspace?.organizationId
+  if (!guard || !organizationId) return
+  try {
+    await guard.assertOptimizationsAllowed(organizationId)
+  } catch (err) {
+    if (err instanceof OptimizationsNotAllowedError) {
+      // 入口层统一映射为 FORBIDDEN + 规格钉死的文案（不泄漏企业 id 等内部信息）
+      throw new TRPCError({ code: 'FORBIDDEN', message: OPTIMIZATIONS_DENIED_MESSAGE })
+    }
+    throw err
+  }
+}
+
+/** 优化门禁的 org 级布尔（weakPoints/loopBoard 响应携带，与 assert 同源） */
+export async function workspaceOptimizationsAllowed(ctx: OptimizationsGateContext): Promise<boolean> {
+  const guard = ctx.services?.billing?.guard
+  const organizationId = ctx.workspace?.organizationId
+  if (!guard || !organizationId) return true
+  return guard.isOptimizationsAllowed(organizationId)
 }

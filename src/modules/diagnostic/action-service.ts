@@ -1,5 +1,9 @@
 import type { PrismaClient } from '@prisma/client'
 import { DiagnosticError } from './errors.js'
+import {
+  resolveWorkspaceOrganization,
+  type BillingCheckpoints,
+} from '../../platform/billing/entitlement-guard.js'
 
 export interface ActionService {
   list(workspaceId: string, runId: string, horizon?: string, status?: string): Promise<any[]>
@@ -19,12 +23,17 @@ export interface ActionServiceDeps {
       result?: Record<string, unknown>
     }): Promise<{ id: string }>
   }
+  /**
+   * 计费检查点（可选注入）：M2 §3.3 优化门禁。缺失 → no-op 放行，
+   * 与 enforcement off 同一语义（无计费机器在场时门禁无判定依据）。
+   */
+  billing?: BillingCheckpoints
 }
 
 const CONVERTIBLE_TYPES = new Set(['OPTIMIZE_EXISTING_PAGE', 'REWRITE_CONTENT', 'ADD_STRUCTURED_DATA', 'UPDATE_KG'])
 
 export function createActionService(deps: ActionServiceDeps): ActionService {
-  const { prisma, taskService } = deps
+  const { prisma, taskService, billing } = deps
 
   return {
     async list(workspaceId, runId, horizon, status) {
@@ -85,6 +94,13 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
       }
 
       const taskType = actionTypeToTaskType(action.actionType)
+
+      // M2 §3.3 优化门禁：写库（建任务 + 改 action 状态）之前断言。
+      // 置于幂等短路之后——已 CONVERTED 的 action 不再创建任何东西，不该被门禁拦。
+      if (billing) {
+        const organizationId = await resolveWorkspaceOrganization(prisma, workspaceId)
+        if (organizationId) await billing.guard.assertOptimizationsAllowed(organizationId)
+      }
 
       const result = await prisma.$transaction(async (tx: any) => {
         const task = await taskService.create({

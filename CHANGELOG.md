@@ -11,6 +11,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Closed-loop automation (M2 §3.3)** — "monitoring finds a weak point → one-click rewrite suggestion
+  → human review + publish (suggestion written back to the page) → next run back-fills → Δ on a loop
+  board". The loop anchor lives on `OptimizationTask` (10 columns + `AWAITING_VERIFICATION`/`VERIFIED`
+  states): `baselineRunId`/`verifiedRunId` (named relations, `ON DELETE SET NULL`), `publishedAt`,
+  the baseline/verification triples (`*SovMean` / `*MentionRate` / `*ValidSamples`) and `verifiedAt`.
+  **Existing PUBLISHED tasks are not migrated** — the loop only covers tasks created from now on.
+- **Optimization gate** — `isOptimizationsAllowed` (pure) + the org-level overload + `assertOptimizationsAllowed`
+  refuse content optimizations only when the internal key `_optimizationsDisabled === true` **and**
+  the merged `optimizationsPerMonth === 0`; a positive quota always wins (converted customers holding
+  both an old TRIAL and a paid subscription). Enforced at six entry points before any LLM call or
+  write (`content.optimize` / `atomize` / `generateFaq`, `diagnostic.actions.convert`,
+  `kg.extractFromPage`, `citation.optimizeFromWeakPoint`) plus a fallback inside `taskService.create`;
+  refusals write one `optimizations.denied` audit record. `_optimizationsDisabled` is injected by the
+  **registration flow**, never by the product catalog, so editing catalog entitlements can't silently
+  re-open the gate for new trials.
+- **Query → page mapping** — `citation.queries.add` accepts `pageId?` (server writes
+  `mappedPageUrl = page.url`) and new `citation.queries.setPageMapping`; both validate workspace
+  ownership. Free-form URLs are not accepted: a suggestion could otherwise be written back to a page
+  the workspace doesn't own. Stale mappings are rejected with "映射页面不存在，请重新关联".
+- **Weak-point detection** — `citation.weakPoints(dateRange)` finds each ACTIVE query's most recent
+  valid run (contains the query, COMPLETED/PARTIAL, at least one group with `validSamples>0`, ordered by
+  `finishedAt`) and flags it when `brandMentionRate < 0.2` while some competitor exceeds `0.4`.
+  Competitor mention rates share the brand denominator (`groupAggregate` → `competitorMentionRates`),
+  and the response carries `optimizationsAllowed` computed by the same function as the hard assertion,
+  so the UI's disabled state can't drift from the server's decision.
+- **Suggestion generation (single entry)** — `rewriter.rewriteForQuery(pageContent, queryText, brand)`
+  produces a whole-page draft; `citation.optimizeFromWeakPoint` is the only endpoint that generates it
+  (other optimization entry points have no single-query page anchor). Generation failure is captured and
+  marks the task `FAILED` with a reason instead of leaving a half-formed `PENDING` task.
+- **Publish is one interactive transaction** — `REVIEWED → AWAITING_VERIFICATION` (no `PUBLISHED`
+  intermediate state for loop tasks) + `publishedAt` + baseline triple + page write-back
+  (`currentContent`/`publishedContent` ← suggestion, `lastPublishedAt`, `status=PUBLISHED`,
+  `optimizedContent` cleared) + `result.originalContent`, all or nothing.
+- **Verification backfill** — after each run finishes (scheduled and manual), tasks published **before**
+  the run started move to `VERIFIED` with `verifiedRunId` + the verification triple. A run that started
+  before the publish doesn't count, a query with no valid sample keeps waiting, the earliest
+  `publishedAt` wins per query, and failures never interrupt run completion. The triple comes from the
+  same aggregation helper as the trend chart, so Δ and the trend can't diverge.
+- **Web** — `/console/w/:workspaceId/loop` loop board (query → baseline → action → verification → Δ →
+  trend deep-link, with an explicit "Δ is not causal" note), a "薄弱查询" card on the reports page with
+  one-click optimize (disabled with an upgrade hint when the gate is closed, and a "go map / re-map"
+  hint when the mapping is missing or stale), query-library "关联页面", and `?queryId=` support on the
+  SOV page.
 - **Self-serve trial channel (M2 §3.0)** — `auth.register` (public, CSRF-guarded) opens a 7-day trial
   tenant in one transaction (User / Organization / Workspace / Order + OrderItem / Subscription) and
   signs the visitor straight in. `Organization.source='TRIAL'` and a `$0` order with `paidAt=null` are
@@ -35,6 +78,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security / cost
 
+- Content optimization is refused for TRIAL tenants at six entry points (see "Optimization gate"),
+  before any LLM call or database write, so a trial cannot burn platform LLM budget through
+  optimization actions. Note the boundary: this closes the **six optimization actions**, not every
+  platform-funded LLM feature.
 - LLM query generation is refused for `TRIAL` organizations ("试用版请手动添加查询"), keeping platform
   LLM spend at zero for trials. Manual query entry stays open (soft `maxQueries` limit: audited and
   metered, never blocked).

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '../../core/trpc/init.js'
+import { assertWorkspaceOptimizationsAllowed } from '../../platform/billing/entitlement-guard.js'
 
 export const kgRouter = router({
   addEntity: protectedProcedure
@@ -73,6 +74,10 @@ export const kgRouter = router({
   extractFromPage: protectedProcedure
     .input(z.object({ pageId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      // M2 §3.3 优化门禁：extractor 直连 taskService.create 不改道（其同时写
+      // extractionProposals，改道会静默破坏 KG 提案持久化），因此断言前置在 router 入口、
+      // 任何抽取与写库之前。
+      await assertWorkspaceOptimizationsAllowed(ctx)
       return ctx.services.kg.extractFromPage(input.pageId)
     }),
 

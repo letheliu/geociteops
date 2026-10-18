@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '../../core/trpc/init.js'
+import { assertWorkspaceOptimizationsAllowed } from '../../platform/billing/entitlement-guard.js'
 
 export const contentRouter = router({
   pages: router({
@@ -50,6 +51,8 @@ export const contentRouter = router({
       pageType: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // M2 §3.3 优化门禁：任何 LLM 调用与写库之前断言
+      await assertWorkspaceOptimizationsAllowed(ctx)
       return ctx.services.orchestrator.optimize({
         workspaceId: ctx.workspace.id,
         content: input.content || '',
@@ -62,6 +65,7 @@ export const contentRouter = router({
   atomize: protectedProcedure
     .input(z.object({ text: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await assertWorkspaceOptimizationsAllowed(ctx)
       const atoms = await ctx.services.atomizer.atomize(input.text)
       return { atoms }
     }),
@@ -72,6 +76,7 @@ export const contentRouter = router({
       count: z.number().min(1).max(20).default(5),
     }))
     .mutation(async ({ ctx, input }) => {
+      await assertWorkspaceOptimizationsAllowed(ctx)
       const faqs = await ctx.services.faqGenerator.generate({
         atoms: [{ text: input.topic, subject: '', predicate: '', object: '', anchors: [] }],
         workspaceId: ctx.workspace.id,

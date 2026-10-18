@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { contentRouter } from './router.js'
+import {
+  OptimizationsNotAllowedError,
+  OPTIMIZATIONS_DENIED_MESSAGE,
+} from '../../platform/billing/entitlement-guard.js'
 
 function createCaller(ctx: any) {
   return contentRouter.createCaller(ctx)
@@ -121,5 +125,67 @@ describe('content router', () => {
     expect(mockPrisma.contentPage.findMany).toHaveBeenCalledWith({
       where: { workspaceId: 'w1', status: 'DRAFT' },
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.3 优化门禁：content.optimize / atomize / generateFaq 三个入口
+// 拒绝时 mock LLM 调用次数 = 0、零写库（规格 §4 硬要求）。
+// ---------------------------------------------------------------------------
+
+describe('content router 优化门禁（M2 §3.3）', () => {
+  function deniedCtx() {
+    const services = {
+      orchestrator: { optimize: vi.fn().mockResolvedValue({}) },
+      atomizer: { atomize: vi.fn().mockResolvedValue([]) },
+      faqGenerator: { generate: vi.fn().mockResolvedValue([]) },
+      pages: { upsert: vi.fn() },
+      prisma: {
+        contentPage: { upsert: vi.fn(), findMany: vi.fn().mockResolvedValue([]), findUnique: vi.fn() },
+      },
+      billing: {
+        guard: {
+          assertOptimizationsAllowed: vi.fn(async () => {
+            throw new OptimizationsNotAllowedError('org-trial')
+          }),
+          isOptimizationsAllowed: vi.fn(async () => false),
+        },
+      },
+    }
+    return {
+      ctx: {
+        workspace: { id: 'w1', organizationId: 'org-trial', status: 'ACTIVE' },
+        actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
+        requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
+        services,
+      } as any,
+      services,
+    }
+  }
+
+  it('optimize 被拒：orchestrator 零调用、零写库', async () => {
+    const { ctx, services } = deniedCtx()
+    const caller = contentRouter.createCaller(ctx)
+    await expect(caller.optimize({ content: '原文', url: 'https://example.com' })).rejects.toThrow(
+      OPTIMIZATIONS_DENIED_MESSAGE,
+    )
+    expect(services.orchestrator.optimize).not.toHaveBeenCalled()
+    expect(services.prisma.contentPage.upsert).not.toHaveBeenCalled()
+  })
+
+  it('atomize 被拒：atomizer 零调用', async () => {
+    const { ctx, services } = deniedCtx()
+    const caller = contentRouter.createCaller(ctx)
+    await expect(caller.atomize({ text: '测试文本' })).rejects.toThrow(OPTIMIZATIONS_DENIED_MESSAGE)
+    expect(services.atomizer.atomize).not.toHaveBeenCalled()
+  })
+
+  it('generateFaq 被拒：faqGenerator 零调用', async () => {
+    const { ctx, services } = deniedCtx()
+    const caller = contentRouter.createCaller(ctx)
+    await expect(caller.generateFaq({ topic: 'AI设计', count: 3 })).rejects.toThrow(
+      OPTIMIZATIONS_DENIED_MESSAGE,
+    )
+    expect(services.faqGenerator.generate).not.toHaveBeenCalled()
   })
 })

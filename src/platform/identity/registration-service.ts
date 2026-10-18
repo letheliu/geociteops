@@ -338,11 +338,14 @@ export function createRegistrationService(deps: RegistrationServiceDeps): Regist
           startAt: registeredAt,
           endAt,
           status: 'ACTIVE',
-          // 快照 = 目录 entitlements + 内部策略键（_graceDays 宽限 90 天 / 7 天试用不写到期提醒）
+          // 快照 = 目录 entitlements + 内部策略键（_graceDays 宽限 90 天 / 7 天试用不写到期提醒 /
+          // _optimizationsDisabled 关闭内容优化门禁）。三个内部键都由**注册流程注入**而非目录声明：
+          // 目录是可编辑商品配置，管理端删掉 marker 只会让新注册失去门禁，判定源必须在这里（M2 §3.3 审查钉子）。
           entitlements: {
             ...planEntitlements,
             _graceDays: TRIAL_GRACE_DAYS,
             _suppressReminder: true,
+            _optimizationsDisabled: true,
           } as never,
         },
       })

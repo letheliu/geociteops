@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { kgRouter } from './router.js'
+import {
+  OptimizationsNotAllowedError,
+  OPTIMIZATIONS_DENIED_MESSAGE,
+} from '../../platform/billing/entitlement-guard.js'
 
 function mockCtx(services: any, workspaceId = 'w1') {
   // 任务 9：Context 双通道形状——补 actor/requestMeta/status mock 字段
@@ -70,5 +74,23 @@ describe('kgRouter', () => {
     const caller = kgRouter.createCaller(mockCtx(services))
     await caller.export({ format: 'jsonld' })
     expect(kg.exportGraph).toHaveBeenCalledWith({ workspaceId: 'w1', format: 'jsonld', entityIds: undefined })
+  })
+})
+
+// M2 §3.3 优化门禁：kg.extractFromPage 入口。extractor 保留直连 taskService.create
+// （改道会静默破坏 KG 提案持久化），因此断言必须发生在 router 入口、任何抽取之前。
+describe('kgRouter 优化门禁（M2 §3.3）', () => {
+  it('被拒：extractFromPage 零调用（抽取/LLM 与写库均未发生）', async () => {
+    const kg = { extractFromPage: vi.fn().mockResolvedValue({ id: 'task-1' }) }
+    const guard = {
+      assertOptimizationsAllowed: vi.fn(async () => {
+        throw new OptimizationsNotAllowedError('org-trial')
+      }),
+    }
+    const ctx = mockCtx({ kg, billing: { guard, meter: {} } })
+    ctx.workspace.organizationId = 'org-trial'
+    const caller = kgRouter.createCaller(ctx)
+    await expect(caller.extractFromPage({ pageId: 'page-1' })).rejects.toThrow(OPTIMIZATIONS_DENIED_MESSAGE)
+    expect(kg.extractFromPage).not.toHaveBeenCalled()
   })
 })

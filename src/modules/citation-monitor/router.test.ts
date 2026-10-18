@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { citationRouter } from './router.js'
-import { QuotaExceededError } from '../../platform/billing/entitlement-guard.js'
+import { QuotaExceededError, OptimizationsNotAllowedError, OPTIMIZATIONS_DENIED_MESSAGE } from '../../platform/billing/entitlement-guard.js'
+import { QueryNotOptimizableError } from './closed-loop-service.js'
 
 function createCaller(ctx: any) {
   return citationRouter.createCaller(ctx)
@@ -15,6 +16,7 @@ function makeDb(seed: {
   runs?: any[]
   events?: any[]
   queries?: any[]
+  pages?: any[]
 } = {}) {
   const runs = (seed.runs ?? []).map((r) => ({ ...r }))
   const events = (seed.events ?? []).map((e) => ({
@@ -28,6 +30,7 @@ function makeDb(seed: {
     ...e,
   }))
   const queries = (seed.queries ?? []).map((q) => ({ ...q }))
+  const pages = (seed.pages ?? []).map((p) => ({ ...p }))
 
   function matchEvent(e: any, where: any) {
     if (where.workspaceId && e.workspaceId !== where.workspaceId) return false
@@ -93,7 +96,14 @@ function makeDb(seed: {
         return hit ? { ...hit } : null
       }),
     },
+    contentPage: {
+      findFirst: vi.fn(async ({ where }: any) => {
+        const hit = pages.find((p) => p.id === where.id && (!where.workspaceId || p.workspaceId === where.workspaceId))
+        return hit ? { ...hit } : null
+      }),
+    },
   }
+  db.state = { runs, events, queries, pages }
   return db
 }
 
@@ -626,5 +636,321 @@ describe('citation.runs.create × monitorSampleCountMax 硬检查', () => {
       runId: 'run-new',
     })
     expect(guard.checkMonitorSampleCountMax).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.3 优化门禁：citation.optimizeFromWeakPoint 入口。门禁必须先于
+// 任何 LLM 调用与写库（本任务为占位实现，任务 5 实装全流程），断言点因此可验证。
+// ---------------------------------------------------------------------------
+
+describe('citation router 优化门禁（M2 §3.3）', () => {
+  function makeGateCtx(deny: boolean) {
+    const guard = {
+      assertOptimizationsAllowed: vi.fn(async () => {
+        if (deny) throw new OptimizationsNotAllowedError('org-trial')
+      }),
+    }
+    const closedLoop = { optimizeFromWeakPoint: vi.fn(async () => ({ task: { id: 'task-1' }, suggestion: 'S' })) }
+    const ctx: any = {
+      workspace: { id: 'w1', organizationId: 'org-trial', status: 'ACTIVE' },
+      actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
+      requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
+      services: { prisma: makeDb(), queryLibrary: {}, monitor: {}, closedLoop, billing: { guard, meter: {} } },
+    }
+    return { ctx, guard, closedLoop }
+  }
+
+  it('被拒：门禁抛错且 LLM/写库零发生', async () => {
+    const { ctx, guard, closedLoop } = makeGateCtx(true)
+    await expect(createCaller(ctx).optimizeFromWeakPoint({ queryId: 'q1' })).rejects.toThrow(
+      OPTIMIZATIONS_DENIED_MESSAGE,
+    )
+    expect(guard.assertOptimizationsAllowed).toHaveBeenCalledWith('org-trial')
+    expect(closedLoop.optimizeFromWeakPoint).not.toHaveBeenCalled()
+  })
+
+  it('放行：门禁放行后才调用闭环服务（建议生成）', async () => {
+    const { ctx, closedLoop } = makeGateCtx(false)
+    await createCaller(ctx).optimizeFromWeakPoint({ queryId: 'q1' })
+    expect(closedLoop.optimizeFromWeakPoint).toHaveBeenCalledWith({
+      workspaceId: 'w1',
+      queryId: 'q1',
+      brand: '',
+    })
+  })
+
+  it('业务错误（映射失效/重复任务等）→ BAD_REQUEST 且原文案透出', async () => {
+    const { ctx, closedLoop } = makeGateCtx(false)
+    closedLoop.optimizeFromWeakPoint.mockRejectedValueOnce(
+      new QueryNotOptimizableError('映射页面不存在，请重新关联'),
+    )
+    await expect(createCaller(ctx).optimizeFromWeakPoint({ queryId: 'q1' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: '映射页面不存在，请重新关联',
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.3 查询映射写入（规格 §5）：queries.add 收 pageId?、新增 setPageMapping。
+// 映射一律 pageId 下拉制——服务端写 page.url，**不收自由 URL**（否则可将查询指向
+// 任意站点，改写建议稿会被写到不属于自己的页面上）。
+// ---------------------------------------------------------------------------
+
+describe('citation queries 页面映射（M2 §3.3）', () => {
+  function makeMappingCtx(seed: any, workspaceId = 'w1') {
+    const db = makeDb(seed)
+    const addQuery = vi.fn(async (input: any) => ({ id: 'q-new', ...input }))
+    const ctx: any = {
+      workspace: { id: workspaceId, organizationId: 'org-1', status: 'ACTIVE' },
+      actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId } },
+      requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
+      services: {
+        prisma: db,
+        queryLibrary: { addQuery, listActive: vi.fn(async () => []) },
+        monitor: {},
+      },
+    }
+    return { db, addQuery, ctx }
+  }
+
+  const PAGES = [
+    { id: 'page-1', workspaceId: 'w1', url: 'https://example.com/a' },
+    { id: 'page-x', workspaceId: 'w-other', url: 'https://other.com/x' },
+  ]
+
+  it('add(pageId)：归属本工作区的页面 → 服务端写 mappedPageUrl=page.url', async () => {
+    const { ctx, addQuery } = makeMappingCtx({ pages: PAGES })
+    await createCaller(ctx).queries.add({ queryText: '最佳 AI 工具', source: 'manual', pageId: 'page-1' })
+    expect(addQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ mappedPageUrl: 'https://example.com/a' }),
+    )
+  })
+
+  it('add(pageId)：他工作区的页面 → 拒，且不建查询', async () => {
+    const { ctx, addQuery } = makeMappingCtx({ pages: PAGES })
+    await expect(
+      createCaller(ctx).queries.add({ queryText: 'Q', source: 'manual', pageId: 'page-x' }),
+    ).rejects.toThrow()
+    expect(addQuery).not.toHaveBeenCalled()
+  })
+
+  it('add(pageId)：页面不存在 → 拒', async () => {
+    const { ctx, addQuery } = makeMappingCtx({ pages: PAGES })
+    await expect(
+      createCaller(ctx).queries.add({ queryText: 'Q', source: 'manual', pageId: 'page-nope' }),
+    ).rejects.toThrow()
+    expect(addQuery).not.toHaveBeenCalled()
+  })
+
+  it('add 不收自由 URL：客户端传的 mappedPageUrl 不生效（zod 无该字段）', async () => {
+    const { ctx, addQuery } = makeMappingCtx({ pages: PAGES })
+    await createCaller(ctx).queries.add({
+      queryText: 'Q',
+      source: 'manual',
+      mappedPageUrl: 'https://evil.example.com',
+    } as any)
+    expect(addQuery).toHaveBeenCalledWith(
+      expect.not.objectContaining({ mappedPageUrl: expect.any(String) }),
+    )
+    expect(addQuery.mock.calls[0][0].mappedPageUrl ?? null).toBeNull()
+  })
+
+  it('setPageMapping：双归属校验通过 → 写 mappedPageUrl', async () => {
+    const { ctx, db } = makeMappingCtx({
+      pages: PAGES,
+      queries: [{ id: 'q1', workspaceId: 'w1', queryText: 'Q' }],
+    })
+    const updated = await createCaller(ctx).queries.setPageMapping({ queryId: 'q1', pageId: 'page-1' })
+    expect(updated.mappedPageUrl).toBe('https://example.com/a')
+    expect(db.contentPage.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'page-1', workspaceId: 'w1' } }),
+    )
+  })
+
+  it('setPageMapping：他工作区的页面 → 拒，零写库', async () => {
+    const { ctx, db } = makeMappingCtx({
+      pages: PAGES,
+      queries: [{ id: 'q1', workspaceId: 'w1', queryText: 'Q' }],
+    })
+    await expect(
+      createCaller(ctx).queries.setPageMapping({ queryId: 'q1', pageId: 'page-x' }),
+    ).rejects.toThrow()
+    expect(db.citationQuery.update).not.toHaveBeenCalled()
+  })
+
+  it('setPageMapping：他工作区的查询 → 拒，零写库', async () => {
+    const { ctx, db } = makeMappingCtx({
+      pages: PAGES,
+      queries: [{ id: 'q-other', workspaceId: 'w-other', queryText: 'Q' }],
+    })
+    await expect(
+      createCaller(ctx).queries.setPageMapping({ queryId: 'q-other', pageId: 'page-1' }),
+    ).rejects.toThrow()
+    expect(db.citationQuery.update).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.3 citation.weakPoints（规格 §5/§8）：范围校验复用趋势的 366 天上限，
+// 响应携带 optimizationsAllowed —— 前端禁用态与后端硬拒绝同源。
+// ---------------------------------------------------------------------------
+
+describe('citation weakPoints 端点（M2 §3.3）', () => {
+  function makeWpCtx(allowed: boolean) {
+    const guard = { isOptimizationsAllowed: vi.fn(async () => allowed) }
+    const db = makeDb()
+    const ctx: any = {
+      workspace: { id: 'w1', organizationId: 'org-1', status: 'ACTIVE' },
+      actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
+      requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
+      services: { prisma: db, queryLibrary: {}, monitor: {}, billing: { guard, meter: {} } },
+    }
+    return { ctx, db, guard }
+  }
+
+  it('返回 weakPoints + optimizationsAllowed（同源布尔）', async () => {
+    const { ctx, guard } = makeWpCtx(false)
+    const result = await createCaller(ctx).weakPoints({ dateRange: { start: '2026-10-01', end: '2026-10-31' } })
+    expect(result.weakPoints).toEqual([])
+    expect(result.optimizationsAllowed).toBe(false)
+    expect(guard.isOptimizationsAllowed).toHaveBeenCalledWith('org-1')
+  })
+
+  it('超 366 天范围 → 拒（与趋势同一上限）', async () => {
+    const { ctx } = makeWpCtx(true)
+    await expect(
+      createCaller(ctx).weakPoints({ dateRange: { start: '2024-01-01', end: '2026-10-31' } }),
+    ).rejects.toThrow(/366/)
+  })
+
+  it('无 billing 装配 → optimizationsAllowed 缺省为 true（与门禁 no-op 语义一致）', async () => {
+    const db = makeDb()
+    const ctx: any = {
+      workspace: { id: 'w1', status: 'ACTIVE' },
+      actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
+      requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
+      services: { prisma: db, queryLibrary: {}, monitor: {} },
+    }
+    const result = await createCaller(ctx).weakPoints({ dateRange: { start: '2026-10-01', end: '2026-10-31' } })
+    expect(result.optimizationsAllowed).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.3 citation.loopBoard（规格 §8）：AWAITING + VERIFIED 全量，带查询文本、
+// queryId 为 null 的"查询已删除"呈现、optimizationsAllowed 同源布尔。
+// ---------------------------------------------------------------------------
+
+describe('citation loopBoard 端点（M2 §3.3）', () => {
+  function makeLoopCtx(opts: { allowed?: boolean; tasks?: any[]; queries?: any[] } = {}) {
+    const tasks = opts.tasks ?? []
+    const guard = { isOptimizationsAllowed: vi.fn(async () => opts.allowed ?? true) }
+    const db: any = {
+      optimizationTask: {
+        findMany: vi.fn(async ({ where }: any) => {
+          let list = tasks.slice()
+          if (where.workspaceId) list = list.filter((t) => t.workspaceId === where.workspaceId)
+          if (where.status?.in) list = list.filter((t) => where.status.in.includes(t.status))
+          return list
+        }),
+      },
+      citationQuery: {
+        findMany: vi.fn(async () => opts.queries ?? []),
+      },
+    }
+    const ctx: any = {
+      workspace: { id: 'w1', organizationId: 'org-1', status: 'ACTIVE' },
+      actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
+      requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
+      services: { prisma: db, queryLibrary: {}, monitor: {}, billing: { guard, meter: {} } },
+    }
+    return { ctx, db, guard, tasks }
+  }
+
+  it('返回 AWAITING + VERIFIED 全量并带上查询文本与 Δ', async () => {
+    const { ctx } = makeLoopCtx({
+      allowed: true,
+      tasks: [
+        {
+          id: 'task-1', workspaceId: 'w1', type: 'OPTIMIZE_FOR_QUERY', queryId: 'q1',
+          status: 'VERIFIED', publishedAt: new Date('2026-10-18T00:00:00Z'), verifiedAt: new Date('2026-10-19T00:00:00Z'),
+          baselineSovMean: 0.1, baselineMentionRate: 0, baselineValidSamples: 4,
+          verifiedSovMean: 0.3, verifiedMentionRate: 0.5, verifiedValidSamples: 4,
+        },
+        {
+          id: 'task-2', workspaceId: 'w1', type: 'OPTIMIZE_FOR_QUERY', queryId: 'q2',
+          status: 'AWAITING_VERIFICATION', publishedAt: new Date('2026-10-18T00:00:00Z'), verifiedAt: null,
+          baselineSovMean: 0.2, baselineMentionRate: 0.1, baselineValidSamples: 3,
+          verifiedSovMean: null, verifiedMentionRate: null, verifiedValidSamples: null,
+        },
+      ],
+      queries: [
+        { id: 'q1', queryText: 'AI 设计工具哪个好', status: 'ACTIVE', scheduled: true },
+        { id: 'q2', queryText: 'PDF 转换工具', status: 'PAUSED', scheduled: false },
+      ],
+    })
+
+    const result = await createCaller(ctx).loopBoard()
+    expect(result.optimizationsAllowed).toBe(true)
+    expect(result.rows).toHaveLength(2)
+
+    const verified = result.rows.find((r: any) => r.taskId === 'task-1')!
+    expect(verified.queryText).toBe('AI 设计工具哪个好')
+    expect(verified.deltaSovMean).toBeCloseTo(0.2)
+    expect(verified.deltaMentionRate).toBeCloseTo(0.5)
+    expect(verified.status).toBe('VERIFIED')
+
+    // 查询状态文案三分（规格 §7）：PAUSED 优先于 scheduled=false
+    const awaiting = result.rows.find((r: any) => r.taskId === 'task-2')!
+    expect(awaiting.queryStateNote).toBe('查询已暂停，恢复监测后完成验证')
+    expect(awaiting.deltaSovMean).toBeNull()
+  })
+
+  it('queryId 为 null（查询已删）→ 呈现"查询已删除"', async () => {
+    const { ctx } = makeLoopCtx({
+      tasks: [
+        {
+          id: 'task-3', workspaceId: 'w1', type: 'OPTIMIZE_FOR_QUERY', queryId: null,
+          status: 'AWAITING_VERIFICATION', publishedAt: new Date('2026-10-18T00:00:00Z'), verifiedAt: null,
+          baselineSovMean: 0.1, baselineMentionRate: 0, baselineValidSamples: 2,
+        },
+      ],
+      queries: [],
+    })
+    const result = await createCaller(ctx).loopBoard()
+    expect(result.rows[0].queryStateNote).toBe('查询已删除')
+    expect(result.rows[0].queryText).toBeNull()
+  })
+
+  it('scheduled=false（查询仍 ACTIVE）→ "查询已退出定时监测"', async () => {
+    const { ctx } = makeLoopCtx({
+      tasks: [
+        {
+          id: 'task-4', workspaceId: 'w1', type: 'OPTIMIZE_FOR_QUERY', queryId: 'q1',
+          status: 'AWAITING_VERIFICATION', publishedAt: new Date('2026-10-18T00:00:00Z'), verifiedAt: null,
+          baselineSovMean: 0.1, baselineMentionRate: 0, baselineValidSamples: 2,
+        },
+      ],
+      queries: [{ id: 'q1', queryText: 'Q', status: 'ACTIVE', scheduled: false }],
+    })
+    const result = await createCaller(ctx).loopBoard()
+    expect(result.rows[0].queryStateNote).toBe('查询已退出定时监测')
+  })
+
+  it('以 ctx.workspace.id 限定（不接受外部 workspaceId 入参）', async () => {
+    const { ctx, db } = makeLoopCtx({ tasks: [] })
+    await createCaller(ctx).loopBoard()
+    expect(db.optimizationTask.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ workspaceId: 'w1' }) }),
+    )
+  })
+
+  it('optimizationsAllowed 与 assert 同源（同一个 guard 方法）', async () => {
+    const { ctx, guard } = makeLoopCtx({ allowed: false, tasks: [] })
+    const result = await createCaller(ctx).loopBoard()
+    expect(result.optimizationsAllowed).toBe(false)
+    expect(guard.isOptimizationsAllowed).toHaveBeenCalledWith('org-1')
   })
 })

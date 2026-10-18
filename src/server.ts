@@ -46,6 +46,7 @@ import { PerplexityAdapter } from './modules/citation-monitor/platform-adapters/
 import { ChatGptSearchAdapter } from './modules/citation-monitor/platform-adapters/chatgpt.js'
 import { GeminiAdapter } from './modules/citation-monitor/platform-adapters/gemini.js'
 import { createQueryLibraryService } from './modules/citation-monitor/query-library.js'
+import { createClosedLoopService } from './modules/citation-monitor/closed-loop-service.js'
 import { createMonitor } from './modules/citation-monitor/monitor.js'
 import { startCitationScheduler } from './workers/citation-scheduler.js'
 import { startOrderActivateWorker } from './workers/order-activate.js'
@@ -198,7 +199,8 @@ async function main() {
   const projectService = createProjectService({ prisma })
   const queryPlanner = createQueryPlanner({ prisma })
   const sampleExecutor = createSampleExecutor({ prisma, registry, analyzeCitation, getCredentials: resolver.getCredentials })
-  const actionService = createActionService({ prisma, taskService: taskService as any })
+  // M2 §3.3：注入 billing 以启用 actions.convert 的优化门禁前置断言
+  const actionService = createActionService({ prisma, taskService: taskService as any, billing })
   const reportService = createReportService({ prisma })
   const dispatchRun = async (runId: string) => {
     const { createDispatcher } = await import('./workers/diagnostic-dispatcher.js')
@@ -284,6 +286,10 @@ async function main() {
   const services = {
     prisma, monitor, queryLibrary,
     orchestrator, taskService, atomizer, faqGenerator,
+    // M2 §3.3 闭环建议生成单入口（依赖 rewriter/atomizer/citability，与 ctx 无关的纯装配）
+    closedLoop: createClosedLoopService({
+      prisma, taskService, rewriter, atomizer, citability,
+    }),
     pages: pageService,
     schema: schemaService,
     kg: kgService,

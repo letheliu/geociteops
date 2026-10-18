@@ -52,6 +52,59 @@ function specExampleEvents(): AggregateEvent[] {
   return [...A, ...B]
 }
 
+// ---------------------------------------------------------------------------
+// M2 §3.3 组级竞品口径（规格 §5）：竞品提及率与品牌指标**同分母**（validSamples），
+// 因此 FAILED 与 sovScore=null 的样本对品牌与竞品同样不计入——两张表不会打架。
+// ---------------------------------------------------------------------------
+
+describe('groupAggregate 竞品口径（M2 §3.3）', () => {
+  const comp = (brand: string, mentioned: boolean) => ({ brand, mentioned, rank: null })
+
+  it('竞品提及率 = 该竞品提及样本数 / validSamples（与 brandMentionRate 同分母）', () => {
+    const events = [
+      ev({ sovScore: 0.3, brandMentioned: false, competitors: [comp('Acme', true)] }),
+      ev({ sovScore: 0.3, brandMentioned: true, competitors: [comp('Acme', false)] }),
+      ev({ sovScore: 0.3, brandMentioned: false, competitors: [comp('Acme', true)] }),
+    ]
+    const agg = groupAggregate(events)
+    expect(agg.validSamples).toBe(3)
+    expect(agg.brandMentionRate).toBeCloseTo(1 / 3)
+    expect(agg.competitorMentionRates).toEqual({ Acme: expect.closeTo(2 / 3, 5) })
+  })
+
+  it('FAILED 样本与 sovScore=null 样本不进竞品分母（与品牌口径同规则）', () => {
+    const events = [
+      ev({ sovScore: 0.3, competitors: [comp('Acme', true)] }),
+      ev({ status: 'FAILED', sovScore: null, competitors: [comp('Acme', true)] } as Partial<AggregateEvent>),
+      ev({ sovScore: null, competitors: [comp('Acme', true)] }),
+    ]
+    const agg = groupAggregate(events)
+    expect(agg.validSamples).toBe(1)
+    expect(agg.competitorMentionRates).toEqual({ Acme: 1 })
+  })
+
+  it('多个竞品分别计率；从未提及的竞品不进 map（不是 0）', () => {
+    const events = [
+      ev({ sovScore: 0.3, competitors: [comp('Acme', true), comp('Beta', false)] }),
+      ev({ sovScore: 0.3, competitors: [comp('Beta', true)] }),
+    ]
+    const agg = groupAggregate(events)
+    expect(agg.competitorMentionRates).toEqual({ Acme: 0.5, Beta: 0.5 })
+  })
+
+  it('validSamples=0 的组：竞品 map 为空对象（不造 0，与其余指标同语义）', () => {
+    const agg = groupAggregate([ev({ status: 'FAILED', sovScore: null, competitors: [comp('Acme', true)] } as Partial<AggregateEvent>)])
+    expect(agg.validSamples).toBe(0)
+    expect(agg.competitorMentionRates).toEqual({})
+  })
+
+  it('组聚合不改变品牌指标（竞品口径为增量字段，向后兼容）', () => {
+    const agg = groupAggregate(specExampleEvents())
+    expect(agg.brandMentionRate).toBeCloseTo(3 / 6)
+    expect(agg.sovMean).toBeCloseTo((0.2 + 0.4 + 0.4 + 0.6 + 0.4 + 0) / 6)
+  })
+})
+
 describe('okEventsWhere / isLegacyEvent', () => {
   it('okEventsWhere 是唯一过滤点且只含 status=OK', () => {
     expect(okEventsWhere()).toEqual({ status: 'OK' })

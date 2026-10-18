@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
-import { NCard, NSpace, NDatePicker, NEmpty, NSpin, NGrid, NGridItem } from 'naive-ui'
+import { useRoute, useRouter } from 'vue-router'
+import { NCard, NSpace, NDatePicker, NEmpty, NSpin, NGrid, NGridItem, NTag } from 'naive-ui'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
@@ -72,8 +73,12 @@ async function loadData() {
   }
   try {
     // 趋势走 trend 端点（Run 级聚合）；分布/统计仍取样本级事件
+    // M2 §3.3：闭环看板的「趋势」跳转带 queryId 落点（口径与看板 Δ 同源）
+    const trendQuery = queryId.value
+      ? { dateRange: dateRangeArg, queryId: queryId.value }
+      : { dateRange: dateRangeArg }
     const [trend, report] = await Promise.all([
-      trpc.citation.trend.query({ dateRange: dateRangeArg }),
+      trpc.citation.trend.query(trendQuery as any),
       trpc.citation.getReport.query({ dateRange: dateRangeArg }),
     ])
     trendPoints.value = trend.points as unknown as TrendPoint[]
@@ -86,8 +91,18 @@ async function loadData() {
   }
 }
 
+// M2 §3.3：?queryId=xxx 聚焦单个查询（闭环看板趋势跳转的落点）
+const route = useRoute()
+const router = useRouter()
+const queryId = ref<string | null>((route.query.queryId as string) || null)
+function clearQueryFilter() {
+  queryId.value = null
+  router.replace({ name: 'citation-sov', query: {} })
+}
+
 onMounted(loadData)
 watch(dateRange, loadData)
+watch(queryId, loadData)
 </script>
 
 <template>
@@ -96,6 +111,9 @@ watch(dateRange, loadData)
 
     <NSpace style="margin-bottom: 16px">
       <NDatePicker v-model:value="dateRange" type="daterange" clearable />
+      <NTag v-if="queryId" closable size="small" type="info" @close="clearQueryFilter">
+        已聚焦单个查询（闭环看板跳转）
+      </NTag>
     </NSpace>
 
     <NSpin :show="loading">

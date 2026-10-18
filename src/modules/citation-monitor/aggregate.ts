@@ -24,6 +24,12 @@ export interface AggregateEvent {
   sovScore: number | null
   capturedAt: Date
   failureReason?: string | null
+  /**
+   * 竞品提及（M2 §3.3 竞品口径的唯一输入）：[{brand, mentioned, rank, ...}]。
+   * 趋势读路径不 select 该列（省列），只有 weakPoints 单独取数时读——
+   * 分母口径与品牌指标完全同源（validSamples），只是数据通道独立。
+   */
+  competitors?: unknown
 }
 
 export type RunStatus = 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED'
@@ -105,6 +111,12 @@ export interface GroupAgg {
   sovStdDev: number | null
   /** 池化 rank 样本，供 Run/期间级复用 */
   ranks: number[]
+  /**
+   * 竞品 → 提及率（M2 §3.3 规格 §5）：**与 brandMentionRate 同分母**（本组 validSamples），
+   * 只统计 OK 且 sovScore 非 null 的样本。从未提及的竞品不进 map（不是 0）；
+   * validSamples=0 的组恒为空对象。
+   */
+  competitorMentionRates: Record<string, number>
 }
 
 export interface RunAgg {
@@ -199,6 +211,25 @@ function macroMean(values: (number | null)[]): number | null {
 }
 
 /**
+ * 组级竞品提及率（M2 §3.3 规格 §5）：竞品名 → 提及样本数 / 本组 validSamples。
+ * 与品牌指标同一个分母（同一批 valid 样本），因此"竞品提及率高"与"品牌提及率低"
+ * 一定落在同一批样本上，不会出现两张表分母不一致的伪信号。
+ */
+function competitorMentionRates(valid: readonly AggregateEvent[]): Record<string, number> {
+  const counts = new Map<string, number>()
+  for (const e of valid) {
+    if (!Array.isArray(e.competitors)) continue
+    for (const c of e.competitors as Array<{ brand?: unknown; mentioned?: unknown }>) {
+      if (!c || typeof c.brand !== 'string' || c.mentioned !== true) continue
+      counts.set(c.brand, (counts.get(c.brand) ?? 0) + 1)
+    }
+  }
+  const out: Record<string, number> = {}
+  for (const [brand, count] of counts) out[brand] = count / valid.length
+  return out
+}
+
+/**
  * 组级聚合：run × query × platform。
  * validSamples=0（全 FAILED 或全无 sovScore）的组所有指标为 null，调用方据此跳过——不造 0。
  */
@@ -230,6 +261,7 @@ export function groupAggregate(events: AggregateEvent[]): GroupAgg {
       rankBest: null,
       sovStdDev: null,
       ranks,
+      competitorMentionRates: {},
     }
   }
 
@@ -248,6 +280,7 @@ export function groupAggregate(events: AggregateEvent[]): GroupAgg {
     rankBest: ranks.length > 0 ? Math.min(...ranks) : null,
     sovStdDev: sampleStdDev(sovScores),
     ranks,
+    competitorMentionRates: competitorMentionRates(valid),
   }
 }
 
