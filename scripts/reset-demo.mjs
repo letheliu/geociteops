@@ -117,6 +117,7 @@ async function main() {
   // 演示账号：ORG_VIEWER 在现有授权模型下恒只读（min(企业角色上限, 成员授权)），
   // 写操作在服务端被拒，因此演示站无需任何新代码即可保证只读。
   const existingUser = await prisma.user.findUnique({ where: { username: DEMO_USERNAME } })
+  let demoUser = existingUser
   if (existingUser) {
     console.log(`✅ 演示账号已存在：${existingUser.username}（orgRole=${existingUser.orgRole}）`)
     console.log('   密码不在库中明文保存，无法二次打印；需要重置请设 DEMO_ACCOUNT_PASSWORD 后删号重建')
@@ -135,12 +136,25 @@ async function main() {
         mustChangePassword: false,
       },
     })
+    demoUser = user
     console.log('='.repeat(52))
     console.log('🔑 演示账号已创建（密码仅打印这一次，请立即记录）')
     console.log(`   用户名：${user.username}`)
     console.log(`   密  码：${plain}`)
     console.log('='.repeat(52))
   }
+  if (!demoUser) throw new Error('演示账号不存在且创建失败')
+
+  // 工作区成员分配：CUSTOMER+VIEWER 的 resolveAccess 要求 WorkspaceMember 记录
+  // （member-service：ORG_VIEWER 无记录 → null → ctx.workspace 解析失败 401）。
+  // M1 期漏造此记录，演示账号只能登录、进不了工作区——2026-10-18 趋势端点验证暴露。
+  // 幂等 upsert：账号已存在的重置路径同样补齐。
+  await prisma.workspaceMember.upsert({
+    where: { workspaceId_userId: { workspaceId: WS_ID, userId: demoUser.id } },
+    create: { workspaceId: WS_ID, userId: demoUser.id, access: 'VIEW' },
+    update: { access: 'VIEW' },
+  })
+  console.log('✅ 演示账号工作区成员记录就绪（access=VIEW）')
 
   // ===== ② 清空演示数据后重跑 seed =====
   console.log('\n🧹 清空演示工作区数据…')
