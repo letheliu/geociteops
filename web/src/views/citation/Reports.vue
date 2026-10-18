@@ -71,11 +71,15 @@ async function handleTrack() {
   }
   trackLoading.value = true
   try {
-    await trpc.citation.trackQuery.mutate({
-      query: trackQuery.value,
+    // M2 §3.1：同步触发已废弃，改为投递一次运行（返回 runId，后台采样）
+    const result = await trpc.citation.runs.create.mutate({
       platforms: trackPlatforms.value,
     })
-    message.success('监测已触发')
+    if (!result.runId) {
+      message.warning('没有可监测的查询，请先在查询库中添加')
+      return
+    }
+    message.success('监测已触发，正在采样…')
     showTrackModal.value = false
     trackQuery.value = ''
     await loadData()

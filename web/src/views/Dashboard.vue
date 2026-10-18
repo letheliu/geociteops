@@ -2,14 +2,18 @@
 import { ref, onMounted } from 'vue'
 import { NCard, NGrid, NGridItem, NStatistic, NSpace, NEmpty, NSpin, NTag, NRadioGroup, NRadioButton, NButton } from 'naive-ui'
 import { trpc } from '../composables/useTrpc'
+import TrendChart, { type TrendPoint } from '../components/TrendChart.vue'
 
 const loading = ref(true)
 const sovScore = ref<number>(0)
-const totalEvents = ref<number>(0)
-const mentionedCount = ref<number>(0)
+const mentionRate = ref<number | null>(null)
+const validSamples = ref<number>(0)
+const failedSamples = ref<number>(0)
+const runCount = ref<number>(0)
 const queryCount = ref<number>(0)
 const pendingTasks = ref<number>(0)
 const recentEvents = ref<any[]>([])
+const trendPoints = ref<TrendPoint[]>([])
 const rangeDays = ref(7)
 
 async function loadData(days = rangeDays.value) {
@@ -22,16 +26,20 @@ async function loadData(days = rangeDays.value) {
     end: now.toISOString(),
   }
   try {
-    const [sov, queries, tasks, report] = await Promise.all([
-      trpc.citation.getSovScore.query({ competitors: [], dateRange }),
+    const [trend, queries, tasks, report] = await Promise.all([
+      trpc.citation.trend.query({ dateRange }),
       trpc.citation.queries.list.query(),
       trpc.tasks.list.query({ status: 'pending' }),
       trpc.citation.getReport.query({ dateRange }),
     ])
 
-    sovScore.value = Math.round(sov.sovScore * 100)
-    totalEvents.value = sov.totalEvents
-    mentionedCount.value = sov.mentionedCount
+    // 口径：sovMean = 份额（SOV 正名）；提及率单列，不再混叫 SOV
+    sovScore.value = Math.round((trend.period.sovMean ?? 0) * 100)
+    mentionRate.value = trend.period.brandMentionRate
+    validSamples.value = trend.period.validSamples
+    failedSamples.value = trend.period.failedSamples
+    runCount.value = trend.period.pointCount
+    trendPoints.value = trend.points as unknown as TrendPoint[]
     queryCount.value = Array.isArray(queries) ? queries.length : 0
     pendingTasks.value = Array.isArray(tasks) ? tasks.length : 0
     recentEvents.value = (report.events || []).slice(0, 5)
@@ -59,7 +67,7 @@ onMounted(() => loadData(7))
       <NGrid :cols="4" :x-gap="16" :y-gap="16" responsive="screen" item-responsive>
         <NGridItem span="4 m:2 l:1">
           <NCard>
-            <NStatistic :label="`SOV 分数（近 ${rangeDays} 天）`" :value="sovScore">
+            <NStatistic :label="`SOV 份额（近 ${rangeDays} 天）`" :value="sovScore">
               <template #suffix>%</template>
             </NStatistic>
           </NCard>
@@ -73,8 +81,10 @@ onMounted(() => loadData(7))
         </NGridItem>
         <NGridItem span="4 m:2 l:1">
           <NCard>
-            <NStatistic label="引用事件" :value="totalEvents">
-              <template #suffix>| 提及 {{ mentionedCount }} 次</template>
+            <NStatistic :label="`有效采样 / 运行次数`" :value="validSamples">
+              <template #suffix>
+                · {{ runCount }} 次运行{{ failedSamples > 0 ? `（失败 ${failedSamples}）` : '' }}
+              </template>
             </NStatistic>
           </NCard>
         </NGridItem>
@@ -84,6 +94,15 @@ onMounted(() => loadData(7))
           </NCard>
         </NGridItem>
       </NGrid>
+
+      <NCard title="监测趋势">
+        <NSpace vertical :size="4">
+          <span style="font-size: 12px; color: var(--text-color-3)">
+            一个点 = 一次运行（N 次采样的聚合）。阴影带为组内离散度，非置信区间。
+          </span>
+          <TrendChart :series="trendPoints" />
+        </NSpace>
+      </NCard>
 
       <NCard title="最近引用事件">
         <NEmpty v-if="recentEvents.length === 0 && !loading" description="暂无数据" />
