@@ -1,4 +1,5 @@
 import type { PlatformAdapter, PlatformResult, SourceCitation } from './types.js'
+import { fetchWithTimeout } from '../../../core/lib/fetch-with-timeout.js'
 
 const URL_REGEX = /https?:\/\/[^\s)]+/gi
 
@@ -10,7 +11,7 @@ export class AnthropicAdapter implements PlatformAdapter {
     const baseUrl = credentials.ANTHROPIC_BASE_URL || 'https://api.anthropic.com'
     const model = credentials.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022'
 
-    const res = await fetch(`${baseUrl}/v1/messages`, {
+    const res = await fetchWithTimeout(`${baseUrl}/v1/messages`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

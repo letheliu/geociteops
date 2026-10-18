@@ -35,44 +35,44 @@ const platformOptions = [
 ]
 const selectedPlatform = ref('')
 
-function deltaColor(v: number): string {
+function deltaColor(v: number | null): string {
+  if (v === null) return '#909399'
   if (v > 0.01) return '#18a058'
   if (v < -0.01) return '#d03050'
   return '#909399'
 }
 
-function deltaText(v: number, suffix = ''): string {
+function deltaText(v: number | null, suffix = ''): string {
+  if (v === null) return '—'
   if (v > 0) return `+${(v * 100).toFixed(1)}${suffix}`
   return `${(v * 100).toFixed(1)}${suffix}`
+}
+
+/** 期间级聚合可能没有可算的点（无有效采样）→ 展示为 —，不显示 0 */
+function pctOrDash(v: number | null): string {
+  return v === null ? '—' : `${(v * 100).toFixed(1)}%`
+}
+
+function numOrDash(v: number | null): string {
+  return v === null ? '—' : v.toFixed(1)
 }
 
 const chartOption = computed(() => {
   if (!result.value) return {}
   const { before, after } = result.value
+  // 口径已随 M2 §3.1 改造：sov = 份额，mention = 提及率，rank = 池化中位数
+  const pick = (s: any) => [
+    s.sovMean === null ? null : Math.round(s.sovMean * 100),
+    s.brandMentionRate === null ? null : Math.round(s.brandMentionRate * 100),
+  ]
   return {
     tooltip: { trigger: 'axis' },
     legend: { data: ['优化前', '优化后'] },
-    xAxis: { type: 'category', data: ['SOV 分数', '品牌提及率'] },
+    xAxis: { type: 'category', data: ['SOV 份额', '品牌提及率'] },
     yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
     series: [
-      {
-        name: '优化前',
-        type: 'bar',
-        data: [
-          Math.round(before.sov * 100),
-          before.totalEvents > 0 ? Math.round((before.mentionedCount / before.totalEvents) * 100) : 0,
-        ],
-        itemStyle: { color: '#909399' },
-      },
-      {
-        name: '优化后',
-        type: 'bar',
-        data: [
-          Math.round(after.sov * 100),
-          after.totalEvents > 0 ? Math.round((after.mentionedCount / after.totalEvents) * 100) : 0,
-        ],
-        itemStyle: { color: '#18a058' },
-      },
+      { name: '优化前', type: 'bar', data: pick(before), itemStyle: { color: '#909399' } },
+      { name: '优化后', type: 'bar', data: pick(after), itemStyle: { color: '#18a058' } },
     ],
   }
 })
@@ -129,15 +129,15 @@ async function loadData() {
         <NGrid :cols="3" :x-gap="16" :y-gap="16" style="margin-bottom: 16px">
           <NGridItem>
             <NCard>
-              <NStatistic label="SOV 变化">
+              <NStatistic label="SOV 份额变化">
                 <template #default>
-                  <span :style="{ color: deltaColor(result.delta.sov), fontSize: '24px', fontWeight: '600' }">
-                    {{ deltaText(result.delta.sov, '%') }}
+                  <span :style="{ color: deltaColor(result.delta.sovMean), fontSize: '24px', fontWeight: '600' }">
+                    {{ deltaText(result.delta.sovMean, '%') }}
                   </span>
                 </template>
                 <template #suffix>
                   <div style="font-size: 12px; color: var(--text-color-3)">
-                    {{ (result.before.sov * 100).toFixed(1) }}% → {{ (result.after.sov * 100).toFixed(1) }}%
+                    {{ pctOrDash(result.before.sovMean) }} → {{ pctOrDash(result.after.sovMean) }}
                   </div>
                 </template>
               </NStatistic>
@@ -147,14 +147,14 @@ async function loadData() {
             <NCard>
               <NStatistic label="品牌提及率变化">
                 <template #default>
-                  <span :style="{ color: deltaColor(result.delta.mentionRate), fontSize: '24px', fontWeight: '600' }">
-                    {{ deltaText(result.delta.mentionRate, '%') }}
+                  <span :style="{ color: deltaColor(result.delta.brandMentionRate), fontSize: '24px', fontWeight: '600' }">
+                    {{ deltaText(result.delta.brandMentionRate, '%') }}
                   </span>
                 </template>
                 <template #suffix>
                   <div style="font-size: 12px; color: var(--text-color-3)">
-                    优化前 {{ result.before.mentionedCount }}/{{ result.before.totalEvents }}
-                    优化后 {{ result.after.mentionedCount }}/{{ result.after.totalEvents }}
+                    优化前 {{ result.before.validSamples }} 个有效采样
+                    优化后 {{ result.after.validSamples }} 个
                   </div>
                 </template>
               </NStatistic>
@@ -162,15 +162,15 @@ async function loadData() {
           </NGridItem>
           <NGridItem>
             <NCard>
-              <NStatistic label="平均排名变化">
+              <NStatistic label="排名中位数变化">
                 <template #default>
-                  <span :style="{ color: deltaColor(-result.delta.avgRank), fontSize: '24px', fontWeight: '600' }">
-                    {{ result.delta.avgRank > 0 ? '+' : '' }}{{ result.delta.avgRank.toFixed(1) }}
+                  <span :style="{ color: deltaColor(result.delta.rankMedian === null ? null : -result.delta.rankMedian), fontSize: '24px', fontWeight: '600' }">
+                    {{ deltaText(result.delta.rankMedian === null ? null : -result.delta.rankMedian, '') }}
                   </span>
                 </template>
                 <template #suffix>
                   <div style="font-size: 12px; color: var(--text-color-3)">
-                    {{ result.before.avgRank.toFixed(1) }} → {{ result.after.avgRank.toFixed(1) }}
+                    {{ numOrDash(result.before.rankMedian) }} → {{ numOrDash(result.after.rankMedian) }}
                   </div>
                 </template>
               </NStatistic>

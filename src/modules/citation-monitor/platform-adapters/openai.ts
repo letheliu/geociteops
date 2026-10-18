@@ -1,4 +1,5 @@
 import type { PlatformAdapter, PlatformResult, SourceCitation } from './types.js'
+import { fetchWithTimeout } from '../../../core/lib/fetch-with-timeout.js'
 
 const URL_REGEX = /https?:\/\/[^\s)]+/gi
 
@@ -10,7 +11,7 @@ export class OpenAiAdapter implements PlatformAdapter {
     const baseUrl = credentials.OPENAI_BASE_URL || 'https://api.openai.com/v1'
     const model = credentials.OPENAI_MODEL || 'gpt-4o-mini'
 
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const res = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -18,7 +19,6 @@ export class OpenAiAdapter implements PlatformAdapter {
       },
       body: JSON.stringify({
         model,
-        temperature: 0,
         messages: [
           { role: 'system', content: '你是一个客观的助手，请直接回答用户问题。' },
           { role: 'user', content: text },

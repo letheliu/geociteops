@@ -2,6 +2,10 @@ import type { PrismaClient } from '@prisma/client'
 import type { PlatformAdapter } from '../citation-monitor/platform-adapters/types.js'
 import type { CitationAnalysis } from '../citation-monitor/analyzer.js'
 import { normalizePlatformResult } from '../citation-monitor/platform-adapters/types.js'
+import { sanitizeMessage } from '../../core/lib/sanitize-message.js'
+
+// 脱敏实现在 core/lib（监测与诊断共用一份规则），这里 re-export 保持原有 import 路径不断链
+export { sanitizeMessage }
 
 export interface ClassifiedSampleError {
   code: 'RATE_LIMITED' | 'PLATFORM_ERROR' | 'NETWORK_ERROR' | 'CONFIGURATION_ERROR' | 'UNSUPPORTED_PLATFORM' | 'PARSE_ERROR' | 'INVALID_CONTEXT' | 'CANCELLED'
@@ -50,11 +54,6 @@ export function classifySampleError(err: any): ClassifiedSampleError {
 
   // Default: platform error, retryable
   return { code: 'PLATFORM_ERROR', retryable: true, message: sanitizeMessage(message) }
-}
-
-function sanitizeMessage(msg: string): string {
-  // Remove sensitive data - API keys, tokens, credentials
-  return msg.replace(/[A-Za-z0-9-_]{20,}/g, '[REDACTED]').slice(0, 500)
 }
 
 export interface ExecuteInput {

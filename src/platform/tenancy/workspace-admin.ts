@@ -25,6 +25,17 @@ export class WorkspaceNotFoundError extends Error {
 }
 
 /**
+ * 工作区配置取值非法错误（如 monitorSampleCount 越界）：name 固定为 WORKSPACE_CONFIG_INVALID。
+ * 与 WORKSPACE_TRANSITION 区分——那是状态机冲突，这是入参不合法，应映射 BAD_REQUEST。
+ */
+export class WorkspaceConfigError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'WORKSPACE_CONFIG_INVALID'
+  }
+}
+
+/**
  * 顾问分配目标不合格错误：name 固定为 OPERATOR_NOT_ELIGIBLE。
  * 触发：用户不存在 / userType 非 PLATFORM（assign 另要求 platformRole 为 OPERATOR）。
  */
@@ -149,6 +160,10 @@ export interface UpdateWorkspaceInput {
   domain?: string
   defaultBrandName?: string
   llmsTxtUrl?: string
+  /** 监测采样数 N（1..10，超范围由 update 抛 INVALID_ARGUMENT） */
+  monitorSampleCount?: number
+  /** 监测节奏：DAILY / WEEKLY / OFF */
+  monitorSchedule?: 'DAILY' | 'WEEKLY' | 'OFF'
 }
 
 /**
@@ -416,6 +431,8 @@ export function createWorkspaceAdminService(deps: WorkspaceAdminDeps): Workspace
         domain?: string
         defaultBrandName?: string
         llmsTxtUrl?: string
+        monitorSampleCount?: number
+        monitorSchedule?: 'DAILY' | 'WEEKLY' | 'OFF'
       } = {}
       const changed: string[] = []
       if (input.name !== undefined) {
@@ -433,6 +450,18 @@ export function createWorkspaceAdminService(deps: WorkspaceAdminDeps): Workspace
       if (input.llmsTxtUrl !== undefined) {
         data.llmsTxtUrl = input.llmsTxtUrl
         changed.push('llmsTxtUrl')
+      }
+      // N 是硬区间（规格 §4）：越界直接拒，不静默夹到边界——让配置者知道自己写错了
+      if (input.monitorSampleCount !== undefined) {
+        if (!Number.isInteger(input.monitorSampleCount) || input.monitorSampleCount < 1 || input.monitorSampleCount > 10) {
+          throw new WorkspaceConfigError('monitorSampleCount 必须是 1..10 的整数')
+        }
+        data.monitorSampleCount = input.monitorSampleCount
+        changed.push('monitorSampleCount')
+      }
+      if (input.monitorSchedule !== undefined) {
+        data.monitorSchedule = input.monitorSchedule
+        changed.push('monitorSchedule')
       }
 
       const workspace = await prisma.workspace.update({ where: { id }, data })

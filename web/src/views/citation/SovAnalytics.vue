@@ -9,6 +9,7 @@ import {
   TitleComponent, TooltipComponent, GridComponent, LegendComponent, DataZoomComponent,
 } from 'echarts/components'
 import PageHeader from '../../components/common/PageHeader.vue'
+import TrendChart, { type TrendPoint } from '../../components/TrendChart.vue'
 import { trpc } from '../../composables/useTrpc'
 
 use([CanvasRenderer, LineChart, BarChart, PieChart, TitleComponent, TooltipComponent, GridComponent, LegendComponent, DataZoomComponent])
@@ -18,43 +19,16 @@ const dateRange = ref<[number, number]>([
   Date.now() - 30 * 86400000,
   Date.now(),
 ])
+// 样本级事件（平台分布/提及统计仍按事件算），趋势改走 trend 端点
 const events = ref<any[]>([])
+const trendPoints = ref<TrendPoint[]>([])
 
 const platforms = computed(() => {
   const set = new Set(events.value.map((e) => e.platform))
   return Array.from(set)
 })
 
-// SOV trend: daily brand mention rate
-const trendOption = computed(() => {
-  const days = new Map<string, { total: number; mentioned: number }>()
-  for (const ev of events.value) {
-    const day = new Date(ev.capturedAt).toISOString().slice(0, 10)
-    if (!days.has(day)) days.set(day, { total: 0, mentioned: 0 })
-    const d = days.get(day)!
-    d.total++
-    if (ev.brandMentioned) d.mentioned++
-  }
-  const sorted = Array.from(days.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-  return {
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['品牌提及率'] },
-    xAxis: { type: 'category', data: sorted.map((s) => s[0]) },
-    yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
-    series: [{
-      name: '品牌提及率',
-      type: 'line',
-      smooth: true,
-      areaStyle: {},
-      data: sorted.map((s) => {
-        const { total, mentioned } = s[1]
-        return total > 0 ? Math.round((mentioned / total) * 100) : 0
-      }),
-    }],
-  }
-})
-
-// Platform distribution pie
+// 平台分布 pie
 const platformOption = computed(() => {
   const counts = new Map<string, number>()
   for (const ev of events.value) {
@@ -92,15 +66,20 @@ const mentionOption = computed(() => {
 
 async function loadData() {
   loading.value = true
+  const dateRangeArg = {
+    start: new Date(dateRange.value[0]).toISOString(),
+    end: new Date(dateRange.value[1]).toISOString(),
+  }
   try {
-    const result = await trpc.citation.getReport.query({
-      dateRange: {
-        start: new Date(dateRange.value[0]).toISOString(),
-        end: new Date(dateRange.value[1]).toISOString(),
-      },
-    })
-    events.value = result.events || []
+    // 趋势走 trend 端点（Run 级聚合）；分布/统计仍取样本级事件
+    const [trend, report] = await Promise.all([
+      trpc.citation.trend.query({ dateRange: dateRangeArg }),
+      trpc.citation.getReport.query({ dateRange: dateRangeArg }),
+    ])
+    trendPoints.value = trend.points as unknown as TrendPoint[]
+    events.value = report.events || []
   } catch {
+    trendPoints.value = []
     events.value = []
   } finally {
     loading.value = false
@@ -120,11 +99,16 @@ watch(dateRange, loadData)
     </NSpace>
 
     <NSpin :show="loading">
-      <NEmpty v-if="events.length === 0 && !loading" description="暂无数据，请先触发监测" />
+      <NEmpty v-if="events.length === 0 && trendPoints.length === 0 && !loading" description="暂无数据，请先触发监测" />
 
       <NSpace v-else vertical :size="16">
-        <NCard title="SOV 趋势">
-          <VChart :option="trendOption" style="height: 320px" autoresize />
+        <NCard title="监测趋势">
+          <NSpace vertical :size="4">
+            <span style="font-size: 12px; color: var(--text-color-3)">
+              一个点 = 一次运行（N 次采样的聚合）。阴影带为组内离散度，非置信区间。
+            </span>
+            <TrendChart :series="trendPoints" />
+          </NSpace>
         </NCard>
 
         <NGrid :cols="2" :x-gap="16">

@@ -11,6 +11,10 @@ export interface WorkspaceGetProjection {
   status: string
   platformSummary: Record<string, { configured: boolean; hint: string }>
   competitors: string[]
+  /** 监测采样数 N（生效前的配置值，实际会被 unit cap 钳制，见规格 §6） */
+  monitorSampleCount: number
+  /** 监测节奏：DAILY / WEEKLY / OFF */
+  monitorSchedule: 'DAILY' | 'WEEKLY' | 'OFF'
 }
 
 /**
@@ -47,6 +51,8 @@ export const workspaceRouter = router({
       status: ws.status,
       platformSummary: summary.platforms,
       competitors: summary.competitors,
+      monitorSampleCount: ws.monitorSampleCount,
+      monitorSchedule: ws.monitorSchedule,
     }
   }),
 })

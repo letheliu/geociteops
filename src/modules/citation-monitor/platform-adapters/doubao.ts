@@ -1,4 +1,5 @@
 import type { PlatformAdapter, PlatformResult, SourceCitation } from './types.js'
+import { fetchWithTimeout } from '../../../core/lib/fetch-with-timeout.js'
 
 const URL_REGEX = /https?:\/\/[^\s)]+/gi
 
@@ -10,7 +11,7 @@ export class DoubaoAdapter implements PlatformAdapter {
     const baseUrl = credentials.DOUBAO_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3'
     const model = credentials.DOUBAO_MODEL || 'doubao-pro-4k'
 
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const res = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -18,7 +19,6 @@ export class DoubaoAdapter implements PlatformAdapter {
       },
       body: JSON.stringify({
         model,
-        temperature: 0,
         messages: [{ role: 'user', content: text }],
       }),
     })

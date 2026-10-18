@@ -1,4 +1,5 @@
 import type { PlatformAdapter, PlatformResult, SourceCitation } from './types.js'
+import { fetchWithTimeout } from '../../../core/lib/fetch-with-timeout.js'
 
 const URL_REGEX = /https?:\/\/[^\s)]+/gi
 
@@ -10,7 +11,7 @@ export class ErnieAdapter implements PlatformAdapter {
     const secretKey = credentials.ERNIE_SECRET_KEY
     const model = credentials.ERNIE_MODEL || 'ernie-speed-128k'
 
-    const tokenRes = await fetch(
+    const tokenRes = await fetchWithTimeout(
       `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${apiKey}&client_secret=${secretKey}`,
       { method: 'POST' }
     )
@@ -19,13 +20,12 @@ export class ErnieAdapter implements PlatformAdapter {
     }
     const tokenJson = (await tokenRes.json()) as { access_token: string }
 
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/${model}`,
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          temperature: 0,
           messages: [{ role: 'user', content: text }],
         }),
       }

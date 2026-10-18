@@ -1,4 +1,5 @@
 import type { PlatformAdapter, PlatformResult, SourceCitation } from './types.js'
+import { fetchWithTimeout } from '../../../core/lib/fetch-with-timeout.js'
 
 const URL_REGEX = /https?:\/\/[^\s)]+/gi
 
@@ -10,7 +11,7 @@ export class QwenAdapter implements PlatformAdapter {
     const baseUrl = credentials.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1'
     const model = credentials.QWEN_MODEL || 'qwen-turbo'
 
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const res = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -18,7 +19,6 @@ export class QwenAdapter implements PlatformAdapter {
       },
       body: JSON.stringify({
         model,
-        temperature: 0,
         messages: [{ role: 'user', content: text }],
       }),
     })

@@ -1,4 +1,5 @@
 import type { PlatformAdapter, PlatformResult, SourceCitation } from './types.js'
+import { fetchWithTimeout } from '../../../core/lib/fetch-with-timeout.js'
 
 /**
  * Perplexity Sonar API adapter。
@@ -12,7 +13,7 @@ export class PerplexityAdapter implements PlatformAdapter {
     const baseUrl = credentials.PERPLEXITY_BASE_URL || 'https://api.perplexity.ai'
     const model = credentials.PERPLEXITY_MODEL || 'sonar'
 
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const res = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

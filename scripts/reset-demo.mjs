@@ -43,6 +43,8 @@ async function truncateDemoData(workspaceId) {
   await prisma.optimizationTask.deleteMany({ where: { workspaceId } })
   await prisma.schemaRecord.deleteMany({ where: { workspaceId } })
   await prisma.citationEvent.deleteMany({ where: { workspaceId } })
+  // 监测运行（M2 §3.1）：Run 删除 Cascade 掉其采样行；显式删除保证重置后不留孤儿 Run
+  await prisma.citationRun.deleteMany({ where: { workspaceId } })
   await prisma.citationQuery.deleteMany({ where: { workspaceId } })
   await prisma.contentPage.deleteMany({ where: { workspaceId } })
   // KgRelation 无 workspaceId，通过实体间接归属：先删关系再删实体

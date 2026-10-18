@@ -94,6 +94,9 @@ const updateInput = z.object({
   domain: z.string().min(1).max(255).optional(),
   defaultBrandName: z.string().min(1).max(100).optional(),
   llmsTxtUrl: z.string().min(1).max(500).optional(),
+  // 监测配置：与 org.workspaces.update 同形状（前端 Settings 双通道只换前缀）
+  monitorSampleCount: z.number().int().min(1).max(10).optional(),
+  monitorSchedule: z.enum(['DAILY', 'WEEKLY', 'OFF']).optional(),
 })
 
 /**
