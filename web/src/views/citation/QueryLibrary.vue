@@ -2,7 +2,7 @@
 import { ref, onMounted, h } from 'vue'
 import {
   NCard, NButton, NDataTable, NTag, NSpace, NModal, NForm, NFormItem,
-  NInput, NSelect, NInputNumber, NPopconfirm, useMessage, NBadge,
+  NInput, NSelect, NInputNumber, NPopconfirm, useMessage, NBadge, NSwitch, NTooltip,
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import PageHeader from '../../components/common/PageHeader.vue'
@@ -114,6 +114,17 @@ async function handleDelete(id: string) {
   }
 }
 
+async function handleToggleScheduled(row: any) {
+  const next = !row.scheduled
+  try {
+    await trpc.citation.queries.setScheduled.mutate({ id: row.id, scheduled: next })
+    message.success(next ? '已加入定时监测' : '已退出定时监测')
+    await loadData()
+  } catch (e: any) {
+    message.error(e?.message || '切换失败')
+  }
+}
+
 const columns: DataTableColumns<any> = [
   {
     title: '状态',
@@ -124,6 +135,34 @@ const columns: DataTableColumns<any> = [
         type: row.status === 'ACTIVE' ? 'success' : 'default',
         dot: true,
       }, { default: () => row.status === 'ACTIVE' ? '活跃' : '暂停' })
+    },
+  },
+  {
+    // scheduled=false 只退出「定时」；status=PAUSED 才退出所有运行（含手动）
+    title: '定时',
+    key: 'scheduled',
+    width: 70,
+    render(row) {
+      return h(
+        NTooltip,
+        {
+          trigger: 'hover',
+        },
+        {
+          trigger: () => h(NSwitch, {
+            size: 'small',
+            value: row.scheduled !== false,
+            disabled: row.status !== 'ACTIVE',
+            'onUpdate:value': () => handleToggleScheduled(row),
+          }),
+          default: () =>
+            row.status !== 'ACTIVE'
+              ? '查询已暂停，不参与任何运行'
+              : row.scheduled === false
+                ? '不参与定时监测（手动触发仍可用）'
+                : '参与定时监测',
+        },
+      )
     },
   },
   { title: 'Query', key: 'queryText', ellipsis: { tooltip: true } },

@@ -13,7 +13,8 @@
 // workspaceId 一律取 route.params.workspaceId（路由参数为唯一事实来源，不读 store）。
 import { computed, onMounted, ref, watch } from 'vue'
 import {
-  NAlert, NButton, NCard, NForm, NFormItem, NInput, NSelect, NSpace, NSpin, NEmpty, NTag,
+  NAlert, NButton, NCard, NForm, NFormItem, NInput, NInputNumber, NRadioButton, NRadioGroup,
+  NSelect, NSpace, NSpin, NEmpty, NTag,
   useMessage,
 } from 'naive-ui'
 import { useRoute } from 'vue-router'
@@ -45,6 +46,22 @@ const savingBasic = ref(false)
 const competitors = ref<string[]>([])
 const savingCompetitors = ref(false)
 
+/** 监测配置（M2 §3.1）：N 与节奏 */
+const monitorSampleCount = ref<number>(5)
+const monitorSchedule = ref<'DAILY' | 'WEEKLY' | 'OFF'>('DAILY')
+const savingMonitor = ref(false)
+/** 当前查询数与平台数估算出的有效 N（unit cap 400）——只做提示，不阻断保存 */
+const activeQueryCount = ref(0)
+const activePlatformCount = ref(0)
+
+const UNIT_CAP = 400
+const effectiveN = computed(() => {
+  const units = Math.max(1, activeQueryCount.value * Math.max(1, activePlatformCount.value))
+  const cap = Math.max(1, Math.floor(UNIT_CAP / units))
+  return Math.min(monitorSampleCount.value, cap)
+})
+const nClamped = computed(() => effectiveN.value < monitorSampleCount.value)
+
 /** load 序号（与 WorkspaceLayout 的 fetchSeq 同款简单节流）：工作区快速切换时丢弃迟到旧响应 */
 let loadSeq = 0
 
@@ -71,12 +88,15 @@ async function load() {
       llmsTxtUrl: data.llmsTxtUrl ?? '',
     }
     competitors.value = [...data.competitors]
+    monitorSampleCount.value = data.monitorSampleCount
+    monitorSchedule.value = data.monitorSchedule
   } catch {
     if (seq !== loadSeq) return
     ws.value = null
   } finally {
     if (seq === loadSeq) loading.value = false
   }
+  void refreshMonitorScope()
 }
 
 onMounted(load)
@@ -118,8 +138,48 @@ async function handleSaveBasic() {
   }
 }
 
-async function handleSaveCompetitors() {
-  savingCompetitors.value = true
+/** 估算当前规模下的有效 N：查询数取 ACTIVE 查询，平台数取已配置凭证的平台 */
+async function refreshMonitorScope() {
+  try {
+    const queries = await trpc.citation.queries.list.query()
+    activeQueryCount.value = Array.isArray(queries) ? queries.length : 0
+    const configured = Object.values(ws.value?.platformSummary ?? {}).filter((p: any) => p.configured).length
+    activePlatformCount.value = configured
+  } catch {
+    activeQueryCount.value = 0
+    activePlatformCount.value = 0
+  }
+}
+
+async function handleSaveMonitor() {
+  if (!Number.isInteger(monitorSampleCount.value) || monitorSampleCount.value < 1 || monitorSampleCount.value > 10) {
+    message.warning('采样次数需在 1..10 之间')
+    return
+  }
+  savingMonitor.value = true
+  try {
+    const mutate = sessionStore.isCustomer
+      ? trpc.org.workspaces.update.mutate
+      : trpc.admin.workspace.update.mutate
+    await mutate({
+      workspaceId: workspaceId.value,
+      monitorSampleCount: monitorSampleCount.value,
+      monitorSchedule: monitorSchedule.value,
+    })
+    message.success(
+      nClamped.value
+        ? `监测配置已保存。注意：当前规模下每次运行实际只跑 ${effectiveN.value} 次采样（总量上限 ${UNIT_CAP}）`
+        : '监测配置已保存',
+    )
+    await load()
+  } catch (e: any) {
+    message.error(e?.message || '保存失败')
+  } finally {
+    savingMonitor.value = false
+  }
+}
+
+async function handleSaveCompetitors() {  savingCompetitors.value = true
   try {
     const list = competitors.value.map((c) => c.trim()).filter(Boolean)
     // 写操作分叉（任务 10）：同形状只换前缀
@@ -184,6 +244,50 @@ async function handleSaveCompetitors() {
           </NForm>
           <NSpace v-if="canWrite" justify="start">
             <NButton type="primary" :loading="savingBasic" @click="handleSaveBasic">保存基本信息</NButton>
+          </NSpace>
+        </NCard>
+
+        <NCard title="监测设置">
+          <NSpace vertical :size="16">
+            <NFormItem label="每次运行采样次数 N" style="margin-bottom: 0">
+              <NInputNumber
+                v-model:value="monitorSampleCount"
+                :min="1"
+                :max="10"
+                :disabled="!canWrite"
+                style="width: 160px"
+              />
+              <div style="font-size: 12px; color: var(--text-color-3); margin-top: 4px">
+                单次 AI 回答有随机性，N 次采样取聚合值（默认 5，可选 1..10）。N 越大越准，但耗时与调用量按 N 倍增长。
+              </div>
+            </NFormItem>
+
+            <NFormItem label="监测节奏" style="margin-bottom: 0">
+              <NRadioGroup v-model:value="monitorSchedule" :disabled="!canWrite">
+                <NRadioButton value="DAILY">每日 02:00</NRadioButton>
+                <NRadioButton value="WEEKLY">每周日 03:00</NRadioButton>
+                <NRadioButton value="OFF">关闭</NRadioButton>
+              </NRadioGroup>
+              <div style="font-size: 12px; color: var(--text-color-3); margin-top: 4px">
+                均按 Asia/Shanghai 时区执行；同一工作区同一天只会有一次定时运行（重触发会续跑当次运行，不重复新建）。
+              </div>
+            </NFormItem>
+
+            <div
+              v-if="nClamped"
+              style="font-size: 12px; color: var(--warning-color); background: var(--warning-color-2); padding: 8px 12px; border-radius: 6px"
+            >
+              当前规模：{{ activeQueryCount }} 个查询 × {{ activePlatformCount }} 个平台，总量上限 {{ UNIT_CAP }}。
+              设定 N={{ monitorSampleCount }} 会被钳制为每次运行实际跑 <b>{{ effectiveN }}</b> 次采样。
+            </div>
+            <div v-else style="font-size: 12px; color: var(--text-color-3)">
+              当前规模：{{ activeQueryCount }} 个查询 × {{ activePlatformCount }} 个平台，
+              每次运行实际采样 {{ activeQueryCount * activePlatformCount * effectiveN }} 次（上限 {{ UNIT_CAP }}）。
+            </div>
+
+            <NSpace v-if="canWrite" justify="start">
+              <NButton type="primary" :loading="savingMonitor" @click="handleSaveMonitor">保存监测设置</NButton>
+            </NSpace>
           </NSpace>
         </NCard>
 
