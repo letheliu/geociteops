@@ -43,6 +43,8 @@ await prisma.$transaction([
   prisma.optimizationTask.deleteMany({ where: { workspaceId: WS_ID } }),
   prisma.schemaRecord.deleteMany({ where: { workspaceId: WS_ID } }),
   prisma.citationEvent.deleteMany({ where: { workspaceId: WS_ID } }),
+  // Run 删除会 Cascade 掉挂在其下的采样行；放在 citationEvent 之后是幂等兜底
+  prisma.citationRun.deleteMany({ where: { workspaceId: WS_ID } }),
   prisma.citationQuery.deleteMany({ where: { workspaceId: WS_ID } }),
   prisma.contentPage.deleteMany({ where: { workspaceId: WS_ID } }),
 ])
@@ -111,12 +113,28 @@ for (const q of QUERIES) {
 }
 console.log(`✅ 查询库已填充: ${createdQueries.length} 条`)
 
-// === 3. CitationEvent（跨 8 平台 × 多查询 × 近 30 天）===
-// 设计意图：ZoomerAI 整体 SOV ≈ 28%（被 Midjourney 压制），但近 7 天呈上升趋势（呼应优化效果）
+// === 3. 监测数据（CitationRun × N 采样 + 一段纯 legacy 事件）===
+// 设计意图：
+// - 最近 25 天 = 每日一个物理 CitationRun，每个 query×platform 组跑 N=3 次采样
+//   → 趋势图上「一个点 = 一次运行」，Report 页有 Run 行可展开看样本
+// - 最近 5 天保留为纯 legacy 事件（runId=null）→ 照亮 isLegacyEvent、日桶合成与
+//   切换日（transition day）：趋势图上 legacy 点是虚线，Reports 里带「历史」角标
+// - 少量采样标 FAILED → 演示 PARTIAL 终态与失败隔离
 const PLATFORMS = ['deepseek', 'doubao', 'qwen', 'ernie', 'chatgpt', 'perplexity', 'gemini', 'anthropic']
+const SAMPLE_COUNT = 3
+const LEGACY_DAYS = 5
+const TOTAL_DAYS = 30
 
-// 每个平台对每个查询生成多次事件，覆盖 30 天
-// rankInAnswer: 1-8（1 最好）；sovScore: 0-1；brandMentioned 概率随时间提升
+// Asia/Shanghai 日键：slotKey 与趋势日桶口径必须与后端一致
+function shanghaiDayKey(date) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
 function seededRandom(seed) {
   const x = Math.sin(seed) * 10000
   return x - Math.floor(x)
@@ -135,71 +153,158 @@ const sampleAnswers = {
   ],
 }
 
+/** 造一个采样行的业务字段（OK / FAILED 两种形态的占位值都归这里） */
+function buildSample(query, platform, daysAgo, sampleIndex) {
+  const capturedAt = new Date(NOW - daysAgo * DAY + (2 + sampleIndex * 0.1) * 3600000)
+  const seed = capturedAt.getTime() + platform.length + query.queryText.length + sampleIndex * 7919
+
+  // 近 7 天提到 ZoomerAI 的概率更高（呼应「优化后效果提升」叙事）
+  const isRecent = daysAgo <= 7
+  const isBrandQuery = query.intentType === 'definitional' || query.queryText.includes('ZoomerAI')
+  const baseMentionProb = isBrandQuery ? 0.95 : (isRecent ? 0.42 : 0.22)
+  const brandMentioned = seededRandom(seed) < baseMentionProb
+
+  // 约 3% 的采样失败：演示失败隔离（失败行进指标，但可以在报告里看到原因）
+  const failed = seededRandom(seed + 999) < 0.03
+  if (failed) {
+    return {
+      platform,
+      sampleIndex,
+      capturedAt,
+      status: 'FAILED',
+      brandMentioned: false,
+      brandSourceCited: false,
+      rankInAnswer: null,
+      citedUrls: [],
+      sourceCitations: [],
+      competitors: [],
+      rawAnswer: '',
+      sovScore: null,
+      failureReason: 'upstream timeout after 30000ms',
+      analysis: { error: 'upstream timeout after 30000ms' },
+    }
+  }
+
+  const rankInAnswer = brandMentioned ? 1 + Math.floor(seededRandom(seed + 1) * 5) : null
+  const sovScore = brandMentioned
+    ? Math.max(0.05, 0.5 - (rankInAnswer - 1) * 0.08 + (seededRandom(seed + 2) - 0.5) * 0.1)
+    : 0
+
+  const competitorsInAnswer = []
+  for (const c of COMPETITORS) {
+    if (seededRandom(seed + c.length) < 0.4) {
+      competitorsInAnswer.push({
+        name: c,
+        mentioned: true,
+        rank: 1 + Math.floor(seededRandom(seed + c.length + 1) * 6),
+      })
+    }
+  }
+
+  const answerPool = brandMentioned ? sampleAnswers.mentioned : sampleAnswers.notMentioned
+  return {
+    platform,
+    sampleIndex,
+    capturedAt,
+    status: 'OK',
+    brandMentioned,
+    brandSourceCited: brandMentioned && seededRandom(seed + 4) < 0.4,
+    rankInAnswer,
+    citedUrls: brandMentioned && seededRandom(seed + 5) < 0.5 ? ['https://zoomer.top'] : [],
+    sourceCitations: brandMentioned && seededRandom(seed + 6) < 0.3
+      ? [{ url: 'https://zoomer.top', title: 'ZoomerAI - AI 图像生成平台' }]
+      : [],
+    competitors: competitorsInAnswer,
+    rawAnswer: answerPool[Math.floor(seededRandom(seed + 3) * answerPool.length)],
+    sovScore: Math.round(sovScore * 100) / 100,
+    failureReason: null,
+  }
+}
+
 let eventCount = 0
-for (const query of createdQueries) {
-  // 每个查询在 30 天内被各平台监测 2-4 次
-  for (const platform of PLATFORMS) {
-    const runs = 2 + Math.floor(Math.random() * 3) // 2-4 次
-    for (let i = 0; i < runs; i++) {
-      const daysAgo = Math.floor(Math.random() * 30)
-      const capturedAt = new Date(NOW - daysAgo * DAY - Math.random() * DAY)
-      const seed = capturedAt.getTime() + platform.length + query.queryText.length
-      const r = seededRandom(seed)
+let runCount = 0
 
-      // 近 7 天提到 ZoomerAI 的概率更高（呼应「优化后效果提升」叙事）
-      const isRecent = daysAgo <= 7
-      const isBrandQuery = query.intentType === 'definitional' || query.queryText.includes('ZoomerAI')
-      const baseMentionProb = isBrandQuery ? 0.95 : (isRecent ? 0.42 : 0.22)
-      const brandMentioned = r < baseMentionProb
+// --- 3a. 每日一个物理 Run（最近 25 天）---
+for (let daysAgo = LEGACY_DAYS; daysAgo < TOTAL_DAYS; daysAgo++) {
+  const startedAt = new Date(NOW - daysAgo * DAY + 2 * 3600000) // 模拟 02:00 触发
+  const dayKey = shanghaiDayKey(startedAt)
+  const slotKey = `${WS_ID}:${dayKey}`
 
-      // 排名：被提及的 1-5，未提及 null
-      const rankInAnswer = brandMentioned
-        ? 1 + Math.floor(seededRandom(seed + 1) * 5)
-        : null
+  const run = await prisma.citationRun.create({
+    data: {
+      workspaceId: WS_ID,
+      trigger: 'SCHEDULED',
+      sampleCount: SAMPLE_COUNT,
+      platforms: PLATFORMS,
+      querySnapshot: createdQueries.map((q) => ({ id: q.id, text: q.queryText })),
+      plannedUnits: SAMPLE_COUNT * createdQueries.length * PLATFORMS.length,
+      completedUnits: 0,
+      failedUnits: 0,
+      status: 'RUNNING',
+      slotKey,
+      startedAt,
+    },
+  })
+  runCount++
 
-      // SOV：被提及且排名靠前则高
-      const sovScore = brandMentioned
-        ? Math.max(0.05, 0.5 - (rankInAnswer - 1) * 0.08 + (seededRandom(seed + 2) - 0.5) * 0.1)
-        : 0
-
-      // 竞品在答案中的分布
-      const competitorsInAnswer = []
-      for (const c of COMPETITORS) {
-        if (seededRandom(seed + c.length) < 0.4) {
-          competitorsInAnswer.push({
-            name: c,
-            mentioned: true,
-            rank: 1 + Math.floor(seededRandom(seed + c.length + 1) * 6),
-          })
-        }
-      }
-
-      const answerPool = brandMentioned ? sampleAnswers.mentioned : sampleAnswers.notMentioned
-      const rawAnswer = answerPool[Math.floor(seededRandom(seed + 3) * answerPool.length)]
-
-      await prisma.citationEvent.create({
-        data: {
+  const rows = []
+  for (const query of createdQueries) {
+    for (const platform of PLATFORMS) {
+      for (let s = 1; s <= SAMPLE_COUNT; s++) {
+        rows.push({
           workspaceId: WS_ID,
           queryId: query.id,
-          platform,
-          brandMentioned,
-          brandSourceCited: brandMentioned && seededRandom(seed + 4) < 0.4,
-          rankInAnswer,
-          citedUrls: brandMentioned && seededRandom(seed + 5) < 0.5 ? ['https://zoomer.top'] : [],
-          sourceCitations: brandMentioned && seededRandom(seed + 6) < 0.3
-            ? [{ url: 'https://zoomer.top', title: 'ZoomerAI - AI 图像生成平台' }]
-            : [],
-          competitors: competitorsInAnswer,
-          rawAnswer,
-          sovScore: Math.round(sovScore * 100) / 100,
-          capturedAt,
-        },
+          runId: run.id,
+          ...buildSample(query, platform, daysAgo, s),
+        })
+      }
+    }
+  }
+  await prisma.citationEvent.createMany({ data: rows })
+  eventCount += rows.length
+
+  // 终态回填（与 Monitor 收尾同一套计数口径）
+  const okCount = rows.filter((r) => r.status === 'OK').length
+  const failedCount = rows.length - okCount
+  const status = okCount === 0 ? 'FAILED' : (failedCount === 0 ? 'COMPLETED' : 'PARTIAL')
+  await prisma.citationRun.update({
+    where: { id: run.id },
+    data: {
+      status,
+      completedUnits: okCount,
+      failedUnits: failedCount,
+      finishedAt: new Date(startedAt.getTime() + 20 * 60000),
+    },
+  })
+  // 参与查询刷新 lastRunAt
+  await prisma.citationQuery.updateMany({
+    where: { id: { in: createdQueries.map((q) => q.id) } },
+    data: { lastRunAt: startedAt },
+  })
+}
+
+// --- 3b. 最近 5 天：纯 legacy 事件（runId=null），照亮日桶与切换日 ---
+const legacyRows = []
+for (const query of createdQueries) {
+  for (const platform of PLATFORMS) {
+    const times = 1 + Math.floor(seededRandom(platform.length + query.queryText.length) * 2)
+    for (let i = 0; i < times; i++) {
+      const daysAgo = Math.floor(seededRandom(i + platform.length + query.queryText.length * 3) * LEGACY_DAYS)
+      legacyRows.push({
+        workspaceId: WS_ID,
+        queryId: query.id,
+        runId: null,
+        ...buildSample(query, platform, daysAgo, 1),
+        sampleIndex: 1,
       })
-      eventCount++
     }
   }
 }
-console.log(`✅ CitationEvent 已填充: ${eventCount} 条（跨 ${PLATFORMS.length} 平台 × ${createdQueries.length} 查询 × 30 天）`)
+await prisma.citationEvent.createMany({ data: legacyRows })
+eventCount += legacyRows.length
+
+console.log(`✅ CitationRun 已填充: ${runCount} 个（近 ${TOTAL_DAYS - LEGACY_DAYS} 天，每日一个，N=${SAMPLE_COUNT}）`)
+console.log(`✅ CitationEvent 已填充: ${eventCount} 条（其中最近 ${LEGACY_DAYS} 天为纯 legacy 事件，用于日桶合成与切换日）`)
 
 // === 4. ContentPage（ZoomerAI 真实页面，含原始内容）===
 const PAGES = [
