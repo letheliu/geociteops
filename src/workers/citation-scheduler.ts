@@ -91,6 +91,13 @@ export async function startCitationScheduler(deps: SchedulerDeps): Promise<void>
   }
 
   await deps.boss.work(CITATION_QUEUES.cronDaily, async () => {
+    // 每日首件事：回收孤儿 RUNNING（进程崩溃未收尾的 Run，规格 §6"防 RUNNING 挂死"）
+    try {
+      const reaped = await deps.monitor.failStaleRunningRuns()
+      if (reaped > 0) console.warn(`[scheduler] 回收孤儿 RUNNING Run ${reaped} 个（疑为进程崩溃遗留）`)
+    } catch (err) {
+      console.error('[scheduler] 孤儿回收失败（不影响后续扇出）:', err)
+    }
     await fanOut('DAILY')
   })
   await deps.boss.work(CITATION_QUEUES.cronWeekly, async () => {

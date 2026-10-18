@@ -43,6 +43,7 @@ describe('citation scheduler', () => {
       },
       monitor: {
         startScheduledRun: vi.fn().mockResolvedValue({ runId: 'run-1', skipped: false, resumed: false, status: 'COMPLETED' }),
+        failStaleRunningRuns: vi.fn().mockResolvedValue(0),
         resumeRun: vi.fn().mockResolvedValue(null),
         runOnce: vi.fn(),
       },
@@ -202,5 +203,13 @@ describe('citation scheduler', () => {
     expect(deps.monitor.startScheduledRun.mock.calls[0][0].slotKey).toBe(
       deps.monitor.startScheduledRun.mock.calls[1][0].slotKey,
     )
+  })
+  it('daily cron 在扇出前调用 failStaleRunningRuns，且失败不阻断扇出', async () => {
+    await startCitationScheduler(deps)
+    deps.monitor.failStaleRunningRuns = vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValue(1)
+    boss.send.mockClear()
+    await handlerOf(CITATION_QUEUES.cronDaily)({ data: {} })
+    expect(deps.monitor.failStaleRunningRuns).toHaveBeenCalled()
+    expect(boss.send).toHaveBeenCalled() // 回收抛错后扇出仍发生
   })
 })

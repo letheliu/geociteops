@@ -89,6 +89,14 @@ export interface Monitor {
   /** 执行一个 RUNNING 态 Run 的全部缺失采样并收尾 */
   executeRunById(runId: string): Promise<RunOutcome | null>
   resumeRun(runId: string): Promise<RunOutcome | null>
+  /**
+   * 孤儿 RUNNING 回收：进程崩溃/重启会留下未收尾的 Run（executeRunById 的
+   * fire-and-forget 不保证跨进程）。超过 olderThanMs（缺省 2×run deadline）
+   * 仍 RUNNING 的行置 FAILED + ORPHANED 说明。幂等（where status=RUNNING），
+   * 由每日 cron 在扇出前调用。趋势层对 RUNNING 本就按样本推导状态，此处
+   * 主要影响 Reports 展示与 slot 续跑判定（规格 §6"防 RUNNING 挂死"）。
+   */
+  failStaleRunningRuns(olderThanMs?: number): Promise<number>
   /** 薄封装：跑一轮并回传产生的采样行（兼容旧调用与测试） */
   runOnce(input: { workspaceId: string; platforms: string[] }): Promise<CitationEvent[]>
 }
@@ -535,6 +543,20 @@ export function createMonitor(deps: MonitorDeps): Monitor {
         data: { status: 'RUNNING', finishedAt: null, updatedAt: now() },
       })
       return executeRun(runId)
+    },
+
+    async failStaleRunningRuns(olderThanMs) {
+      const cutoff = new Date(now().getTime() - (olderThanMs ?? 2 * resolveDeadlineMs(deps)))
+      const res = await deps.prisma.citationRun.updateMany({
+        where: { status: 'RUNNING', startedAt: { lt: cutoff } },
+        data: {
+          status: 'FAILED',
+          failureReason: 'ORPHANED: runner process did not finalize (suspected crash/restart)',
+          finishedAt: now(),
+          updatedAt: now(),
+        },
+      })
+      return res.count
     },
 
     /** 薄封装：跑一轮并回传本次 Run 的 OK 采样行（兼容旧调用与测试） */

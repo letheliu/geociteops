@@ -604,3 +604,34 @@ describe('monitor — Run 编排', () => {
     expect(row.sovScore).toBeGreaterThan(0)
   })
 })
+
+describe('failStaleRunningRuns：孤儿 RUNNING 回收（评审修复）', () => {
+  function janitorMonitor(db: ReturnType<typeof makePrisma>) {
+    return createMonitor({
+      prisma: db.prisma,
+      registry: registryOf({ openai: okAdapter() }),
+      queryLibrary: stubQueryLibrary(),
+    } as any)
+  }
+
+  it('超龄 RUNNING → updateMany 置 FAILED + ORPHANED 说明，where 含 status=RUNNING 与 startedAt lt cutoff', async () => {
+    const db = makePrisma()
+    const n = await janitorMonitor(db).failStaleRunningRuns(10_000)
+    expect(n).toBe(0) // mock 的 updateMany 按 id 过滤不命中，此处验证调用契约
+    const call = db.callLog.runUpdateMany.at(-1)!
+    expect(call.where.status).toBe('RUNNING')
+    expect(call.where.startedAt.lt).toBeInstanceOf(Date)
+    expect(call.data.status).toBe('FAILED')
+    expect(call.data.failureReason).toMatch(/ORPHANED/)
+    expect(call.data.finishedAt).toBeInstanceOf(Date)
+  })
+
+  it('olderThanMs 缺省 = 2 × run deadline（默认 60 分钟）', async () => {
+    const db = makePrisma()
+    const before = Date.now()
+    await janitorMonitor(db).failStaleRunningRuns()
+    const cutoff = db.callLog.runUpdateMany.at(-1)!.where.startedAt.lt as Date
+    expect(cutoff.getTime()).toBeGreaterThan(before - 2 * 30 * 60 * 1000 - 5_000)
+    expect(cutoff.getTime()).toBeLessThan(before - 2 * 30 * 60 * 1000 + 5_000)
+  })
+})
