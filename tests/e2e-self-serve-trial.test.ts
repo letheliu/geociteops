@@ -84,7 +84,7 @@ describe('e2e: self-serve 试用全旅程', () => {
       username: `trialuser${Date.now().toString(36)}`,
       password: 'Zx9!qwerty',
       email: `trial${Date.now().toString(36)}@example.com`,
-      brandName: '试用品牌',
+      brandName: 'zoomer AI', // 对齐 FakeAdapter 答案叙事（提及率>0 断言的前提）
       ip: '203.0.113.9',
     })
     created = { organizationId: result.trial.organizationId, workspaceId: result.trial.workspaceId }
@@ -163,7 +163,9 @@ describe('e2e: self-serve 试用全旅程', () => {
   it('monitorSampleCountMax 硬检查：TRIAL org 传 sampleCount=10 被拒，传 3 放行', async () => {
     const prisma = getPrismaClient()
     const audit = createAuditService(prisma)
-    const guard = createEntitlementGuard({ prisma, meter: createUsageMeter({ prisma }), audit })
+    // 显式注入 enforcement：CI 进程 env 不设 BILLING_ENFORCEMENT（避免影响其他
+    // 用例的 off 语义），本用例的硬检查必须按 on 判定
+    const guard = createEntitlementGuard({ prisma, meter: createUsageMeter({ prisma }), audit, enforcement: () => true })
 
     await expect(
       guard.checkMonitorSampleCountMax(created!.organizationId, 10),
