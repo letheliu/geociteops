@@ -9,7 +9,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet.
+M2 §3.1 "monitoring credibility". Monitoring used to mean "one fetch, one row"; it now means
+"one **run** = N samples", and every reported number is a read-time aggregate over that run.
+
+### Added
+
+- **`CitationRun`** — one monitoring run: trigger, effective sample count, platform/query snapshot,
+  unit counters, terminal status, and a unique `slotKey` (`{workspaceId}:{YYYY-MM-DD Asia/Shanghai}`)
+  that guarantees at most one run per slot per day.
+- **Per-workspace scheduling** — `DAILY` 02:00 and `WEEKLY` Sunday 03:00, both with
+  `tz: 'Asia/Shanghai'`; per-query `scheduled` switch to opt out of timed runs only
+  (`status: PAUSED` still excludes a query from every run, manual included).
+- **Manual trigger** — `citation.runs.create` returns a `runId` immediately and samples in the
+  background; poll `citation.runStatus`.
+- **Run-oriented reporting** — `citation.runs.list` (physical runs plus synthesized
+  `legacy:<date>` day buckets) and `citation.runs.samples` (per-run sample detail incl. `rawAnswer`).
+- **`citation.trend`** — a trend series whose points are runs, with optional `queryId` / `platform`
+  filters, a ≤366-day range, and `TrendChart` in the console (SOV share main line, mention/citation
+  rate switch, ±`sovStdDev` band, PARTIAL markers, dashed legacy points).
+- **Shared `fetchWithTimeout`** (default 30 s, `CITATION_FETCH_TIMEOUT_MS`) and a shared
+  `sanitizeMessage` now used by both the monitoring and diagnostic modules.
+- **Unit cap** — `MAX_RUN_UNITS = 400`; the effective N is clamped to `max(1, floor(400 / (Q×P)))`
+  and the run records `N clamped 10→5: unit cap 400` rather than rejecting silently.
+
+### Changed
+
+- **Breaking — metric renaming.** The old `getSovScore` response field `sovScore` was in fact the
+  *mention rate*, not share of voice. The share metric is now `sovMean`, and the mention/citation
+  rates are `brandMentionRate` / `brandSourceCitationRate`. `getEffectComparison` returns the same
+  aggregated shape for `before` / `after` / `delta`.
+- **Breaking — micro → macro.** Rate metrics are averaged per `query × platform` group and then
+  across groups (groups count equally regardless of sample count), instead of pooling raw events.
+  `rankMedian` is a pooled median; `rankBest` is a true global minimum. Trend numbers therefore
+  will not reproduce the previous per-day figures exactly.
+- **Breaking — `trackQuery` / `batchTrack` removed.** Both ignored their input and blocked on the
+  whole run. Use `citation.runs.create` instead.
+- **Sampling no longer pins `temperature`.** `temperature: 0` was removed from every adapter request
+  body: it made N identical samples deterministic and defeated the purpose of sampling. Variance now
+  comes from platform retrieval and model non-determinism.
+- **Failures are isolated to a sample.** A failed or timed-out sample is stored as a `FAILED` row
+  (`rawAnswer: ''`, `brandMentioned: false`, `sovScore: null`, sanitized `analysis.error`) instead of
+  being silently dropped. Runs end as `COMPLETED` / `PARTIAL` / `FAILED`; only runs with at least
+  one OK sample enter the trend.
+- **Legacy data is readable, not rewritten.** Events predating `CitationRun` (`runId = null`) are
+  synthesized into per-day buckets at read time and suppressed on days that already have a physical
+  run. `getReport` stays sample-level but now filters to OK rows.
+
+### Removed
+
+- `src/modules/citation-monitor/metrics.ts` — no business callers; its micro averages are superseded
+  by the aggregation layer.
+
+### Security
+
+- `failureReason` on both runs and samples, and the `analysis.error` object, pass through the shared
+  sanitizer, so platform error text containing credentials is masked before it reaches the database.
+- `citation.runStatus` / `runs.samples` scope lookups by `ctx.workspace.id`; a run id from another
+  workspace returns `NOT_FOUND` rather than another workspace's data.
 
 ## [0.1.0] - 2026-10-17
 
