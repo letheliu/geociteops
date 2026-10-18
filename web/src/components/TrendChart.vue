@@ -7,6 +7,12 @@ import { LineChart } from 'echarts/charts'
 import { TooltipComponent, GridComponent, LegendComponent } from 'echarts/components'
 import { NEmpty, NRadioGroup, NRadioButton } from 'naive-ui'
 
+// echarts/core 是按需注册制：本组件必须自己注册所需的 renderer/chart/component。
+// 缺了这一步，冷加载直接进 Dashboard（本组件唯一被直接渲染的入口）会因为
+// 组件未注册而抛 `X is not a constructor` 并渲染不出 canvas；先访问过
+// SovAnalytics.vue（它自己注册过）后碰巧正常，属于典型的顺序依赖。
+use([CanvasRenderer, LineChart, TooltipComponent, GridComponent, LegendComponent])
+
 /**
  * 监测趋势图（规格 §8）：一个点 = 一次运行（N 次采样的聚合），不是一天一次抓取。
  *
