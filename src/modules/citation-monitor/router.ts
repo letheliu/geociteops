@@ -9,6 +9,7 @@ import {
   type RunListRow,
 } from './trend-query.js'
 import { MAX_SAMPLE_COUNT, MIN_SAMPLE_COUNT } from './monitor.js'
+import { QuotaExceededError, resolveWorkspaceOrganization } from '../../platform/billing/entitlement-guard.js'
 
 /**
  * 监测读路径（规格 §5）。
@@ -191,6 +192,30 @@ export const citationRouter = router({
           }
           if (found.some((q: { status: string }) => q.status !== 'ACTIVE')) {
             throw new TRPCError({ code: 'BAD_REQUEST', message: 'queryIds 含非 ACTIVE 查询（PAUSED 不参与任何运行）' })
+          }
+        }
+
+        // M2 §3.0：显式指定 N 时按配额硬检查（试用声明 3 → 传 10 直接拒）。
+        // 必须在 createManualRun 之前——Run 一旦建出来就已在跑，事后拦不住。
+        if (input.sampleCount !== undefined && ctx.services.billing) {
+          const organizationId =
+            ctx.workspace.organizationId ??
+            (await resolveWorkspaceOrganization(ctx.services.prisma, ctx.workspace.id))
+          if (organizationId) {
+            try {
+              await ctx.services.billing.guard.checkMonitorSampleCountMax(
+                organizationId,
+                clampSampleCount(input.sampleCount),
+              )
+            } catch (err) {
+              if (err instanceof QuotaExceededError) {
+                throw new TRPCError({
+                  code: 'BAD_REQUEST',
+                  message: `采样数 N 超出套餐上限：本次请求 ${clampSampleCount(input.sampleCount)}，套餐允许最多 ${err.limit}`,
+                })
+              }
+              throw err
+            }
           }
         }
 

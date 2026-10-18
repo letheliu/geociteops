@@ -128,6 +128,7 @@ async function main() {
     queryLibrary,
     competitors: [], // 生产环境从配置加载
     resolveConfig: resolver.resolveConfig,
+    billing,
   })
 
   // 组装 content-optimizer 组件
@@ -297,6 +298,7 @@ async function main() {
     // 任务 12：identity/session/audit/workspaceAdmin/loginRateLimiter/getWorkspaceSummary
     identity: identityService,
     registration: registrationService,
+    billing,
     session: sessionService,
     audit: auditService,
     workspaceAdmin: workspaceAdminService,

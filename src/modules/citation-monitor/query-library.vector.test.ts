@@ -39,6 +39,9 @@ function mockPrisma() {
       update: vi.fn().mockResolvedValue({}),
       delete: vi.fn().mockResolvedValue({}),
     },
+    // M2 §3.0：generateQueries 先判组织来源（缺省正式组织 → 既有行为不受影响）
+    workspace: { findUnique: vi.fn().mockResolvedValue({ id: 'w1', organizationId: 'org-1' }) },
+    organization: { findUnique: vi.fn().mockResolvedValue({ id: 'org-1', source: 'PLATFORM' }) },
   } as any
 }
 

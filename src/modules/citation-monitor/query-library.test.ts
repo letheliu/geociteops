@@ -20,6 +20,13 @@ function mockPrisma() {
       })),
       delete: vi.fn().mockResolvedValue({ id: 'q1' }),
     },
+    // M2 §3.0：generateQueries 先查组织来源判试用租户（缺省正式组织 = 既有行为不受影响）
+    workspace: {
+      findUnique: vi.fn().mockResolvedValue({ id: 'w1', organizationId: 'org-1' }),
+    },
+    organization: {
+      findUnique: vi.fn().mockResolvedValue({ id: 'org-1', source: 'PLATFORM' }),
+    },
   } as any
 }
 
@@ -262,5 +269,76 @@ describe('query library 计费检查点（任务 9）', () => {
     expect(meterPrisma.usageRecord.aggregate).not.toHaveBeenCalled()
     expect(meterAudit.record).not.toHaveBeenCalled()
     expect(meter.pending()).toBe(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.0：试用租户（Organization.source='TRIAL'）的生成禁用 + maxQueries 软限钉子
+// ---------------------------------------------------------------------------
+
+describe('query library 试用租户策略（M2 §3.0）', () => {
+  function assembleTrial(source: string | null) {
+    const prisma: any = mockPrisma()
+    prisma.workspace = { findUnique: vi.fn(async () => ({ id: 'w1', organizationId: 'org-1' })) }
+    prisma.organization = { findUnique: vi.fn(async () => (source === null ? null : { id: 'org-1', source })) }
+    const llm = { chat: vi.fn(async () => ({ text: '["AI设计工具"]', usage: null })) }
+    const svc = createQueryLibraryService(prisma, llm as any)
+    return { prisma, svc, llm }
+  }
+
+  it('TRIAL 组织：generateQueries 明确拒绝「试用版请手动添加查询」，且不触达 LLM', async () => {
+    const { svc, llm } = assembleTrial('TRIAL')
+    await expect(svc.generateQueries({ workspaceId: 'w1', topic: 'AI设计', count: 5 })).rejects.toMatchObject({
+      name: 'TRIAL_GENERATION_DISABLED',
+      message: '试用版请手动添加查询',
+    })
+    expect(llm.chat).not.toHaveBeenCalled()
+  })
+
+  it('回归：正式组织（source=PLATFORM）生成不受影响', async () => {
+    const { svc, llm } = assembleTrial('PLATFORM')
+    const created = await svc.generateQueries({ workspaceId: 'w1', topic: 'AI设计', count: 1 })
+    expect(llm.chat).toHaveBeenCalledTimes(1)
+    expect(created).toHaveLength(1)
+  })
+
+  it('maxQueries 软限钉子：试用配额 10、已用 10，第 11 条仍创建成功（软限只审计）', async () => {
+    const prisma: any = mockPrisma()
+    prisma.workspace = { findUnique: vi.fn(async () => ({ id: 'w1', organizationId: 'org-1' })) }
+    prisma.organizationEntitlement = {
+      findUnique: vi.fn(async () => ({
+        organizationId: 'org-1',
+        limits: { maxWorkspaces: 1, maxQueries: 10, allowedPlatforms: [], monitorSampleCountMax: 3 },
+      })),
+    }
+    const meterPrisma = {
+      usageRecord: {
+        createMany: vi.fn(async () => ({ count: 0 })),
+        aggregate: vi.fn(async () => ({ _sum: { quantity: 10 } })),
+      },
+    } as any
+    const meterAudit = { record: vi.fn(async () => {}), list: vi.fn(async () => ({ items: [], total: 0 })) }
+    const meter = createUsageMeter({ prisma: meterPrisma })
+    const guard = createEntitlementGuard({
+      prisma,
+      meter,
+      audit: meterAudit as any,
+      enforcement: () => true,
+    })
+    const svc = createQueryLibraryService(prisma, undefined, undefined, { guard, meter })
+
+    const q = await svc.addQuery({ workspaceId: 'w1', queryText: '第 11 条', source: 'MANUAL' })
+
+    expect(q.id).toBe('q-1')
+    expect(prisma.citationQuery.create).toHaveBeenCalledTimes(1)
+    expect(meterAudit.record).toHaveBeenCalledWith({
+      actorType: 'SYSTEM',
+      action: 'quota.soft_exceeded',
+      organizationId: 'org-1',
+      diff: { kind: 'maxQueries', current: 10, limit: 10, organizationId: 'org-1' },
+    })
+    await meter.flush()
+    const rows = meterPrisma.usageRecord.createMany.mock.calls[0][0].data
+    expect(rows[0]).toMatchObject({ kind: 'QUERY_ADDED', quantity: 1 })
   })
 })

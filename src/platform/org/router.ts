@@ -24,6 +24,8 @@ import {
 } from '../tenancy/workspace-admin.js'
 import { createOrgService } from './service.js'
 import type { OrgService } from './service.js'
+import { QuotaExceededError } from '../billing/entitlement-guard.js'
+import type { BillingCheckpoints } from '../billing/entitlement-guard.js'
 
 /** 成员管理可授予的企业角色（zod 物理排除 ORG_OWNER——控制者裁定：OWNER 由平台侧创建） */
 const orgMemberRoleSchema = z.enum(['ORG_MEMBER', 'ORG_VIEWER'])
@@ -264,6 +266,27 @@ export const orgRouter = router({
       .mutation(async ({ ctx, input }) => {
         const { workspaceId, ...fields } = input
         try {
+          // M2 §3.0：保存 N 前按配额硬检查（试用声明 3 → 保存 5 直接拒）。
+          // 这是 N 的第一生效点：工作区里存的值会喂给调度路径。
+          if (fields.monitorSampleCount !== undefined) {
+            const billing = (ctx as { services?: { billing?: BillingCheckpoints } }).services?.billing
+            if (billing) {
+              try {
+                await billing.guard.checkMonitorSampleCountMax(
+                  actorOrgId(ctx),
+                  fields.monitorSampleCount,
+                )
+              } catch (err) {
+                if (err instanceof QuotaExceededError) {
+                  throw new TRPCError({
+                    code: 'BAD_REQUEST',
+                    message: `采样数 N 超出套餐上限：本次设置 ${fields.monitorSampleCount}，套餐允许最多 ${err.limit}`,
+                  })
+                }
+                throw err
+              }
+            }
+          }
           return await getOrgService(ctx).updateWorkspace(
             actorOrgId(ctx),
             workspaceId,

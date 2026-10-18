@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { citationRouter } from './router.js'
+import { QuotaExceededError } from '../../platform/billing/entitlement-guard.js'
 
 function createCaller(ctx: any) {
   return citationRouter.createCaller(ctx)
@@ -558,5 +559,72 @@ describe('citation 模块 × 试用到期两态（只读保留）', () => {
       message: expect.stringContaining('SUSPENDED'),
     })
     expect(monitor.createManualRun).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.0 monitorSampleCountMax 硬检查：runs.create 的 sampleCount 覆盖绕过点
+// （审查重点 #2 钉子——N 的钳制只看 1..10，试用声明 3 时传 10 必须被拒）
+// ---------------------------------------------------------------------------
+
+describe('citation.runs.create × monitorSampleCountMax 硬检查', () => {
+  function makeQuotaCtx(declared: number | undefined) {
+    const monitor = {
+      createManualRun: vi.fn(async () => ({ runId: 'run-new', skipped: false, resumed: false, status: 'RUNNING' })),
+      executeRunById: vi.fn(async () => ({ runId: 'run-new', status: 'COMPLETED', completedUnits: 1, failedUnits: 0 })),
+    }
+    const guard = {
+      checkMonitorSampleCountMax: vi.fn(async (_orgId: string, requested: number) => {
+        if (declared === undefined) return
+        if (requested > declared) {
+          throw new QuotaExceededError({
+            field: 'monitorSampleCountMax',
+            limit: declared,
+            current: requested,
+            organizationId: 'org-1',
+          })
+        }
+      }),
+    }
+    const quotaCtx: any = {
+      workspace: { id: 'w1', organizationId: 'org-1', defaultBrandName: 'zoomer AI', status: 'ACTIVE' },
+      actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
+      requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
+      services: { monitor, billing: { guard }, prisma: makeDb(), queryLibrary: {} },
+    }
+    return { quotaCtx, monitor, guard }
+  }
+
+  it('TRIAL org（声明 3）传 sampleCount=10 → 拒，且不建 Run', async () => {
+    const { quotaCtx, monitor, guard } = makeQuotaCtx(3)
+    await expect(createCaller(quotaCtx).runs.create({ platforms: ['openai'], sampleCount: 10 })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('超出套餐上限'),
+    })
+    expect(guard.checkMonitorSampleCountMax).toHaveBeenCalledWith('org-1', 10)
+    expect(monitor.createManualRun).not.toHaveBeenCalled()
+  })
+
+  it('声明 3 传 sampleCount=3 → 放行（边界含等）', async () => {
+    const { quotaCtx, monitor } = makeQuotaCtx(3)
+    await expect(createCaller(quotaCtx).runs.create({ platforms: ['openai'], sampleCount: 3 })).resolves.toMatchObject({
+      runId: 'run-new',
+    })
+    expect(monitor.createManualRun).toHaveBeenCalled()
+  })
+
+  it('键缺失（未声明上限）→ 不受限，传 10 放行', async () => {
+    const { quotaCtx } = makeQuotaCtx(undefined)
+    await expect(createCaller(quotaCtx).runs.create({ platforms: ['openai'], sampleCount: 10 })).resolves.toMatchObject({
+      runId: 'run-new',
+    })
+  })
+
+  it('未传 sampleCount → 不做配额检查（用工作区配置值，由调度侧钳制）', async () => {
+    const { quotaCtx, guard } = makeQuotaCtx(3)
+    await expect(createCaller(quotaCtx).runs.create({ platforms: ['openai'] })).resolves.toMatchObject({
+      runId: 'run-new',
+    })
+    expect(guard.checkMonitorSampleCountMax).not.toHaveBeenCalled()
   })
 })

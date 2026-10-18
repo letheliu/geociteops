@@ -5,6 +5,7 @@ import {
   resolveWorkspaceOrganization,
   type BillingCheckpoints,
 } from '../../platform/billing/entitlement-guard.js'
+import { TRIAL_ORG_SOURCE } from '../../platform/identity/registration-service.js'
 
 export interface AddQueryInput {
   workspaceId: string
@@ -57,6 +58,34 @@ function normalizeQueryDraft(raw: any): GeneratedQueryDraft {
     mappedPageUrl: raw.mappedPageUrl,
     priority: raw.priority || 3,
   }
+}
+
+/** 试用租户禁止 LLM 查询生成（文案由 router/前端统一消费，勿另立说法） */
+export const TRIAL_GENERATION_DISABLED_MESSAGE = '试用版请手动添加查询'
+
+/** 试用租户调 LLM 生成查询：name 固定 TRIAL_GENERATION_DISABLED */
+export class TrialGenerationDisabledError extends Error {
+  constructor() {
+    super(TRIAL_GENERATION_DISABLED_MESSAGE)
+    this.name = 'TRIAL_GENERATION_DISABLED'
+  }
+}
+
+/** 工作区所属组织是否为自助试用租户（Organization.source='TRIAL'） */
+export async function isTrialWorkspace(
+  prisma: Pick<PrismaClient, 'workspace' | 'organization'>,
+  workspaceId: string,
+): Promise<boolean> {
+  const workspace = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { organizationId: true },
+  })
+  if (!workspace) return false
+  const org = await prisma.organization.findUnique({
+    where: { id: workspace.organizationId },
+    select: { source: true },
+  })
+  return org?.source === TRIAL_ORG_SOURCE
 }
 
 export function createQueryLibraryService(
@@ -163,6 +192,13 @@ export function createQueryLibraryService(
     },
 
     async generateQueries(input) {
+      // M2 §3.0 成本口子：查询生成/embedding 走平台侧 OPENAI_API_KEY，试用租户
+      // （Organization.source='TRIAL'）一律禁用生成入口——平台方 LLM 成本严格归零，
+      // 手动添加不限（仍受 maxQueries 软限审计）。判定直查 prisma 不缓存：
+      // 试用转正（source 变更）后无需等缓存过期即可恢复。
+      if (await isTrialWorkspace(prisma, input.workspaceId)) {
+        throw new TrialGenerationDisabledError()
+      }
       if (!llm) throw new Error('LLM provider required for generateQueries')
       const prompt = `为主题"${input.topic}"生成 ${input.count} 个用户可能在 AI 搜索引擎中提问的 query。
 输出 JSON 数组，每个元素可以是字符串或包含以下字段的对象：
