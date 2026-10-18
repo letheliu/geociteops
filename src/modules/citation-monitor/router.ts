@@ -379,14 +379,96 @@ export const citationRouter = router({
    * 前端一键优化的禁用态因此不会与后端硬拒绝漂移。
    */
   weakPoints: protectedProcedure
-    .input(dateRangeInput)
+    .input(z.object({ dateRange: dateRangeInput }))
     .query(async ({ ctx, input }) => {
-      const { fromDay, toDay } = resolveRange(input)
+      const { fromDay, toDay } = resolveRange(input.dateRange)
       const [weakPoints, optimizationsAllowed] = await Promise.all([
         loadWeakPoints(ctx.services.prisma, { workspaceId: ctx.workspace.id, fromDay, toDay }),
         workspaceOptimizationsAllowed(ctx),
       ])
       return { weakPoints, optimizationsAllowed }
+    }),
+
+  /**
+   * 闭环看板（M2 §3.3 规格 §8）：AWAITING_VERIFICATION + VERIFIED 两态全量，
+   * 以 ctx.workspace.id 限定。Δ 为「发布后首个有效 run 的观测值」之差，
+   * **非因果效应**——UI 必须同口径提示（validSamples tooltip）。
+   */
+  loopBoard: protectedProcedure
+    .input(z.object({}).optional())
+    .query(async ({ ctx }) => {
+      const tasks = await ctx.services.prisma.optimizationTask.findMany({
+        where: { workspaceId: ctx.workspace.id, status: { in: ['AWAITING_VERIFICATION', 'VERIFIED'] } },
+        orderBy: { publishedAt: 'desc' },
+        select: {
+          id: true,
+          type: true,
+          queryId: true,
+          pageId: true,
+          status: true,
+          publishedAt: true,
+          verifiedAt: true,
+          baselineRunId: true,
+          verifiedRunId: true,
+          baselineSovMean: true,
+          verifiedSovMean: true,
+          baselineMentionRate: true,
+          verifiedMentionRate: true,
+          baselineValidSamples: true,
+          verifiedValidSamples: true,
+        },
+      })
+
+      // 查询文本与状态：queryId 可能为 null（查询已删）——呈现"查询已删除"
+      const queryIds = [
+        ...new Set(tasks.map((t: { queryId: string | null }) => t.queryId).filter((q: string | null): q is string => !!q)),
+      ]
+      const queries = queryIds.length > 0
+        ? await ctx.services.prisma.citationQuery.findMany({
+            where: { id: { in: queryIds }, workspaceId: ctx.workspace.id },
+            select: { id: true, queryText: true, status: true, scheduled: true },
+          })
+        : []
+      const queryById = new Map<string, { queryText: string; status: string; scheduled: boolean }>(
+        (queries as Array<{ id: string; queryText: string; status: string; scheduled: boolean }>).map((q) => [q.id, q]),
+      )
+
+      const delta = (a: number | null, b: number | null): number | null =>
+        a === null || b === null ? null : b - a
+
+      const rows = tasks.map((t: any) => {
+        const query = t.queryId ? queryById.get(t.queryId) : null
+        // 状态文案三分（规格 §7）：PAUSED > scheduled=false > 正常
+        let queryStateNote: string | null = null
+        if (!t.queryId) queryStateNote = '查询已删除'
+        else if (!query) queryStateNote = '查询已删除'
+        else if (query.status === 'PAUSED') queryStateNote = '查询已暂停，恢复监测后完成验证'
+        else if (query.scheduled === false) queryStateNote = '查询已退出定时监测'
+
+        return {
+          taskId: t.id,
+          type: t.type,
+          status: t.status,
+          queryId: t.queryId ?? null,
+          queryText: query ? query.queryText : null,
+          queryStateNote,
+          pageId: t.pageId ?? null,
+          publishedAt: t.publishedAt,
+          verifiedAt: t.verifiedAt,
+          baselineRunId: t.baselineRunId,
+          verifiedRunId: t.verifiedRunId,
+          baselineSovMean: t.baselineSovMean,
+          verifiedSovMean: t.verifiedSovMean,
+          baselineMentionRate: t.baselineMentionRate,
+          verifiedMentionRate: t.verifiedMentionRate,
+          baselineValidSamples: t.baselineValidSamples,
+          verifiedValidSamples: t.verifiedValidSamples,
+          deltaSovMean: delta(t.baselineSovMean, t.verifiedSovMean),
+          deltaMentionRate: delta(t.baselineMentionRate, t.verifiedMentionRate),
+        }
+      })
+
+      return { rows, optimizationsAllowed: await workspaceOptimizationsAllowed(ctx) }
     }),
 
   /**

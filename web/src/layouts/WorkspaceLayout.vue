@@ -64,6 +64,8 @@ const menuOptions: MenuOption[] = [
       { label: '引用报告', key: 'citation-reports', icon: renderIcon('📋') } as MenuOption,
       { label: 'SOV 分析', key: 'citation-sov', icon: renderIcon('📈') } as MenuOption,
       { label: '效果对比', key: 'citation-effect', icon: renderIcon('⚖️') } as MenuOption,
+      // M2 §3.3 闭环看板
+      { label: '闭环看板', key: 'citation-loop', icon: renderIcon('🔁') } as MenuOption,
     ],
   },
   {

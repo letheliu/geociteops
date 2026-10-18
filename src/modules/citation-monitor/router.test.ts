@@ -812,7 +812,7 @@ describe('citation weakPoints 端点（M2 §3.3）', () => {
 
   it('返回 weakPoints + optimizationsAllowed（同源布尔）', async () => {
     const { ctx, guard } = makeWpCtx(false)
-    const result = await createCaller(ctx).weakPoints({ start: '2026-10-01', end: '2026-10-31' })
+    const result = await createCaller(ctx).weakPoints({ dateRange: { start: '2026-10-01', end: '2026-10-31' } })
     expect(result.weakPoints).toEqual([])
     expect(result.optimizationsAllowed).toBe(false)
     expect(guard.isOptimizationsAllowed).toHaveBeenCalledWith('org-1')
@@ -821,7 +821,7 @@ describe('citation weakPoints 端点（M2 §3.3）', () => {
   it('超 366 天范围 → 拒（与趋势同一上限）', async () => {
     const { ctx } = makeWpCtx(true)
     await expect(
-      createCaller(ctx).weakPoints({ start: '2024-01-01', end: '2026-10-31' }),
+      createCaller(ctx).weakPoints({ dateRange: { start: '2024-01-01', end: '2026-10-31' } }),
     ).rejects.toThrow(/366/)
   })
 
@@ -833,7 +833,124 @@ describe('citation weakPoints 端点（M2 §3.3）', () => {
       requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
       services: { prisma: db, queryLibrary: {}, monitor: {} },
     }
-    const result = await createCaller(ctx).weakPoints({ start: '2026-10-01', end: '2026-10-31' })
+    const result = await createCaller(ctx).weakPoints({ dateRange: { start: '2026-10-01', end: '2026-10-31' } })
     expect(result.optimizationsAllowed).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.3 citation.loopBoard（规格 §8）：AWAITING + VERIFIED 全量，带查询文本、
+// queryId 为 null 的"查询已删除"呈现、optimizationsAllowed 同源布尔。
+// ---------------------------------------------------------------------------
+
+describe('citation loopBoard 端点（M2 §3.3）', () => {
+  function makeLoopCtx(opts: { allowed?: boolean; tasks?: any[]; queries?: any[] } = {}) {
+    const tasks = opts.tasks ?? []
+    const guard = { isOptimizationsAllowed: vi.fn(async () => opts.allowed ?? true) }
+    const db: any = {
+      optimizationTask: {
+        findMany: vi.fn(async ({ where }: any) => {
+          let list = tasks.slice()
+          if (where.workspaceId) list = list.filter((t) => t.workspaceId === where.workspaceId)
+          if (where.status?.in) list = list.filter((t) => where.status.in.includes(t.status))
+          return list
+        }),
+      },
+      citationQuery: {
+        findMany: vi.fn(async () => opts.queries ?? []),
+      },
+    }
+    const ctx: any = {
+      workspace: { id: 'w1', organizationId: 'org-1', status: 'ACTIVE' },
+      actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
+      requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
+      services: { prisma: db, queryLibrary: {}, monitor: {}, billing: { guard, meter: {} } },
+    }
+    return { ctx, db, guard, tasks }
+  }
+
+  it('返回 AWAITING + VERIFIED 全量并带上查询文本与 Δ', async () => {
+    const { ctx } = makeLoopCtx({
+      allowed: true,
+      tasks: [
+        {
+          id: 'task-1', workspaceId: 'w1', type: 'OPTIMIZE_FOR_QUERY', queryId: 'q1',
+          status: 'VERIFIED', publishedAt: new Date('2026-10-18T00:00:00Z'), verifiedAt: new Date('2026-10-19T00:00:00Z'),
+          baselineSovMean: 0.1, baselineMentionRate: 0, baselineValidSamples: 4,
+          verifiedSovMean: 0.3, verifiedMentionRate: 0.5, verifiedValidSamples: 4,
+        },
+        {
+          id: 'task-2', workspaceId: 'w1', type: 'OPTIMIZE_FOR_QUERY', queryId: 'q2',
+          status: 'AWAITING_VERIFICATION', publishedAt: new Date('2026-10-18T00:00:00Z'), verifiedAt: null,
+          baselineSovMean: 0.2, baselineMentionRate: 0.1, baselineValidSamples: 3,
+          verifiedSovMean: null, verifiedMentionRate: null, verifiedValidSamples: null,
+        },
+      ],
+      queries: [
+        { id: 'q1', queryText: 'AI 设计工具哪个好', status: 'ACTIVE', scheduled: true },
+        { id: 'q2', queryText: 'PDF 转换工具', status: 'PAUSED', scheduled: false },
+      ],
+    })
+
+    const result = await createCaller(ctx).loopBoard()
+    expect(result.optimizationsAllowed).toBe(true)
+    expect(result.rows).toHaveLength(2)
+
+    const verified = result.rows.find((r: any) => r.taskId === 'task-1')!
+    expect(verified.queryText).toBe('AI 设计工具哪个好')
+    expect(verified.deltaSovMean).toBeCloseTo(0.2)
+    expect(verified.deltaMentionRate).toBeCloseTo(0.5)
+    expect(verified.status).toBe('VERIFIED')
+
+    // 查询状态文案三分（规格 §7）：PAUSED 优先于 scheduled=false
+    const awaiting = result.rows.find((r: any) => r.taskId === 'task-2')!
+    expect(awaiting.queryStateNote).toBe('查询已暂停，恢复监测后完成验证')
+    expect(awaiting.deltaSovMean).toBeNull()
+  })
+
+  it('queryId 为 null（查询已删）→ 呈现"查询已删除"', async () => {
+    const { ctx } = makeLoopCtx({
+      tasks: [
+        {
+          id: 'task-3', workspaceId: 'w1', type: 'OPTIMIZE_FOR_QUERY', queryId: null,
+          status: 'AWAITING_VERIFICATION', publishedAt: new Date('2026-10-18T00:00:00Z'), verifiedAt: null,
+          baselineSovMean: 0.1, baselineMentionRate: 0, baselineValidSamples: 2,
+        },
+      ],
+      queries: [],
+    })
+    const result = await createCaller(ctx).loopBoard()
+    expect(result.rows[0].queryStateNote).toBe('查询已删除')
+    expect(result.rows[0].queryText).toBeNull()
+  })
+
+  it('scheduled=false（查询仍 ACTIVE）→ "查询已退出定时监测"', async () => {
+    const { ctx } = makeLoopCtx({
+      tasks: [
+        {
+          id: 'task-4', workspaceId: 'w1', type: 'OPTIMIZE_FOR_QUERY', queryId: 'q1',
+          status: 'AWAITING_VERIFICATION', publishedAt: new Date('2026-10-18T00:00:00Z'), verifiedAt: null,
+          baselineSovMean: 0.1, baselineMentionRate: 0, baselineValidSamples: 2,
+        },
+      ],
+      queries: [{ id: 'q1', queryText: 'Q', status: 'ACTIVE', scheduled: false }],
+    })
+    const result = await createCaller(ctx).loopBoard()
+    expect(result.rows[0].queryStateNote).toBe('查询已退出定时监测')
+  })
+
+  it('以 ctx.workspace.id 限定（不接受外部 workspaceId 入参）', async () => {
+    const { ctx, db } = makeLoopCtx({ tasks: [] })
+    await createCaller(ctx).loopBoard()
+    expect(db.optimizationTask.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ workspaceId: 'w1' }) }),
+    )
+  })
+
+  it('optimizationsAllowed 与 assert 同源（同一个 guard 方法）', async () => {
+    const { ctx, guard } = makeLoopCtx({ allowed: false, tasks: [] })
+    const result = await createCaller(ctx).loopBoard()
+    expect(result.optimizationsAllowed).toBe(false)
+    expect(guard.isOptimizationsAllowed).toHaveBeenCalledWith('org-1')
   })
 })
