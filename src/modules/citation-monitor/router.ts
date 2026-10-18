@@ -13,7 +13,9 @@ import {
   QuotaExceededError,
   assertWorkspaceOptimizationsAllowed,
   resolveWorkspaceOrganization,
+  workspaceOptimizationsAllowed,
 } from '../../platform/billing/entitlement-guard.js'
+import { loadWeakPoints } from './weak-points.js'
 
 /**
  * 监测读路径（规格 §5）。
@@ -368,6 +370,22 @@ export const citationRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: '运行记录不存在' })
       }
       return run
+    }),
+
+  /**
+   * 薄弱点列表（M2 §3.3 规格 §5/§8）：Reports 页"薄弱查询"卡的数据源。
+   * 响应携带 optimizationsAllowed——与 assertOptimizationsAllowed 同源算出，
+   * 前端一键优化的禁用态因此不会与后端硬拒绝漂移。
+   */
+  weakPoints: protectedProcedure
+    .input(dateRangeInput)
+    .query(async ({ ctx, input }) => {
+      const { fromDay, toDay } = resolveRange(input)
+      const [weakPoints, optimizationsAllowed] = await Promise.all([
+        loadWeakPoints(ctx.services.prisma, { workspaceId: ctx.workspace.id, fromDay, toDay }),
+        workspaceOptimizationsAllowed(ctx),
+      ])
+      return { weakPoints, optimizationsAllowed }
     }),
 
   /**

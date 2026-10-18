@@ -775,3 +775,49 @@ describe('citation queries 页面映射（M2 §3.3）', () => {
     expect(db.citationQuery.update).not.toHaveBeenCalled()
   })
 })
+
+// ---------------------------------------------------------------------------
+// M2 §3.3 citation.weakPoints（规格 §5/§8）：范围校验复用趋势的 366 天上限，
+// 响应携带 optimizationsAllowed —— 前端禁用态与后端硬拒绝同源。
+// ---------------------------------------------------------------------------
+
+describe('citation weakPoints 端点（M2 §3.3）', () => {
+  function makeWpCtx(allowed: boolean) {
+    const guard = { isOptimizationsAllowed: vi.fn(async () => allowed) }
+    const db = makeDb()
+    const ctx: any = {
+      workspace: { id: 'w1', organizationId: 'org-1', status: 'ACTIVE' },
+      actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
+      requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
+      services: { prisma: db, queryLibrary: {}, monitor: {}, billing: { guard, meter: {} } },
+    }
+    return { ctx, db, guard }
+  }
+
+  it('返回 weakPoints + optimizationsAllowed（同源布尔）', async () => {
+    const { ctx, guard } = makeWpCtx(false)
+    const result = await createCaller(ctx).weakPoints({ start: '2026-10-01', end: '2026-10-31' })
+    expect(result.weakPoints).toEqual([])
+    expect(result.optimizationsAllowed).toBe(false)
+    expect(guard.isOptimizationsAllowed).toHaveBeenCalledWith('org-1')
+  })
+
+  it('超 366 天范围 → 拒（与趋势同一上限）', async () => {
+    const { ctx } = makeWpCtx(true)
+    await expect(
+      createCaller(ctx).weakPoints({ start: '2024-01-01', end: '2026-10-31' }),
+    ).rejects.toThrow(/366/)
+  })
+
+  it('无 billing 装配 → optimizationsAllowed 缺省为 true（与门禁 no-op 语义一致）', async () => {
+    const db = makeDb()
+    const ctx: any = {
+      workspace: { id: 'w1', status: 'ACTIVE' },
+      actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
+      requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
+      services: { prisma: db, queryLibrary: {}, monitor: {} },
+    }
+    const result = await createCaller(ctx).weakPoints({ start: '2026-10-01', end: '2026-10-31' })
+    expect(result.optimizationsAllowed).toBe(true)
+  })
+})
