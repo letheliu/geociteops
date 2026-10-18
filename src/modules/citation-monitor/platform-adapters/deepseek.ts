@@ -1,4 +1,5 @@
 import type { PlatformAdapter, PlatformResult, SourceCitation } from './types.js'
+import { fetchWithTimeout } from '../../../core/lib/fetch-with-timeout.js'
 
 const URL_REGEX = /https?:\/\/[^\s)]+/gi
 
@@ -10,7 +11,7 @@ export class DeepSeekAdapter implements PlatformAdapter {
     const baseUrl = credentials.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
     const model = credentials.DEEPSEEK_MODEL || 'deepseek-chat'
 
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const res = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -18,7 +19,6 @@ export class DeepSeekAdapter implements PlatformAdapter {
       },
       body: JSON.stringify({
         model,
-        temperature: 0,
         messages: [{ role: 'user', content: text }],
       }),
     })

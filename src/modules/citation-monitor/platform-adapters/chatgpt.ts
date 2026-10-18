@@ -1,4 +1,5 @@
 import type { PlatformAdapter, PlatformResult, SourceCitation } from './types.js'
+import { fetchWithTimeout } from '../../../core/lib/fetch-with-timeout.js'
 
 const URL_REGEX = /https?:\/\/[^\s)]+/gi
 
@@ -14,7 +15,7 @@ export class ChatGptSearchAdapter implements PlatformAdapter {
     const baseUrl = credentials.OPENAI_BASE_URL || 'https://api.openai.com/v1'
     const model = credentials.OPENAI_SEARCH_MODEL || 'gpt-4o-search-preview'
 
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const res = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

@@ -1,4 +1,5 @@
 import type { PlatformAdapter, PlatformResult, SourceCitation } from './types.js'
+import { fetchWithTimeout } from '../../../core/lib/fetch-with-timeout.js'
 
 /**
  * Google Gemini adapter（Generative Language API）。
@@ -13,7 +14,7 @@ export class GeminiAdapter implements PlatformAdapter {
     const baseUrl = credentials.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta'
 
     const url = `${baseUrl}/models/${model}:generateContent?key=${apiKey}`
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
