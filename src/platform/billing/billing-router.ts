@@ -7,9 +7,24 @@ import { createEntitlementService } from './entitlement-service.js'
 import type { EntitlementService } from './entitlement-service.js'
 import { CAPACITY_FIELDS, OPTIONAL_CAPACITY_FIELDS, shanghaiMonthWindow } from './entitlement-merge.js'
 import type { CapacityKey } from './entitlement-merge.js'
+import {
+  GRACE_DAYS_ENTITLEMENT_KEY,
+  SUPPRESS_REMINDER_ENTITLEMENT_KEY,
+} from './subscription-service.js'
 
 /** 遍历型配额字段全集（必填 + 可选），与 QUOTA_USAGE_KIND 的键域一致 */
 const ALL_CAPACITY_FIELDS: readonly CapacityKey[] = [...CAPACITY_FIELDS, ...OPTIONAL_CAPACITY_FIELDS]
+
+/**
+ * 该订阅快照是否为试用（M2 §3.0）：试用开通时注册服务在目录 entitlements 上叠加了
+ * 两个内部策略键（_graceDays / _suppressReminder），正式套餐没有。前端试用横幅
+ * 据此判断，不靠 planId/名称字面量。
+ */
+function isTrialEntitlements(raw: unknown): boolean {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return false
+  const record = raw as Record<string, unknown>
+  return record[SUPPRESS_REMINDER_ENTITLEMENT_KEY] === true || record[GRACE_DAYS_ENTITLEMENT_KEY] !== undefined
+}
 
 // ---------------------------------------------------------------------------
 // 客户侧"我的服务"轻查询路由（任务 14，挂载于 appRouter.billing）：
@@ -101,6 +116,9 @@ export const billingRouter = router({
         status: row.status,
         startAt: row.startAt,
         endAt: row.endAt,
+        // M2 §3.0：试用订阅快照带内部策略键（_suppressReminder/_graceDays），
+        // 前端据此识别试用横幅（正式套餐快照无这些键）。
+        trial: isTrialEntitlements(row.entitlements),
       })),
     }
   }),

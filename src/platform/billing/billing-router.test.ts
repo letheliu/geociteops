@@ -105,9 +105,29 @@ describe('billingRouter.subscriptions（orgProcedure()：本 org 订阅薄投影
           status: 'ACTIVE',
           startAt: NOW,
           endAt: new Date('2027-10-15T00:00:00.000Z'),
+          // M2 §3.0：正式套餐快照无内部策略键 → trial=false
+          trial: false,
         },
       ],
     })
+  })
+
+  it('试用订阅：快照带 _suppressReminder/_graceDays → trial=true（前端横幅数据源）', async () => {
+    prisma.subscription.findMany.mockResolvedValue([
+      {
+        id: 'sub-trial',
+        planId: 'plan_trial',
+        status: 'ACTIVE',
+        startAt: NOW,
+        endAt: new Date('2026-10-25T00:00:00.000Z'),
+        createdAt: NOW,
+        plan: { id: 'plan_trial', name: '试用套餐' },
+        entitlements: { maxWorkspaces: 1, maxQueries: 10, _graceDays: 90, _suppressReminder: true },
+      },
+    ] as never)
+    const caller = billingRouter.createCaller(makeCtx())
+    const result = await caller.subscriptions()
+    expect(result.items[0].trial).toBe(true)
   })
 
   it('ORG_VIEWER 亦可见（orgProcedure() 无权限点）；未挂靠企业 → FORBIDDEN', async () => {

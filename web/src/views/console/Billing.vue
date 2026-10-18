@@ -56,7 +56,7 @@ function fmtDate(value: string | Date | null): string {
   return value ? new Date(value).toLocaleDateString('zh-CN') : '—'
 }
 
-/** 配额键 → 中文标签（与后端 CAPACITY_FIELDS 同键集；usage 键到中文标签映射） */
+/** 配额键 → 中文标签（与后端 CAPACITY_FIELDS ∪ OPTIONAL_CAPACITY_FIELDS 同键集） */
 const QUOTA_FIELDS: { key: keyof EntitlementsResult['usage']; label: string }[] = [
   { key: 'maxWorkspaces', label: 'Workspace 数' },
   { key: 'maxQueries', label: '查询数 / 月' },
@@ -64,6 +64,8 @@ const QUOTA_FIELDS: { key: keyof EntitlementsResult['usage']; label: string }[] 
   { key: 'diagnosticRunsPerMonth', label: '诊断次数 / 月' },
   { key: 'samplesPerRun', label: '单次样本数' },
   { key: 'optimizationsPerMonth', label: '优化次数 / 月' },
+  // M2 §3.0：单次运行采样数上限——单次参数，无月度计量，展示"上限 3 / —"不画进度条
+  { key: 'monitorSampleCountMax', label: '监测采样数上限 N' },
 ]
 
 /** 用量进度（百分比）：上限 0 视为未开通（null 不渲染条），超限 100+ 红色 */
@@ -81,7 +83,22 @@ function quotaStatus(usage: number, limit: number): 'default' | 'success' | 'war
 
 /** samplesPerRun 为单次上限无月度计量（usage 恒 0 展示"—"） */
 function isUnmetered(key: keyof EntitlementsResult['usage']): boolean {
-  return key === 'samplesPerRun'
+  return key === 'samplesPerRun' || key === 'monitorSampleCountMax'
+}
+
+/** 单次运行上限类字段：只展示"上限 N / —"，不画进度条（无月度累计语义） */
+function isSingleRunLimit(key: keyof EntitlementsResult['usage']): boolean {
+  return key === 'samplesPerRun' || key === 'monitorSampleCountMax'
+}
+
+/**
+ * 上限文案：monitorSampleCountMax 未声明 = 不限（键缺失），展示"—"而不是 0——
+ * 0 会被误读成"一次都不能跑"。
+ */
+function quotaLimitText(key: keyof EntitlementsResult['usage']): string {
+  const limit = entitlements.value?.limits[key]
+  if (limit === undefined || limit === null) return key === 'monitorSampleCountMax' ? '—（不限）' : '0'
+  return String(limit)
 }
 
 // 统计窗口标签（遗留 D4）：取后端 billing.entitlements 返回的 periodStart/periodEnd
@@ -172,17 +189,17 @@ const periodLabel = computed(() => {
                 <NText style="font-size: 13px">{{ field.label }}</NText>
                 <NText depth="3" style="font-size: 12px">
                   {{ isUnmetered(field.key) ? '—' : entitlements?.usage[field.key] ?? 0 }}
-                  / {{ entitlements?.limits[field.key] ?? 0 }}
+                  / {{ quotaLimitText(field.key) }}
                 </NText>
               </NSpace>
               <NProgress
-                v-if="quotaPercent(entitlements?.usage[field.key] ?? 0, entitlements?.limits[field.key] ?? 0) !== null"
+                v-if="!isSingleRunLimit(field.key) && quotaPercent(entitlements?.usage[field.key] ?? 0, entitlements?.limits[field.key] ?? 0) !== null"
                 :percentage="quotaPercent(entitlements?.usage[field.key] ?? 0, entitlements?.limits[field.key] ?? 0) ?? 0"
                 :status="quotaStatus(entitlements?.usage[field.key] ?? 0, entitlements?.limits[field.key] ?? 0)"
                 :show-indicator="false"
               />
               <NText v-else depth="3" style="font-size: 12px">
-                未开通或无计量（上限 0 / 单次上限无月度统计）
+                {{ isSingleRunLimit(field.key) ? '单次运行上限，无月度统计' : '未开通或无计量（上限 0）' }}
               </NText>
             </NSpace>
           </NGridItem>

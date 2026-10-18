@@ -30,6 +30,8 @@ export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   CONTRACT_CREDIT: '合同账期',
   WECHAT: '微信支付',
   ALIPAY: '支付宝',
+  // M2 §3.0：$0 零元试用单（paidAt=null，不进财务口径，仅作开通痕迹）
+  TRIAL: '试用开通',
 }
 
 export function paymentMethodLabel(method: string | null | undefined): string {
