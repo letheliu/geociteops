@@ -131,7 +131,7 @@ docker compose exec app sh -c 'ls -la /app/data/zvec'
 
 ---
 
-## 3. Demo site deployment — `demo.zoomer.top`
+## 3. Demo site deployment — `geo.gsgroup.club`
 
 **Coexistence first.** The host already runs another application; do not disturb it. The compose
 stack publishes only `5170`, and deliberately does **not** publish PostgreSQL to the host, so it
@@ -143,14 +143,22 @@ cannot collide with an existing 5432.
 
 DNS and HTTPS:
 
-- [ ] `demo.zoomer.top` A record → host public IP
-- [ ] Host nginx terminates TLS (existing certbot) and proxies to `127.0.0.1:5170`
-- [ ] `X-Forwarded-Proto` is forwarded — `web/nginx.conf` sets it, and the backend uses it when
-      deciding whether to issue the session cookie
-- [ ] `GEO_COOKIE_NAME` stays at the default `__Host-geo_sid` (HTTPS ⇒ the prefix is honored)
+- [x] `geo.gsgroup.club` A record → host public IP
+- [x] Host nginx terminates TLS (panel-managed) and proxies to `127.0.0.1:5170`
+- [x] `GEO_COOKIE_NAME` stays at the default `__Host-geo_sid` (HTTPS ⇒ the prefix is honored;
+      verified end-to-end: `auth.login` returns `Set-Cookie: __Host-geo_sid=...; Secure`)
 
-> Only set `GEO_COOKIE_NAME=geo_sid` for a **bare IP over plain HTTP** deployment. Over HTTPS the
-> `__Host-` prefix is strictly more protective and should be left alone.
+> `web/nginx.conf` still forwards `X-Forwarded-Proto` for future use, but note the backend does
+> **not** currently read it — the session cookie is always issued with `Secure` unconditionally.
+> Only set `GEO_COOKIE_NAME=geo_sid` for a **bare IP over plain HTTP** deployment.
+
+Demo account password: `reset-demo.mjs` reads `DEMO_ACCOUNT_PASSWORD` from its **process
+environment** — the compose `app` service does not map this variable, and the host `.env` is not
+visible inside the container. Pass it explicitly on every invocation (the nightly cron included):
+
+```bash
+docker compose exec -T -e DEMO_ACCOUNT_PASSWORD=<password> app tsx scripts/reset-demo.mjs
+```
 
 Demo behaviour to confirm by hand:
 
@@ -177,7 +185,7 @@ crontab -e
 ```
 
 ```cron
-20 4 * * * cd /opt/geociteops && docker compose exec -T app tsx scripts/reset-demo.mjs >> /var/log/geociteops-demo-reset.log 2>&1
+20 4 * * * cd /opt/geociteops && docker compose exec -T -e DEMO_ACCOUNT_PASSWORD=<password> app tsx scripts/reset-demo.mjs >> /var/log/geociteops-demo-reset.log 2>&1
 ```
 
 - [ ] Manual run succeeds
@@ -196,7 +204,7 @@ Set after the repository is public (Settings → General / About):
 | Field | Value |
 | --- | --- |
 | Description | AI citation intelligence and optimization platform for generative search |
-| Website | `https://demo.zoomer.top` |
+| Website | `https://geo.gsgroup.club` |
 | Topics | `geo`, `generative-engine-optimization`, `llm-seo`, `ai-search`, `brand-monitoring`, `typescript` |
 
 - [ ] Description set

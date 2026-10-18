@@ -39,7 +39,7 @@ GeoCiteOps is an end-to-end **Generative Engine Optimization (GEO)** platform. I
 
   <img src="./docs/assets/demo.svg" alt="GeoCiteOps demo: citation monitoring to SOV report" width="800" />
 
-  Live read-only demo: https://demo.zoomer.top
+  Live read-only demo: https://geo.gsgroup.club
 -->
 
 ## Why GeoCiteOps
@@ -143,7 +143,7 @@ The session cookie is named `__Host-geo_sid` by default (`src/platform/identity/
 | --- | --- |
 | `http://localhost:5170` | Works as-is. Browsers treat localhost as a secure context. |
 | Bare IP over HTTP, e.g. `http://203.0.113.10:5170` | **Set `GEO_COOKIE_NAME=geo_sid`** in `.env` (drop the `__Host-` prefix), or put the deployment behind HTTPS. |
-| HTTPS (e.g. `demo.zoomer.top`) | Keep the default `__Host-geo_sid` — it is strictly more protective. |
+| HTTPS (e.g. `geo.gsgroup.club`) | Keep the default `__Host-geo_sid` — it is strictly more protective. |
 
 ### Option B — Local development with pnpm
 

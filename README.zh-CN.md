@@ -39,7 +39,7 @@ GeoCiteOps 是一套端到端的**生成式引擎优化（Generative Engine Opti
 
   <img src="./docs/assets/demo.svg" alt="GeoCiteOps 演示：引用监测到 SOV 报告" width="800" />
 
-  在线只读演示站：https://demo.zoomer.top
+  在线只读演示站：https://geo.gsgroup.club
 -->
 
 ## 为什么需要 GeoCiteOps
@@ -143,7 +143,7 @@ docker compose exec app tsx scripts/reset-demo.mjs
 | --- | --- |
 | `http://localhost:5170` | 保持默认即可，浏览器把 localhost 视为可信上下文。 |
 | 裸 IP + 纯 HTTP，如 `http://203.0.113.10:5170` | **必须**在 `.env` 设 `GEO_COOKIE_NAME=geo_sid`（去掉 `__Host-` 前缀），或改走 HTTPS。 |
-| HTTPS（如 `demo.zoomer.top`） | 保持默认 `__Host-geo_sid`，保护更强，不要改。 |
+| HTTPS（如 `geo.gsgroup.club`） | 保持默认 `__Host-geo_sid`，保护更强，不要改。 |
 
 ### 方式 B：本机 pnpm 开发
 
