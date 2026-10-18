@@ -162,7 +162,7 @@ docker compose exec -T -e DEMO_ACCOUNT_PASSWORD=<password> app tsx scripts/reset
 
 Demo behaviour to confirm by hand:
 
-- [ ] The shared demo account (`ORG_VIEWER`) can sign in and browse the seed data
+- [x] The shared demo account (`ORG_VIEWER`) can sign in and browse the seed data (verified 2026-10-18: workspace entry requires the WorkspaceMember row the reset script now creates)
 - [ ] A write attempt (run monitoring, optimize content, change settings) is **rejected
       server-side**, not merely hidden in the UI
 - [ ] The homepage states that live monitoring / content optimization are unavailable on the demo,
