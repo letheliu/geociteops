@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { citationRouter } from './router.js'
 
 function createCaller(ctx: any) {
@@ -491,5 +491,72 @@ describe('citation router', () => {
     ctx.services.prisma = db
     await expect(createCaller(ctx).queries.setScheduled({ id: 'qx', scheduled: false })).rejects.toThrow(/不存在/)
     expect(db.citationQuery.update).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.0 TTL 到期后的真实行为（规格 §5）：ACTIVE 到期 → GRACE、宽限满 → EXPIRED
+// + workspace SUSPENDED——**两种状态都是只读保留**（数据永不删），区别只在 UI 文案。
+// 本组把这两种只读形态在 citation 模块上钉死：query（trend）放行、mutation
+// （runs.create）被拒，且服务层未被触达。
+// ---------------------------------------------------------------------------
+
+describe('citation 模块 × 试用到期两态（只读保留）', () => {
+  function makeStateCtx(opts: {
+    serviceState: 'GRACE' | 'NONE'
+    workspaceStatus: 'ACTIVE' | 'SUSPENDED'
+  }) {
+    const stateDb = makeDb({
+      runs: [
+        { id: 'r1', workspaceId: 'w1', trigger: 'SCHEDULED', sampleCount: 2, status: 'COMPLETED', startedAt: new Date('2026-10-10T02:00:00+08:00') },
+      ],
+      events: [
+        { workspaceId: 'w1', runId: 'r1', queryId: 'q1', platform: 'openai', sovScore: 1, brandMentioned: true, capturedAt: new Date('2026-10-10T02:00:00+08:00') },
+      ],
+    })
+    const monitor = { createManualRun: vi.fn(), runOnce: vi.fn() }
+    const stateCtx: any = {
+      workspace: { id: 'w1', organizationId: 'org-1', defaultBrandName: 'zoomer AI', status: opts.workspaceStatus },
+      actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
+      requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
+      services: {
+        prisma: stateDb,
+        monitor,
+        queryLibrary: { listActive: vi.fn(), generateQueries: vi.fn() },
+        serviceState: { resolve: vi.fn(async () => opts.serviceState) },
+      },
+    }
+    return { stateCtx, monitor }
+  }
+
+  beforeEach(() => {
+    // enforcement 打开才走服务状态矩阵（requireWorkspace 的闸门条件）
+    vi.stubEnv('BILLING_ENFORCEMENT', 'on')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('GRACE（订阅到期、workspace 仍 ACTIVE）：trend ✓ / runs.create ✗「宽限期只读，请续费」', async () => {
+    const { stateCtx, monitor } = makeStateCtx({ serviceState: 'GRACE', workspaceStatus: 'ACTIVE' })
+
+    await expect(createCaller(stateCtx).trend({ dateRange: RUN_DATE })).resolves.toMatchObject({ points: expect.any(Array) })
+    await expect(createCaller(stateCtx).runs.create({ platforms: ['openai'] })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: expect.stringContaining('宽限期只读'),
+    })
+    expect(monitor.createManualRun).not.toHaveBeenCalled()
+  })
+
+  it('EXPIRED + workspace SUSPENDED：trend ✓（历史数据只读）/ runs.create ✗「工作区已暂停」', async () => {
+    const { stateCtx, monitor } = makeStateCtx({ serviceState: 'NONE', workspaceStatus: 'SUSPENDED' })
+
+    await expect(createCaller(stateCtx).trend({ dateRange: RUN_DATE })).resolves.toMatchObject({ points: expect.any(Array) })
+    await expect(createCaller(stateCtx).runs.create({ platforms: ['openai'] })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: expect.stringContaining('SUSPENDED'),
+    })
+    expect(monitor.createManualRun).not.toHaveBeenCalled()
   })
 })
