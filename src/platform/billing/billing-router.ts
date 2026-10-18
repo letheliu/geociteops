@@ -5,8 +5,11 @@ import type { Context } from '../../core/trpc/init.js'
 import { getPrismaClient } from '../../core/db/client.js'
 import { createEntitlementService } from './entitlement-service.js'
 import type { EntitlementService } from './entitlement-service.js'
-import { CAPACITY_FIELDS, shanghaiMonthWindow } from './entitlement-merge.js'
-import type { CapacityField } from './entitlement-merge.js'
+import { CAPACITY_FIELDS, OPTIONAL_CAPACITY_FIELDS, shanghaiMonthWindow } from './entitlement-merge.js'
+import type { CapacityKey } from './entitlement-merge.js'
+
+/** 遍历型配额字段全集（必填 + 可选），与 QUOTA_USAGE_KIND 的键域一致 */
+const ALL_CAPACITY_FIELDS: readonly CapacityKey[] = [...CAPACITY_FIELDS, ...OPTIONAL_CAPACITY_FIELDS]
 
 // ---------------------------------------------------------------------------
 // 客户侧"我的服务"轻查询路由（任务 14，挂载于 appRouter.billing）：
@@ -47,24 +50,26 @@ function actorOrgId(ctx: Context): string {
 }
 
 /**
- * 六个容量配额键 → 当月用量聚合来源：
+ * 容量配额键 → 当月用量聚合来源：
  * - 计量类四键（与 entitlement-guard 的 SOFT_CHECK_USAGE_KIND 同映射）：UsageRecord
  *   当月 Σquantity；
  * - maxWorkspaces：用量 = 非 ARCHIVED workspace 计数（与硬限检查口径一致，不走
  *   UsageRecord）；
- * - samplesPerRun：单次运行上限，无月度计量概念（恒 0，前端展示为"—/上限"）。
+ * - samplesPerRun / monitorSampleCountMax：单次运行上限，无月度计量概念（恒 0，
+ *   前端展示为"—/上限"，不画进度条）。
  */
-const QUOTA_USAGE_KIND: Record<CapacityField, string | null> = {
+const QUOTA_USAGE_KIND: Record<CapacityKey, string | null> = {
   maxQueries: 'QUERY_ADDED',
   maxPages: 'PAGE_CREATED',
   diagnosticRunsPerMonth: 'DIAGNOSTIC_RUN',
   optimizationsPerMonth: 'OPTIMIZATION_CREATED',
   maxWorkspaces: null,
   samplesPerRun: null,
+  monitorSampleCountMax: null,
 }
 
 /** 初始全 0 用量表（未计量键保持 0） */
-function zeroUsage(): Record<CapacityField, number> {
+function zeroUsage(): Record<CapacityKey, number> {
   return {
     maxWorkspaces: 0,
     maxQueries: 0,
@@ -72,6 +77,7 @@ function zeroUsage(): Record<CapacityField, number> {
     diagnosticRunsPerMonth: 0,
     samplesPerRun: 0,
     optimizationsPerMonth: 0,
+    monitorSampleCountMax: 0,
   }
 }
 
@@ -107,7 +113,7 @@ export const billingRouter = router({
     // 当月用量（Asia/Shanghai 自然月，与配额统计窗口同源）：四个计量键并行聚合
     const window = shanghaiMonthWindow(new Date())
     const usage = zeroUsage()
-    const meteredFields = CAPACITY_FIELDS.filter((field) => QUOTA_USAGE_KIND[field] !== null)
+    const meteredFields = ALL_CAPACITY_FIELDS.filter((field) => QUOTA_USAGE_KIND[field] !== null)
     await Promise.all(
       meteredFields.map(async (field) => {
         const aggregated = await prisma.usageRecord.aggregate({

@@ -184,6 +184,8 @@ describe('billingRouter.entitlements（limits + 当月用量聚合）', () => {
       diagnosticRunsPerMonth: 3,
       samplesPerRun: 0,
       optimizationsPerMonth: 25,
+      // M2 §3.0：单次运行上限无月度量，用量恒 0（前端展示"—/上限"）
+      monitorSampleCountMax: 0,
     })
     expect(result.limits.maxWorkspaces).toBe(5)
     expect(result.limits.allowedPlatforms).toEqual(['deepseek'])
