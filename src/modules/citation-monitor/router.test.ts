@@ -15,6 +15,7 @@ function makeDb(seed: {
   runs?: any[]
   events?: any[]
   queries?: any[]
+  pages?: any[]
 } = {}) {
   const runs = (seed.runs ?? []).map((r) => ({ ...r }))
   const events = (seed.events ?? []).map((e) => ({
@@ -28,6 +29,7 @@ function makeDb(seed: {
     ...e,
   }))
   const queries = (seed.queries ?? []).map((q) => ({ ...q }))
+  const pages = (seed.pages ?? []).map((p) => ({ ...p }))
 
   function matchEvent(e: any, where: any) {
     if (where.workspaceId && e.workspaceId !== where.workspaceId) return false
@@ -93,7 +95,14 @@ function makeDb(seed: {
         return hit ? { ...hit } : null
       }),
     },
+    contentPage: {
+      findFirst: vi.fn(async ({ where }: any) => {
+        const hit = pages.find((p) => p.id === where.id && (!where.workspaceId || p.workspaceId === where.workspaceId))
+        return hit ? { ...hit } : null
+      }),
+    },
   }
+  db.state = { runs, events, queries, pages }
   return db
 }
 
@@ -664,5 +673,105 @@ describe('citation router 优化门禁（M2 §3.3）', () => {
       code: 'NOT_IMPLEMENTED',
     })
     expect(guard.assertOptimizationsAllowed).toHaveBeenCalledWith('org-trial')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.3 查询映射写入（规格 §5）：queries.add 收 pageId?、新增 setPageMapping。
+// 映射一律 pageId 下拉制——服务端写 page.url，**不收自由 URL**（否则可将查询指向
+// 任意站点，改写建议稿会被写到不属于自己的页面上）。
+// ---------------------------------------------------------------------------
+
+describe('citation queries 页面映射（M2 §3.3）', () => {
+  function makeMappingCtx(seed: any, workspaceId = 'w1') {
+    const db = makeDb(seed)
+    const addQuery = vi.fn(async (input: any) => ({ id: 'q-new', ...input }))
+    const ctx: any = {
+      workspace: { id: workspaceId, organizationId: 'org-1', status: 'ACTIVE' },
+      actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId } },
+      requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
+      services: {
+        prisma: db,
+        queryLibrary: { addQuery, listActive: vi.fn(async () => []) },
+        monitor: {},
+      },
+    }
+    return { db, addQuery, ctx }
+  }
+
+  const PAGES = [
+    { id: 'page-1', workspaceId: 'w1', url: 'https://example.com/a' },
+    { id: 'page-x', workspaceId: 'w-other', url: 'https://other.com/x' },
+  ]
+
+  it('add(pageId)：归属本工作区的页面 → 服务端写 mappedPageUrl=page.url', async () => {
+    const { ctx, addQuery } = makeMappingCtx({ pages: PAGES })
+    await createCaller(ctx).queries.add({ queryText: '最佳 AI 工具', source: 'manual', pageId: 'page-1' })
+    expect(addQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ mappedPageUrl: 'https://example.com/a' }),
+    )
+  })
+
+  it('add(pageId)：他工作区的页面 → 拒，且不建查询', async () => {
+    const { ctx, addQuery } = makeMappingCtx({ pages: PAGES })
+    await expect(
+      createCaller(ctx).queries.add({ queryText: 'Q', source: 'manual', pageId: 'page-x' }),
+    ).rejects.toThrow()
+    expect(addQuery).not.toHaveBeenCalled()
+  })
+
+  it('add(pageId)：页面不存在 → 拒', async () => {
+    const { ctx, addQuery } = makeMappingCtx({ pages: PAGES })
+    await expect(
+      createCaller(ctx).queries.add({ queryText: 'Q', source: 'manual', pageId: 'page-nope' }),
+    ).rejects.toThrow()
+    expect(addQuery).not.toHaveBeenCalled()
+  })
+
+  it('add 不收自由 URL：客户端传的 mappedPageUrl 不生效（zod 无该字段）', async () => {
+    const { ctx, addQuery } = makeMappingCtx({ pages: PAGES })
+    await createCaller(ctx).queries.add({
+      queryText: 'Q',
+      source: 'manual',
+      mappedPageUrl: 'https://evil.example.com',
+    } as any)
+    expect(addQuery).toHaveBeenCalledWith(
+      expect.not.objectContaining({ mappedPageUrl: expect.any(String) }),
+    )
+    expect(addQuery.mock.calls[0][0].mappedPageUrl ?? null).toBeNull()
+  })
+
+  it('setPageMapping：双归属校验通过 → 写 mappedPageUrl', async () => {
+    const { ctx, db } = makeMappingCtx({
+      pages: PAGES,
+      queries: [{ id: 'q1', workspaceId: 'w1', queryText: 'Q' }],
+    })
+    const updated = await createCaller(ctx).queries.setPageMapping({ queryId: 'q1', pageId: 'page-1' })
+    expect(updated.mappedPageUrl).toBe('https://example.com/a')
+    expect(db.contentPage.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'page-1', workspaceId: 'w1' } }),
+    )
+  })
+
+  it('setPageMapping：他工作区的页面 → 拒，零写库', async () => {
+    const { ctx, db } = makeMappingCtx({
+      pages: PAGES,
+      queries: [{ id: 'q1', workspaceId: 'w1', queryText: 'Q' }],
+    })
+    await expect(
+      createCaller(ctx).queries.setPageMapping({ queryId: 'q1', pageId: 'page-x' }),
+    ).rejects.toThrow()
+    expect(db.citationQuery.update).not.toHaveBeenCalled()
+  })
+
+  it('setPageMapping：他工作区的查询 → 拒，零写库', async () => {
+    const { ctx, db } = makeMappingCtx({
+      pages: PAGES,
+      queries: [{ id: 'q-other', workspaceId: 'w-other', queryText: 'Q' }],
+    })
+    await expect(
+      createCaller(ctx).queries.setPageMapping({ queryId: 'q-other', pageId: 'page-1' }),
+    ).rejects.toThrow()
+    expect(db.citationQuery.update).not.toHaveBeenCalled()
   })
 })

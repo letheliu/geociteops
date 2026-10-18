@@ -393,20 +393,64 @@ export const citationRouter = router({
         return ctx.services.queryLibrary.listActive(ctx.workspace.id)
       }),
 
+    /**
+     * 新增查询。pageId 可选——关联页面一律 **pageId 下拉制**，服务端写 mappedPageUrl=page.url，
+     * 不收自由 URL（规格 §5）：否则查询可被指向任意站点，改写建议稿会写到不属于自己的页面上。
+     */
     add: protectedProcedure
       .input(
         z.object({
           queryText: z.string(),
           source: z.enum(['manual', 'google_suggest', 'llm_generated', 'paa', 'competitor']),
           intent: z.record(z.unknown()).optional(),
+          pageId: z.string().optional(),
         }),
       )
       .mutation(async ({ ctx, input }) => {
+        let mappedPageUrl: string | undefined
+        if (input.pageId) {
+          const page = await ctx.services.prisma.contentPage.findFirst({
+            where: { id: input.pageId, workspaceId: ctx.workspace.id },
+            select: { url: true },
+          })
+          if (!page) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: '关联页面不存在或不属于当前工作区' })
+          }
+          mappedPageUrl = page.url
+        }
         return ctx.services.queryLibrary.addQuery({
           workspaceId: ctx.workspace.id,
           queryText: input.queryText,
           source: input.source.toUpperCase() as any,
           intent: input.intent,
+          mappedPageUrl,
+        })
+      }),
+
+    /**
+     * 关联/改关联页面（QueryLibrary 行操作）。双归属校验：query 与 page 都必须落在
+     * ctx.workspace.id 内——只校验一侧会让"改他人查询的映射"或"指向他人页面"成为可能。
+     */
+    setPageMapping: protectedProcedure
+      .input(z.object({ queryId: z.string().min(1), pageId: z.string().min(1) }))
+      .mutation(async ({ ctx, input }) => {
+        const query = await ctx.services.prisma.citationQuery.findFirst({
+          where: { id: input.queryId, workspaceId: ctx.workspace.id },
+          select: { id: true },
+        })
+        if (!query) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: '查询不存在' })
+        }
+        const page = await ctx.services.prisma.contentPage.findFirst({
+          where: { id: input.pageId, workspaceId: ctx.workspace.id },
+          select: { url: true },
+        })
+        if (!page) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: '关联页面不存在或不属于当前工作区' })
+        }
+        return ctx.services.prisma.citationQuery.update({
+          where: { id: input.queryId },
+          data: { mappedPageUrl: page.url },
         })
       }),
 
