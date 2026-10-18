@@ -10,14 +10,18 @@ import type { Context } from '../../core/trpc/init.js'
 import { getPrismaClient } from '../../core/db/client.js'
 import { createSessionService } from '../../core/auth/session.js'
 import { createAuditService } from '../audit/service.js'
+import { loadMasterKey } from '../../core/crypto/envelope.js'
 import { createIdentityService } from './service.js'
 import type { IdentityService } from './service.js'
 import { createLoginRateLimiter } from './rate-limiter.js'
 import { createMemberService } from '../tenancy/member-service.js'
 import { clearSessionCookie, serializeSessionCookie } from './cookie.js'
 import { usernameSchema } from './username-schema.js'
+import { createRegistrationService, registrationEnabled } from './registration-service.js'
+import type { RegistrationService } from './registration-service.js'
 
 let defaultService: IdentityService | undefined
+let defaultRegistrationService: RegistrationService | undefined
 
 /**
  * 取 identity service：优先 ctx.services.identity（测试/组装注入），
@@ -37,6 +41,27 @@ function getIdentityService(ctx: Context): IdentityService {
     })
   }
   return defaultService
+}
+
+/**
+ * 取注册 service：优先 ctx.services.registration（server.ts 装配/测试注入），
+ * 否则惰性构建默认实例。默认实例的 entitlement recompute 与信封主密钥都在装配处
+ * 解析（无主密钥的部署本就起不来），因此惰性路径仅作兜底。
+ */
+function getRegistrationService(ctx: Context): RegistrationService {
+  const injected = (ctx as { services?: { registration?: RegistrationService } }).services?.registration
+  if (injected) return injected
+  if (!defaultRegistrationService) {
+    const prisma = getPrismaClient()
+    defaultRegistrationService = createRegistrationService({
+      prisma,
+      sessions: createSessionService(prisma),
+      audit: createAuditService(prisma),
+      entitlements: { recompute: async () => ({}) },
+      envelopeKey: loadMasterKey(),
+    })
+  }
+  return defaultRegistrationService
 }
 
 /**
@@ -67,6 +92,51 @@ export const authRouter = router({
           displayName: user.displayName,
           userType: user.userType,
           platformRole: user.platformRole,
+        },
+      }
+    }),
+
+  /**
+   * 自助注册开关（public query）：登录页据此显隐"注册试用"入口，/register 也据此
+   * 显示关闭文案。判定含双开关联动（REGISTRATION_ENABLED × BILLING_ENFORCEMENT）。
+   */
+  registrationEnabled: publicProcedure.query(async () => registrationEnabled()),
+
+  /**
+   * 自助注册（publicProcedure 已挂 csrfGuard）：访客注册即得 7 天试用租户。
+   * 双开关任一关闭 → FORBIDDEN + 关闭文案（fail-closed，不建任何记录）。
+   */
+  register: publicProcedure
+    .input(
+      z.object({
+        username: usernameSchema,
+        /** 可选，仅联系方式（不做验证码验证，见规格 §2 非目标） */
+        email: z.string().email().max(128).optional(),
+        password: z.string().min(1).max(128),
+        brandName: z.string().min(1).max(64).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const result = await getRegistrationService(ctx).registerTrial({
+        ...input,
+        ip: ctx.requestMeta?.ip,
+      })
+      // 同 login：会话 token 只经 HttpOnly Cookie 下发，响应体不回传
+      ctx.res?.setHeader?.('Set-Cookie', serializeSessionCookie(result.token))
+      return {
+        mustChangePassword: result.user.mustChangePassword,
+        user: {
+          id: result.user.id,
+          username: result.user.username,
+          displayName: result.user.displayName,
+          userType: result.user.userType,
+          platformRole: null,
+        },
+        trial: {
+          organizationId: result.trial.organizationId,
+          workspaceId: result.trial.workspaceId,
+          planName: result.trial.planName,
+          endAt: result.trial.endAt,
         },
       }
     }),

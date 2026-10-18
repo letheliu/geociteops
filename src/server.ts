@@ -16,6 +16,7 @@ import { createSessionService } from './core/auth/session.js'
 import { createAuditService } from './platform/audit/service.js'
 import { createIdentityService } from './platform/identity/service.js'
 import { createLoginRateLimiter } from './platform/identity/rate-limiter.js'
+import { createRegistrationService } from './platform/identity/registration-service.js'
 import { createApiCredentialService } from './platform/tenancy/api-credentials.js'
 import { createMemberService } from './platform/tenancy/member-service.js'
 import { createWorkspaceAdminService } from './platform/tenancy/workspace-admin.js'
@@ -253,6 +254,14 @@ async function main() {
   })
   // 任务 8：企业配额重算服务（开通 worker 末步统一调用，§6.4）
   const entitlementService = createEntitlementService({ prisma })
+  // M2 §3.0：自助注册服务（auth.register 五件套试用开通 + 双开关闸）
+  const registrationService = createRegistrationService({
+    prisma,
+    sessions: sessionService,
+    audit: auditService,
+    entitlements: entitlementService,
+    envelopeKey: credentialMasterKey,
+  })
   // 任务 12：退款服务（申请/审批执行/配额回收）——渠道退款复用装配级 payChannels
   // 注册表（createPayment 与 refund 共享同一 mock 内存注册表，见 Minor-5 修复注释）
   const refundService = createRefundService({
@@ -287,6 +296,7 @@ async function main() {
     },
     // 任务 12：identity/session/audit/workspaceAdmin/loginRateLimiter/getWorkspaceSummary
     identity: identityService,
+    registration: registrationService,
     session: sessionService,
     audit: auditService,
     workspaceAdmin: workspaceAdminService,

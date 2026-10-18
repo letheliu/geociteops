@@ -133,6 +133,118 @@ describe('authRouter（createCaller）', () => {
     })
   })
 
+  describe('register / registrationEnabled（M2 §3.0 自助试用通道）', () => {
+    function makeRegistrationService() {
+      return {
+        registerTrial: vi.fn(),
+        isEnabled: vi.fn(() => true),
+      }
+    }
+
+    function makeRegisterCtx(registration: ReturnType<typeof makeRegistrationService>) {
+      const ctx = makeCtx()
+      ctx.services.registration = registration
+      return ctx
+    }
+
+    it('register 成功 → 写 HttpOnly Cookie 并返回用户与试用信息，响应体不含 token', async () => {
+      const registration = makeRegistrationService()
+      const ctx = makeRegisterCtx(registration)
+      const caller = authRouter.createCaller(ctx)
+      registration.registerTrial.mockResolvedValue({
+        token: 'tok-trial',
+        session: { id: 'sess-trial' },
+        user: {
+          id: 'user-9',
+          username: 'trialuser',
+          displayName: '试用用户',
+          userType: 'CUSTOMER',
+          organizationId: 'org-9',
+          orgRole: 'ORG_OWNER',
+          mustChangePassword: false,
+        },
+        trial: {
+          organizationId: 'org-9',
+          workspaceId: 'ws-9',
+          subscriptionId: 'sub-9',
+          planId: 'plan_trial',
+          planName: '试用套餐',
+          endAt: new Date('2026-10-25T06:00:00.000Z'),
+        },
+      })
+
+      const result = await caller.register({
+        username: 'trialuser',
+        email: 'trial@example.com',
+        password: 'Zx9!qwerty',
+        brandName: '试用用户',
+      })
+
+      expect(registration.registerTrial).toHaveBeenCalledWith({
+        username: 'trialuser',
+        email: 'trial@example.com',
+        password: 'Zx9!qwerty',
+        brandName: '试用用户',
+        ip: '9.9.9.9',
+      })
+      expect(ctx.res.setHeader).toHaveBeenCalledWith(
+        'Set-Cookie',
+        serializeSessionCookie('tok-trial'),
+      )
+      expect(JSON.stringify(result)).not.toContain('tok-trial')
+      expect(result.mustChangePassword).toBe(false)
+      expect(result.trial).toMatchObject({ organizationId: 'org-9', workspaceId: 'ws-9' })
+    })
+
+    it('register：email 可省略；username 必填（短于 3 → zod 拒绝，不触达 service）', async () => {
+      const registration = makeRegistrationService()
+      const caller = authRouter.createCaller(makeRegisterCtx(registration))
+      await expect(caller.register({ username: 'ab', password: 'x' })).rejects.toThrow()
+      expect(registration.registerTrial).not.toHaveBeenCalled()
+    })
+
+    it('register：email 格式非法 → zod 拒绝', async () => {
+      const registration = makeRegistrationService()
+      const caller = authRouter.createCaller(makeRegisterCtx(registration))
+      await expect(
+        caller.register({ username: 'trialuser', email: 'not-an-email', password: 'x' }),
+      ).rejects.toThrow()
+      expect(registration.registerTrial).not.toHaveBeenCalled()
+    })
+
+    it('register：缺少 csrf 头 → 写操作被守卫拒绝（publicProcedure 语义）', async () => {
+      const registration = makeRegistrationService()
+      const ctx = makeRegisterCtx(registration)
+      ctx.requestMeta.headers = {}
+      const caller = authRouter.createCaller(ctx)
+      await expect(
+        caller.register({ username: 'trialuser', password: 'Zx9!qwerty' }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+      expect(registration.registerTrial).not.toHaveBeenCalled()
+    })
+
+    it('registrationEnabled：双开关全开 → 返回 true（public query 不需登录/csrf）', async () => {
+      vi.stubEnv('REGISTRATION_ENABLED', 'on')
+      vi.stubEnv('BILLING_ENFORCEMENT', 'on')
+      const caller = authRouter.createCaller(makeCtx())
+      await expect(caller.registrationEnabled()).resolves.toBe(true)
+    })
+
+    it('registrationEnabled：enforcement off → 返回 false（与 register 的 fail-closed 同源）', async () => {
+      vi.stubEnv('REGISTRATION_ENABLED', 'on')
+      vi.stubEnv('BILLING_ENFORCEMENT', 'off')
+      const caller = authRouter.createCaller(makeCtx())
+      await expect(caller.registrationEnabled()).resolves.toBe(false)
+    })
+
+    it('registrationEnabled：缺省（env 未设）→ 返回 false（默认关）', async () => {
+      vi.stubEnv('REGISTRATION_ENABLED', '')
+      vi.stubEnv('BILLING_ENFORCEMENT', '')
+      const caller = authRouter.createCaller(makeCtx())
+      await expect(caller.registrationEnabled()).resolves.toBe(false)
+    })
+  })
+
   describe('me', () => {
     it('把 ctx.userId 传给 service.me', async () => {
       const ctx = makeCtx({ userId: 'user-7' })
