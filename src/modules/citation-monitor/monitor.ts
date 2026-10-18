@@ -81,6 +81,13 @@ export interface RunOutcome {
 export interface Monitor {
   startScheduledRun(input: StartScheduledRunInput): Promise<StartRunResult>
   startManualRun(input: StartManualRunInput): Promise<StartRunResult>
+  /**
+   * 只建 Run 行并立刻返回（不等采样跑完）——`citation.runs.create` 用它拿到 runId 后
+   * 把执行丢到后台，前端拿 runId 轮询 citation.runStatus（规格 §6 的异步语义）。
+   */
+  createManualRun(input: StartManualRunInput): Promise<StartRunResult>
+  /** 执行一个 RUNNING 态 Run 的全部缺失采样并收尾 */
+  executeRunById(runId: string): Promise<RunOutcome | null>
   resumeRun(runId: string): Promise<RunOutcome | null>
   /** 薄封装：跑一轮并回传产生的采样行（兼容旧调用与测试） */
   runOnce(input: { workspaceId: string; platforms: string[] }): Promise<CitationEvent[]>
@@ -461,9 +468,10 @@ export function createMonitor(deps: MonitorDeps): Monitor {
       }
     },
 
-    async startManualRun(input) {
+    async createManualRun(input) {
       await loadConfig(input.workspaceId)
       let queries
+      let defaultN = MIN_SAMPLE_COUNT
       if (input.queryIds && input.queryIds.length > 0) {
         // 校验归属 + ACTIVE：跨工作区或 PAUSED 一律拒绝，不静默丢弃
         const found = await deps.prisma.citationQuery.findMany({
@@ -482,14 +490,16 @@ export function createMonitor(deps: MonitorDeps): Monitor {
           where: { workspaceId: input.workspaceId, status: 'ACTIVE' },
           orderBy: { priority: 'asc' },
         })
+        // 未指定 N 时取工作区配置
+        const ws = await deps.prisma.workspace.findUnique({ where: { id: input.workspaceId } })
+        defaultN = ws?.monitorSampleCount ?? MIN_SAMPLE_COUNT
       }
       if (queries.length === 0 || input.platforms.length === 0) {
         return { runId: null, skipped: true, resumed: false, status: 'SKIPPED' }
       }
 
-      const requested = input.sampleCount ?? (await deps.prisma.workspace.findUnique({ where: { id: input.workspaceId } }))?.monitorSampleCount ?? MIN_SAMPLE_COUNT
-      const { n, clampedFrom } = effectiveSampleCount(requested, queries.length, input.platforms.length)
-      const created = await createRun({
+      const { n, clampedFrom } = effectiveSampleCount(input.sampleCount ?? defaultN, queries.length, input.platforms.length)
+      return createRun({
         workspaceId: input.workspaceId,
         trigger: 'MANUAL',
         platforms: input.platforms,
@@ -498,8 +508,15 @@ export function createMonitor(deps: MonitorDeps): Monitor {
         clampedFrom,
         slotKey: null, // MANUAL 不占 slot，同一天可以跑多次
       })
-      if (created.runId === null) return created
+    },
 
+    async executeRunById(runId) {
+      return executeRun(runId)
+    },
+
+    async startManualRun(input) {
+      const created = await api.createManualRun(input)
+      if (created.runId === null) return created
       const outcome = await executeRun(created.runId)
       return {
         runId: created.runId,

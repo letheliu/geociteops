@@ -19,6 +19,7 @@ import { createCredentialResolver } from '../tenancy/credential-resolver.js'
 import {
   createWorkspaceAdminService,
   WorkspaceNotFoundError,
+  WorkspaceConfigError,
   WorkspaceTransitionError,
 } from '../tenancy/workspace-admin.js'
 import { createOrgService } from './service.js'
@@ -96,6 +97,9 @@ function mapServiceError(err: unknown): never {
   if (err instanceof WorkspaceNotFoundError) {
     throw new TRPCError({ code: 'NOT_FOUND', message: err.message })
   }
+  if (err instanceof WorkspaceConfigError) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: err.message })
+  }
   // org 流程中 credential 存在性已前置校验，此错误实际语义为"已吊销再吊销"（状态冲突）
   if (err instanceof ApiCredentialNotRevokableError) {
     throw new TRPCError({ code: 'CONFLICT', message: err.message })
@@ -125,6 +129,9 @@ const updateWorkspaceInput = z.object({
   domain: z.string().min(1).max(255).optional(),
   defaultBrandName: z.string().min(1).max(100).optional(),
   llmsTxtUrl: z.string().min(1).max(500).optional(),
+  // 监测配置（M2 §3.1）：N 的区间在 zod 层就拒，越界给 BAD_REQUEST 而不是 500
+  monitorSampleCount: z.number().int().min(1).max(10).optional(),
+  monitorSchedule: z.enum(['DAILY', 'WEEKLY', 'OFF']).optional(),
 })
 
 /**
