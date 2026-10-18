@@ -19,11 +19,16 @@ model Workspace {
   suspendReason      String?
   organizationId     String
   archivedAt         DateTime?
+  /// 监测采样数 N（生效值，钳制后写入 CitationRun.sampleCount）；约束 1..10 由应用层校验
+  monitorSampleCount Int                 @default(5)
+  /// 监测节奏：DAILY 02:00 / WEEKLY 周日 03:00（Asia/Shanghai）/ OFF 不调度
+  monitorSchedule    MonitorSchedule     @default(DAILY)
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
   organization       Organization         @relation(fields: [organizationId], references: [id])
   events             CitationEvent[]
   queries            CitationQuery[]
+  runs               CitationRun[]
   pages              ContentPage[]
   entities           KgEntity[]
   tasks              OptimizationTask[]
@@ -237,6 +242,8 @@ model CitationQuery {
   lastRunAt     DateTime?
   source        QuerySource
   status        QueryStatus        @default(ACTIVE)
+  /// scheduled=false 仅退出定时调度；status=PAUSED 才退出所有运行（含手动）。两者语义独立
+  scheduled     Boolean            @default(true)
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
   events        CitationEvent[]
@@ -244,6 +251,7 @@ model CitationQuery {
   tasks         OptimizationTask[]
 
   @@index([workspaceId, status])
+  @@index([workspaceId, scheduled])
 }
 
 model CitationEvent {
@@ -262,12 +270,51 @@ model CitationEvent {
   competitors      Json          @default("[]")
   rawAnswer        String
   sovScore         Float?
+  /// 所属运行；null = 遗留事件（读时按自然日合成伪 Run，见 aggregate.bucketLegacyDays）
+  runId            String?
+  /// 第几次采样（1..N）；遗留行为 1
+  sampleIndex      Int           @default(1)
+  status           CitationEventStatus @default(OK)
+  /// 失败原因（经 sanitizeMessage 脱敏）；OK 行恒为 null
+  failureReason    String?
   capturedAt       DateTime      @default(now())
   query            CitationQuery @relation(fields: [queryId], references: [id], onDelete: Cascade)
   workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  /// Run 删除即放弃该 run 全部数据——刻意不用 SetNull，避免事件回流成 legacy 污染趋势
+  run              CitationRun?  @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, platform, capturedAt])
   @@index([queryId, capturedAt])
+  /// 续跑补缺靠 upsert：同 run 的同 query×platform×sampleIndex 只能有一行
+  @@unique([runId, queryId, platform, sampleIndex])
+  @@index([runId])
+}
+
+/// 一次监测运行 = N 次采样的一组（规格 §4）。slotKey 唯一保证「单 slot 单 Run」
+model CitationRun {
+  id             String           @id @default(cuid())
+  workspaceId    String
+  trigger        CitationTrigger
+  /// 生效 N（已按 MAX_RUN_UNITS 钳制），与 Workspace.monitorSampleCount 的请求值可能不同
+  sampleCount    Int
+  platforms      Json
+  /// 建 Run 时的查询快照 [{id, text}]：续跑与收尾缺样检测以它为锚，抵御查询中途被删
+  querySnapshot  Json
+  plannedUnits   Int
+  completedUnits Int              @default(0)
+  failedUnits    Int              @default(0)
+  status         CitationRunStatus
+  /// 超时/钳制说明（脱敏）
+  failureReason  String?
+  startedAt      DateTime         @default(now())
+  finishedAt     DateTime?
+  updatedAt      DateTime         @updatedAt
+  /// SCHEDULED = `${workspaceId}:${YYYY-MM-DD Asia/Shanghai}`；MANUAL = null
+  slotKey        String?          @unique
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  events         CitationEvent[]
+
+  @@index([workspaceId, startedAt])
 }
 
 model ContentPage {
@@ -395,6 +442,29 @@ enum QuerySource {
 enum QueryStatus {
   ACTIVE
   PAUSED
+}
+
+enum CitationRunStatus {
+  RUNNING
+  COMPLETED
+  PARTIAL
+  FAILED
+}
+
+enum CitationTrigger {
+  SCHEDULED
+  MANUAL
+}
+
+enum CitationEventStatus {
+  OK
+  FAILED
+}
+
+enum MonitorSchedule {
+  DAILY
+  WEEKLY
+  OFF
 }
 
 enum ContentStatus {
