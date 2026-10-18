@@ -165,6 +165,73 @@ describe('OptimizationTaskService', () => {
 })
 
 // ---------------------------------------------------------------------------
+// M2 §3.3 任务 1：review 状态守卫（双向）
+//
+// 闭环引入 AWAITING_VERIFICATION/VERIFIED 两态后，review 若仍无守卫，会留下
+// "FAILED 任务经 API 审核复活/退回"的洞：FAILED 是建议生成失败的终态（规格 §6.2），
+// 应由用户拒绝后重建，而非原地复活。仅 PENDING/IN_PROGRESS 可被审核。
+// ---------------------------------------------------------------------------
+
+describe('taskService.review 状态守卫（M2 §3.3）', () => {
+  function svcWithStatus(status: string) {
+    const prisma = mockPrisma() as any
+    prisma.optimizationTask.findUnique = vi.fn().mockResolvedValue({
+      id: 'task-1',
+      status,
+      workspaceId: 'w1',
+      pageId: 'page-1',
+    })
+    return { prisma, svc: createTaskService({ prisma }) }
+  }
+
+  it('approve：FAILED 任务抛错（不得复活为 REVIEWED）', async () => {
+    const { prisma, svc } = svcWithStatus('FAILED')
+    await expect(svc.review('task-1', true)).rejects.toThrow(/FAILED/)
+    expect(prisma.optimizationTask.update).not.toHaveBeenCalled()
+  })
+
+  it('reject：FAILED 任务抛错（不得被退回为 PENDING）', async () => {
+    const { prisma, svc } = svcWithStatus('FAILED')
+    await expect(svc.review('task-1', false, '内容不准确')).rejects.toThrow(/FAILED/)
+    expect(prisma.optimizationTask.update).not.toHaveBeenCalled()
+  })
+
+  it('approve：AWAITING_VERIFICATION（已发布待验证）不可再审核', async () => {
+    const { prisma, svc } = svcWithStatus('AWAITING_VERIFICATION')
+    await expect(svc.review('task-1', true)).rejects.toThrow()
+    expect(prisma.optimizationTask.update).not.toHaveBeenCalled()
+  })
+
+  it('approve：VERIFIED（闭环终态）不可再审核', async () => {
+    const { prisma, svc } = svcWithStatus('VERIFIED')
+    await expect(svc.review('task-1', true)).rejects.toThrow()
+    expect(prisma.optimizationTask.update).not.toHaveBeenCalled()
+  })
+
+  it('PENDING 任务 approve/reject 均正常（守卫不误伤主流程）', async () => {
+    const approve = svcWithStatus('PENDING')
+    await expect(approve.svc.review('task-1', true)).resolves.toMatchObject({ status: 'REVIEWED' })
+
+    const reject = svcWithStatus('PENDING')
+    await expect(reject.svc.review('task-1', false, '改')).resolves.toMatchObject({ status: 'PENDING' })
+  })
+
+  it('IN_PROGRESS 任务 approve/reject 均正常', async () => {
+    const approve = svcWithStatus('IN_PROGRESS')
+    await expect(approve.svc.review('task-1', true)).resolves.toMatchObject({ status: 'REVIEWED' })
+
+    const reject = svcWithStatus('IN_PROGRESS')
+    await expect(reject.svc.review('task-1', false)).resolves.toMatchObject({ status: 'PENDING' })
+  })
+
+  it('REVIEWED 任务不可再次审核（防止重复 approve 幂等外溢）', async () => {
+    const { prisma, svc } = svcWithStatus('REVIEWED')
+    await expect(svc.review('task-1', true)).rejects.toThrow()
+    expect(prisma.optimizationTask.update).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
 // 任务 9：计费检查点——优化任务创建 optimizationsPerMonth 软限 + 计量
 // ---------------------------------------------------------------------------
 

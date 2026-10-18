@@ -62,4 +62,22 @@ describe('task router', () => {
     expect(mockTaskService.publish).toHaveBeenCalledWith('task-1')
     expect(result.status).toBe('PUBLISHED')
   })
+
+  // M2 §3.3：闭环两态进入任务筛选器（看板之外的任务列表也要能筛出闭环任务）
+  it('list 接受 awaiting_verification 状态过滤', async () => {
+    const caller = createCaller(ctx)
+    await caller.list({ status: 'awaiting_verification' })
+    expect(mockTaskService.list).toHaveBeenCalledWith('w1', 'AWAITING_VERIFICATION')
+  })
+
+  it('list 接受 verified 状态过滤', async () => {
+    const caller = createCaller(ctx)
+    await caller.list({ status: 'verified' })
+    expect(mockTaskService.list).toHaveBeenCalledWith('w1', 'VERIFIED')
+  })
+
+  it('list 拒绝未知状态值', async () => {
+    const caller = createCaller(ctx)
+    await expect(caller.list({ status: 'archived' as any })).rejects.toThrow()
+  })
 })

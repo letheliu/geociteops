@@ -82,6 +82,15 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
       const task = await prisma.optimizationTask.findUnique({ where: { id } })
       if (!task) throw new Error(`Task not found: ${id}`)
 
+      // M2 §3.3 状态守卫（双向）：仅 PENDING/IN_PROGRESS 可被审核。
+      // approve 与 reject 同规则——否则 FAILED（建议生成失败的终态）可经 reject 被
+      // 退回为 PENDING 再复活，闭环两态也可被重复审核外溢。
+      if (task.status !== 'PENDING' && task.status !== 'IN_PROGRESS') {
+        throw new Error(
+          `Task must be PENDING or IN_PROGRESS to review, current: ${task.status}`,
+        )
+      }
+
       if (approved) {
         const updated = await prisma.optimizationTask.update({
           where: { id },

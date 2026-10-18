@@ -19,6 +19,8 @@ const statusFilters = [
   { label: '待审', value: 'pending' },
   { label: '已审', value: 'reviewed' },
   { label: '已发布', value: 'published' },
+  { label: '待验证', value: 'awaiting_verification' },
+  { label: '已验证', value: 'verified' },
 ]
 
 // Review drawer
@@ -32,6 +34,8 @@ const statusColors: Record<string, any> = {
   IN_PROGRESS: 'info',
   REVIEWED: 'success',
   PUBLISHED: 'success',
+  AWAITING_VERIFICATION: 'info',
+  VERIFIED: 'success',
   FAILED: 'error',
 }
 

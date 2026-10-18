@@ -5,7 +5,15 @@ export const taskRouter = router({
   list: protectedProcedure
     .input(
       z.object({
-        status: z.enum(['pending', 'in_progress', 'reviewed', 'published', 'failed']).optional(),
+        status: z.enum([
+          'pending',
+          'in_progress',
+          'reviewed',
+          'published',
+          'awaiting_verification',
+          'verified',
+          'failed',
+        ]).optional(),
       }).optional(),
     )
     .query(async ({ ctx, input }) => {

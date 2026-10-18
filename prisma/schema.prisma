@@ -313,6 +313,9 @@ model CitationRun {
   slotKey        String?          @unique
   workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   events         CitationEvent[]
+  /// 闭环任务侧的基线/验证反向字段（Run 删除即置空，不牵连任务）
+  baselineForTasks OptimizationTask[] @relation("BaselineRun")
+  verifiedForTasks OptimizationTask[] @relation("VerifiedRun")
 
   @@index([workspaceId, startedAt])
 }
@@ -369,11 +372,25 @@ model OptimizationTask {
   result              Json?
   reviewNote          String?
   extractionProposals Json?
+  // M2 §3.3 闭环锚：基线/验证两次命中的监测 Run（命名双向关系，Run 被删即置空）
+  baselineRunId       String?
+  verifiedRunId       String?
+  /// 进入 AWAITING_VERIFICATION 的时刻（与状态迁移同一次更新写入），也是回填窗口锚
+  publishedAt         DateTime?
+  baselineSovMean     Float?
+  verifiedSovMean     Float?
+  baselineMentionRate Float?
+  verifiedMentionRate Float?
+  baselineValidSamples Int?
+  verifiedValidSamples Int?
+  verifiedAt          DateTime?
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   page                ContentPage?   @relation(fields: [pageId], references: [id])
   query               CitationQuery? @relation(fields: [queryId], references: [id])
   workspace           Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  baselineRun         CitationRun?   @relation("BaselineRun", fields: [baselineRunId], references: [id], onDelete: SetNull)
+  verifiedRun         CitationRun?   @relation("VerifiedRun", fields: [verifiedRunId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, status])
 }
@@ -485,6 +502,10 @@ enum TaskStatus {
   IN_PROGRESS
   REVIEWED
   PUBLISHED
+  /// M2 §3.3：发布即写回页面并落基线，等待后续监测回填（闭环任务不落 PUBLISHED 中间态）
+  AWAITING_VERIFICATION
+  /// M2 §3.3：后续监测已回填验证指标，闭环完成
+  VERIFIED
   FAILED
 }
 
