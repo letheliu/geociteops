@@ -4,6 +4,7 @@ import type { QueryLibraryService } from './query-library.js'
 import { analyzeCitation, type Competitor } from './analyzer.js'
 import { sanitizeMessage } from '../../core/lib/sanitize-message.js'
 import { deriveRunStatus } from './aggregate.js'
+import { queryLevelsForRun } from './weak-points.js'
 import {
   QuotaExceededError,
   resolveWorkspaceOrganization,
@@ -336,7 +337,97 @@ export function createMonitor(deps: MonitorDeps): Monitor {
       })
     }
 
-    return finalizeRun(runId, timedOut)
+    const outcome = await finalizeRun(runId, timedOut)
+    // M2 §3.3 闭环回填：收尾之后触发（手动 run 同样触发）。异常不阻断收尾——
+    // backfillVerifications 内部已兜底，这里再兜一层以防它自身抛错。
+    if (outcome) {
+      const finished = await deps.prisma.citationRun.findUnique({
+        where: { id: runId },
+        select: { id: true, startedAt: true, querySnapshot: true },
+      })
+      if (finished) {
+        try {
+          await backfillVerifications(run.workspaceId, finished)
+        } catch (err) {
+          console.error('[monitor] backfill hook failed:', err)
+        }
+      }
+    }
+    return outcome
+  }
+
+  /**
+   * 闭环验证回填（M2 §3.3 规格 §7）：Run 收尾后，把发布于本次运行**启动之前**的任务
+   * AWAITING_VERIFICATION → VERIFIED，并写 verifiedRunId + 验证三指标 + verifiedAt。
+   *
+   * 规则逐条：
+   * - 候选 = status=AWAITING_VERIFICATION 且 queryId ∈ run.querySnapshot
+   * - 窗口：run.startedAt >= task.publishedAt（**发布前启动、发布后收尾**的 run 不算——
+   *   它的采样发生在改动之前，拿它当"改动后的验证值"是自欺）
+   * - 该查询在本次 run 至少一组 validSamples>0 才置 VERIFIED，否则保持 AWAITING 等下次
+   * - 同查询多任务只回填 publishedAt 最早的一个（避免同一 run 重复消费给多个任务）
+   * - 幂等（条件更新：仍处 AWAITING_VERIFICATION 才改）+ 异常不阻断收尾
+   *
+   * 口径：查询级三指标与 §5 weakPoints、citation.trend({queryId}) 同一 helper
+   * （groupAggregate → queryLevelAggregate），杜绝 Δ 与趋势图两张口径。
+   */
+  async function backfillVerifications(workspaceId: string, run: {
+    id: string
+    startedAt: Date
+    querySnapshot: unknown
+  }): Promise<number> {
+    try {
+      const snapshot = parseSnapshot(run.querySnapshot)
+      if (snapshot.length === 0) return 0
+      const queryIds = snapshot.map((q) => q.id)
+      const completedAt = now()
+
+      const candidates = await deps.prisma.optimizationTask.findMany({
+        where: {
+          workspaceId,
+          status: 'AWAITING_VERIFICATION',
+          queryId: { in: queryIds },
+        },
+        select: { id: true, queryId: true, publishedAt: true },
+      })
+      if (candidates.length === 0) return 0
+
+      // 窗口过滤 + 同查询取 publishedAt 最早的一个
+      const perQuery = new Map<string, (typeof candidates)[number]>()
+      for (const task of candidates) {
+        if (!task.queryId || !task.publishedAt) continue
+        if (run.startedAt < task.publishedAt) continue
+        const current = perQuery.get(task.queryId)
+        if (!current || task.publishedAt < (current.publishedAt as Date)) perQuery.set(task.queryId, task)
+      }
+      if (perQuery.size === 0) return 0
+
+      const byQuery = await queryLevelsForRun(deps.prisma, workspaceId, run.id, [...perQuery.keys()])
+
+      let backfilled = 0
+      for (const [queryId, task] of perQuery) {
+        const level = byQuery.get(queryId)
+        // 该查询至少一组 validSamples>0 才置 VERIFIED，否则保持 AWAITING 等下次
+        if (!level) continue
+        const res = await deps.prisma.optimizationTask.updateMany({
+          where: { id: task.id, status: 'AWAITING_VERIFICATION' },
+          data: {
+            status: 'VERIFIED',
+            verifiedRunId: run.id,
+            verifiedSovMean: level.sovMean,
+            verifiedMentionRate: level.brandMentionRate,
+            verifiedValidSamples: level.validSamples,
+            verifiedAt: completedAt,
+          },
+        })
+        backfilled += res.count
+      }
+      return backfilled
+    } catch (err) {
+      // 回填失败不得影响监测收尾（Run 终态已落库）
+      console.error('[monitor] backfillVerifications failed:', err)
+      return 0
+    }
   }
 
   /** FAILED 采样行的占位值（规格 §4/D2）——"未提及"与"失败"只靠 status 区分 */

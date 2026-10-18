@@ -8,6 +8,8 @@ import {
 } from './monitor.js'
 import type { PlatformResult } from './platform-adapters/types.js'
 import { QuotaExceededError } from '../../platform/billing/entitlement-guard.js'
+import { loadTrendPoints } from './trend-query.js'
+import { dayKey } from './aggregate.js'
 
 const OK_RESULT: PlatformResult = {
   answer: '推荐 zoomer AI，详见 https://zoomer.top',
@@ -36,6 +38,8 @@ function makePrisma(opts: {
   workspace?: Partial<any>
   queries?: Array<Partial<any> & { id: string }>
   events?: SeedEvent[]
+  /** M2 §3.3：闭环任务种子（回填用） */
+  tasks?: Array<Partial<any> & { id: string }>
 } = {}) {
   const workspace = {
     id: 'w1',
@@ -72,9 +76,25 @@ function makePrisma(opts: {
     })
   }
 
-  const callLog = { runUpdateMany: [] as any[] }
+  const callLog = { runUpdateMany: [] as any[], taskUpdateMany: [] as any[] }
+  const tasks = (opts.tasks ?? []).map((t) => ({ workspaceId: 'w1', status: 'AWAITING_VERIFICATION', ...t }))
 
   const prisma: any = {
+    optimizationTask: {
+      findMany: vi.fn(async ({ where }: any) => {
+        let list = tasks.slice()
+        if (where.workspaceId) list = list.filter((t) => t.workspaceId === where.workspaceId)
+        if (where.status) list = list.filter((t) => t.status === where.status)
+        if (where.queryId?.in) list = list.filter((t) => where.queryId.in.includes(t.queryId))
+        return list.map((t) => ({ ...t }))
+      }),
+      updateMany: vi.fn(async ({ where, data }: any) => {
+        const hit = tasks.filter((t) => t.id === where.id && (where.status === undefined || t.status === where.status))
+        for (const t of hit) Object.assign(t, data)
+        callLog.taskUpdateMany.push({ where, data })
+        return { count: hit.length }
+      }),
+    },
     workspace: {
       findUnique: vi.fn(async ({ where }: any) => (where.id === workspace.id ? { ...workspace } : null)),
     },
@@ -96,6 +116,18 @@ function makePrisma(opts: {
       findUnique: vi.fn(async ({ where }: any) => {
         const run = where.id ? runs.find((r) => r.id === where.id) : runs.find((r) => r.slotKey === where.slotKey)
         return run ? { ...run } : null
+      }),
+      findMany: vi.fn(async ({ where, orderBy }: any) => {
+        let list = runs.slice()
+        if (where.workspaceId) list = list.filter((r) => r.workspaceId === where.workspaceId)
+        if (where.status?.in) list = list.filter((r) => where.status.in.includes(r.status))
+        if (where.startedAt?.gte) list = list.filter((r) => r.startedAt >= where.startedAt.gte)
+        if (where.startedAt?.lt) list = list.filter((r) => r.startedAt < where.startedAt.lt)
+        if (where.finishedAt?.not === null) list = list.filter((r) => r.finishedAt !== null)
+        if (where.finishedAt?.lte) list = list.filter((r) => r.finishedAt !== null && r.finishedAt <= where.finishedAt.lte)
+        if (orderBy?.finishedAt) list.sort((a, b) => (a.finishedAt < b.finishedAt ? 1 : -1))
+        if (orderBy?.startedAt) list.sort((a, b) => (a.startedAt < b.startedAt ? -1 : 1))
+        return list.map((r) => ({ ...r }))
       }),
       create: vi.fn(async ({ data }: any) => {
         // slotKey 唯一约束
@@ -125,8 +157,16 @@ function makePrisma(opts: {
     citationEvent: {
       findMany: vi.fn(async ({ where }: any) => {
         let list = events.slice()
-        if (where.runId !== undefined) list = list.filter((e) => e.runId === where.runId)
+        if (where.runId !== undefined) {
+          if (where.runId?.in) list = list.filter((e) => where.runId.in.includes(e.runId))
+          else list = list.filter((e) => e.runId === where.runId)
+        }
         if (where.status !== undefined) list = list.filter((e) => e.status === where.status)
+        if (where.queryId !== undefined) {
+          if (where.queryId?.in) list = list.filter((e) => where.queryId.in.includes(e.queryId))
+          else list = list.filter((e) => e.queryId === where.queryId)
+        }
+        if (where.workspaceId) list = list.filter((e) => e.workspaceId === where.workspaceId)
         return list.map((e) => ({ ...e }))
       }),
       upsert: vi.fn(async ({ where, create, update }: any) => {
@@ -145,7 +185,7 @@ function makePrisma(opts: {
     },
   }
 
-  return { prisma, runs, events, queries, callLog }
+  return { prisma, runs, events, queries, tasks, callLog }
 }
 
 function stubQueryLibrary() {
@@ -702,5 +742,154 @@ describe('monitor 调度 × monitorSampleCountMax（生效点三）', () => {
     await monitor.startScheduledRun({ workspaceId: 'w1', platforms: ['openai'], slotKey: SLOT })
     const run = db.prisma.citationRun.create.mock.calls[0][0].data
     expect(run.sampleCount).toBe(5)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.3 闭环验证回填（规格 §7）：窗口 / 最早一个 / 幂等 / 容错 / 手动触发 / 口径对拍。
+// 对拍是审查重点 #2 的钉子：task 验证三指标必须 === trend({queryId}) 该 run 点的值。
+// ---------------------------------------------------------------------------
+
+describe('monitor — 闭环验证回填（M2 §3.3）', () => {
+  const PUBLISHED_BEFORE = new Date('2026-10-18T00:00:00.000Z')
+
+  function makeBackfillDb(taskOverrides: Record<string, any> = {}, eventOverrides: Partial<SeedEvent> = {}) {
+    return makePrisma({
+      queries: [{ id: 'q1', queryText: 'AI设计工具', status: 'ACTIVE', scheduled: true }],
+      tasks: [
+        {
+          id: 'task-1',
+          queryId: 'q1',
+          type: 'OPTIMIZE_FOR_QUERY',
+          publishedAt: PUBLISHED_BEFORE,
+          ...taskOverrides,
+        },
+      ],
+      events: [
+        { runId: null, queryId: 'q1', platform: 'openai', sampleIndex: 1, sovScore: 0.5, brandMentioned: true, ...eventOverrides },
+      ],
+    })
+  }
+
+  function makeMonitor(db: ReturnType<typeof makePrisma>, deps: Record<string, any> = {}) {
+    return createMonitor({
+      prisma: db.prisma,
+      registry: registryOf({ openai: okAdapter() }),
+      queryLibrary: stubQueryLibrary(),
+      competitors: [],
+      ...deps,
+    })
+  }
+
+  it('回填：发布早于 run 启动 → VERIFIED + verifiedRunId + 验证三指标 + verifiedAt', async () => {
+    const db = makeBackfillDb()
+    const monitor = makeMonitor(db)
+
+    // run 的 startedAt 默认 = new Date()（晚于 publishedAt）
+    await monitor.startManualRun({ workspaceId: 'w1', platforms: ['openai'], queryIds: ['q1'], sampleCount: 1 })
+
+    const task = db.tasks[0]
+    expect(task.status).toBe('VERIFIED')
+    expect(task.verifiedRunId).not.toBeNull()
+    expect(task.verifiedSovMean).toBeGreaterThan(0)
+    expect(task.verifiedMentionRate).toBe(1)
+    expect(task.verifiedValidSamples).toBe(1)
+    expect(task.verifiedAt).toBeInstanceOf(Date)
+  })
+
+  it('窗口：run 在发布前启动（发布后收尾）→ 不回填，保持 AWAITING', async () => {
+    const db = makeBackfillDb()
+    // 把已发布任务的 publishedAt 推到"未来"，等价于 run 先启动、任务后发布
+    db.tasks[0].publishedAt = new Date(Date.now() + 60_000)
+    const monitor = makeMonitor(db)
+
+    await monitor.startManualRun({ workspaceId: 'w1', platforms: ['openai'], queryIds: ['q1'], sampleCount: 1 })
+    expect(db.tasks[0].status).toBe('AWAITING_VERIFICATION')
+    expect(db.tasks[0].verifiedRunId).toBeUndefined()
+  })
+
+  it('全失败查询（validSamples=0）→ 保持 AWAITING，等下次监测', async () => {
+    const db = makeBackfillDb()
+    // 采样全部失败：该查询在本 run 无有效样本
+    const failing = { name: 'openai', query: vi.fn().mockRejectedValue(new Error('platform down')) }
+    const monitor = makeMonitor(db, { registry: registryOf({ openai: failing }) })
+    await monitor.startManualRun({ workspaceId: 'w1', platforms: ['openai'], queryIds: ['q1'], sampleCount: 1 })
+    expect(db.tasks[0].status).toBe('AWAITING_VERIFICATION')
+  })
+
+  it('同查询多任务 → 只回填 publishedAt 最早的一个', async () => {
+    const db = makeBackfillDb()
+    db.tasks.push({
+      id: 'task-2', workspaceId: 'w1', queryId: 'q1', type: 'OPTIMIZE_FOR_QUERY',
+      status: 'AWAITING_VERIFICATION',
+      publishedAt: new Date(PUBLISHED_BEFORE.getTime() + 3_600_000),
+    })
+    const monitor = makeMonitor(db)
+    await monitor.startManualRun({ workspaceId: 'w1', platforms: ['openai'], queryIds: ['q1'], sampleCount: 1 })
+
+    expect(db.tasks[0].status).toBe('VERIFIED')
+    expect(db.tasks[1].status).toBe('AWAITING_VERIFICATION')
+  })
+
+  it('幂等：重复收尾零副作用（已 VERIFIED 不再被改写）', async () => {
+    const db = makeBackfillDb()
+    const monitor = makeMonitor(db)
+    await monitor.startManualRun({ workspaceId: 'w1', platforms: ['openai'], queryIds: ['q1'], sampleCount: 1 })
+    const firstVerifiedAt = db.tasks[0].verifiedAt
+
+    // 再跑一轮：候选集合按 status=AWAITING_VERIFICATION 查，已 VERIFIED 不在其中
+    await monitor.startManualRun({ workspaceId: 'w1', platforms: ['openai'], queryIds: ['q1'], sampleCount: 1 })
+    expect(db.tasks[0].status).toBe('VERIFIED')
+    expect(db.tasks[0].verifiedAt).toEqual(firstVerifiedAt)
+  })
+
+  it('容错：回填查询异常 → 监测收尾照常完成', async () => {
+    const db = makeBackfillDb()
+    db.prisma.optimizationTask.findMany = vi.fn(async () => {
+      throw new Error('回填查询炸了')
+    })
+    const monitor = makeMonitor(db)
+    const result = await monitor.startManualRun({ workspaceId: 'w1', platforms: ['openai'], queryIds: ['q1'], sampleCount: 1 })
+    expect(result.status).toBe('COMPLETED')
+    expect(db.runs[0].status).toBe('COMPLETED')
+  })
+
+  it('手动 run 同样触发回填（不只定时）', async () => {
+    const db = makeBackfillDb()
+    const monitor = makeMonitor(db)
+    const created = await monitor.createManualRun({ workspaceId: 'w1', platforms: ['openai'], queryIds: ['q1'], sampleCount: 1 })
+    expect(created.status).toBe('RUNNING')
+    expect(db.tasks[0].status).toBe('AWAITING_VERIFICATION')
+    await monitor.executeRunById(created.runId!)
+    expect(db.tasks[0].status).toBe('VERIFIED')
+  })
+
+  it('对拍（审查重点 #2 钉子）：验证三指标 === trend({queryId}) 该 run 点的值', async () => {
+    const db = makeBackfillDb({}, { sovScore: 0.3, brandMentioned: true })
+    const monitor = makeMonitor(db)
+    await monitor.startManualRun({ workspaceId: 'w1', platforms: ['openai'], queryIds: ['q1'], sampleCount: 1 })
+
+    const points = await loadTrendPoints(db.prisma, {
+      workspaceId: 'w1',
+      fromDay: '2020-01-01',
+      toDay: dayKey(new Date()),
+      queryId: 'q1',
+    })
+    const runPoint = points.find((p) => !p.legacy)!
+    expect(runPoint).toBeDefined()
+
+    expect(db.tasks[0].verifiedSovMean).toBeCloseTo(runPoint.sovMean as number, 10)
+    expect(db.tasks[0].verifiedMentionRate).toBeCloseTo(runPoint.brandMentionRate as number, 10)
+    expect(db.tasks[0].verifiedValidSamples).toBe(runPoint.validSamples)
+  })
+
+  it('无候选任务时零查询开销（updateMany 不被调用）', async () => {
+    const db = makePrisma({
+      queries: [{ id: 'q1', queryText: 'AI设计工具', status: 'ACTIVE', scheduled: true }],
+      tasks: [],
+    })
+    const monitor = makeMonitor(db)
+    await monitor.startManualRun({ workspaceId: 'w1', platforms: ['openai'], queryIds: ['q1'], sampleCount: 1 })
+    expect(db.prisma.optimizationTask.updateMany).not.toHaveBeenCalled()
   })
 })

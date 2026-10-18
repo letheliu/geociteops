@@ -126,6 +126,65 @@ export interface QueryBaseline {
   level: QueryLevelAgg
 }
 
+/** 把一批事件按 (runId × queryId) 聚成查询级结果（口径唯一实现，基线/验证/薄弱点共用） */
+function levelsFromEvents(events: readonly AggregateEvent[]): Map<string, QueryLevelAgg> {
+  const byRunQuery = new Map<string, AggregateEvent[]>()
+  for (const e of events) {
+    const key = `${e.runId}::${e.queryId}`
+    const bucket = byRunQuery.get(key)
+    if (bucket) bucket.push(e)
+    else byRunQuery.set(key, [e])
+  }
+  const out = new Map<string, QueryLevelAgg>()
+  for (const [key, bucket] of byRunQuery) {
+    const level = queryLevelAggregate(
+      String(bucket[0].runId),
+      [...groupEventsByKey(bucket).values()].map(groupAggregate),
+    )
+    if (level) out.set(key, level)
+  }
+  return out
+}
+
+/**
+ * 某个 Run 内指定查询的查询级结果（回填验证用）。
+ * 与基线读共用 levelsFromEvents——同一段聚合代码，因此验证值与趋势图该 run 点的值必然相等。
+ */
+export async function queryLevelsForRun(
+  prisma: WeakPointsDb,
+  workspaceId: string,
+  runId: string,
+  queryIds: readonly string[],
+): Promise<Map<string, QueryLevelAgg>> {
+  if (queryIds.length === 0) return new Map()
+  const events = (await prisma.citationEvent.findMany({
+    where: {
+      workspaceId,
+      runId,
+      // 唯一过滤点：FAILED 行不进任何指标（与趋势同源）
+      ...okEventsWhere(),
+      queryId: { in: [...queryIds] },
+    },
+    select: {
+      id: true,
+      queryId: true,
+      platform: true,
+      runId: true,
+      status: true,
+      brandMentioned: true,
+      brandSourceCited: true,
+      rankInAnswer: true,
+      sovScore: true,
+      capturedAt: true,
+      competitors: true,
+    },
+  })) as unknown as AggregateEvent[]
+
+  const byQuery = new Map<string, QueryLevelAgg>()
+  for (const level of levelsFromEvents(events).values()) byQuery.set(level.queryId, level)
+  return byQuery
+}
+
 /**
  * 取范围内每个 ACTIVE 查询的**最近一个有效 Run**（规格 §5 规则，§6/§7 的基线同源）：
  * 含该查询 + COMPLETED/PARTIAL + 已收尾 + 该查询至少一组 validSamples>0，
@@ -185,21 +244,13 @@ export async function loadQueryBaselines(
     },
   })) as unknown as AggregateEvent[]
 
-  const byRunQuery = new Map<string, AggregateEvent[]>()
-  for (const e of events) {
-    const key = `${e.runId}::${e.queryId}`
-    const bucket = byRunQuery.get(key)
-    if (bucket) bucket.push(e)
-    else byRunQuery.set(key, [e])
-  }
+  const levels = levelsFromEvents(events)
 
   for (const run of runs) {
     for (const query of queries) {
       if (baselines.has(query.id)) continue
-      const bucket = byRunQuery.get(`${run.id}::${query.id}`)
-      if (!bucket || bucket.length === 0) continue
-      const level = queryLevelAggregate(run.id, [...groupEventsByKey(bucket).values()].map(groupAggregate))
       // 该查询在本次 run 至少一组 validSamples>0 才算有效基线；否则继续往更早的 run 找
+      const level = levels.get(`${run.id}::${query.id}`)
       if (!level) continue
       baselines.set(query.id, {
         queryId: query.id,
