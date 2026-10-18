@@ -198,7 +198,8 @@ async function main() {
   const projectService = createProjectService({ prisma })
   const queryPlanner = createQueryPlanner({ prisma })
   const sampleExecutor = createSampleExecutor({ prisma, registry, analyzeCitation, getCredentials: resolver.getCredentials })
-  const actionService = createActionService({ prisma, taskService: taskService as any })
+  // M2 §3.3：注入 billing 以启用 actions.convert 的优化门禁前置断言
+  const actionService = createActionService({ prisma, taskService: taskService as any, billing })
   const reportService = createReportService({ prisma })
   const dispatchRun = async (runId: string) => {
     const { createDispatcher } = await import('./workers/diagnostic-dispatcher.js')

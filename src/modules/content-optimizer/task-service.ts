@@ -37,6 +37,13 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
 
   return {
     async create(input) {
+      // M2 §3.3 优化门禁兜底（规格 §4）：六入口已在前置断言，此处是直连 create
+      // （如 KG extractor 保留直连、SDK 内部调用等）的最后一道闸——同样在写库之前。
+      if (billing) {
+        const organizationId = await resolveWorkspaceOrganization(prisma, input.workspaceId)
+        if (organizationId) await billing.guard.assertOptimizationsAllowed(organizationId)
+      }
+
       // 任务 9：优化任务创建软限检查点（先检查后计量，超额告警不拦截）
       let meterTask: (() => void) | null = null
       if (billing) {

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import {
   createEntitlementGuard,
+  isOptimizationsAllowed,
+  assertWorkspaceOptimizationsAllowed,
+  workspaceOptimizationsAllowed,
+  OptimizationsNotAllowedError,
+  OPTIMIZATIONS_DENIED_MESSAGE,
   PlatformNotAllowedError,
   QuotaExceededError,
 } from './entitlement-guard.js'
@@ -409,5 +414,146 @@ describe('entitlementGuard.checkMonitorSampleCountMax（enforcement on）', () =
     const { guard } = makeGuard(prisma, makeMeter(), makeAudit(), () => false)
     await guard.checkMonitorSampleCountMax('org-1', 9999)
     expect(prisma.organizationEntitlement.findUnique).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.3 优化门禁（规格 §4）
+//
+// 判定 = !(limits._optimizationsDisabled === true && limits.optimizationsPerMonth === 0)
+// 即"marker 为 true 且合并后配额为 0 才拒"；merged > 0 恒放行（双订阅并存的兜底）。
+// ---------------------------------------------------------------------------
+
+describe('优化门禁判定矩阵（M2 §3.3）', () => {
+  it('纯函数：marker=true + 配额 0 → 拒', () => {
+    expect(isOptimizationsAllowed({ ...ZERO_LIMITS, _optimizationsDisabled: true } as any)).toBe(false)
+  })
+
+  it('纯函数：marker=true + 配额 > 0 → 放行（双订阅并存：转化客户恒可用）', () => {
+    expect(
+      isOptimizationsAllowed({ ...ZERO_LIMITS, optimizationsPerMonth: 20, _optimizationsDisabled: true } as any),
+    ).toBe(true)
+  })
+
+  it('纯函数：无 marker + 配额 0 → 放行（正式租户未声明标记，回归既有计量语义）', () => {
+    expect(isOptimizationsAllowed({ ...ZERO_LIMITS } as any)).toBe(true)
+  })
+
+  it('纯函数：marker 为 false（显式关闭标记）+ 配额 0 → 放行', () => {
+    expect(
+      isOptimizationsAllowed({ ...ZERO_LIMITS, _optimizationsDisabled: false } as any),
+    ).toBe(true)
+  })
+
+  it('纯函数：marker 非布尔（脏值）→ 放行（只认 === true，不做宽松真值判断）', () => {
+    expect(isOptimizationsAllowed({ ...ZERO_LIMITS, _optimizationsDisabled: 'true' } as any)).toBe(true)
+  })
+
+  function guardWithLimits(limits: Record<string, unknown>, enforcement: () => boolean = () => true) {
+    const prisma = makePrisma({ oeRow: { organizationId: 'org-1', limits: { ...ZERO_LIMITS, ...limits } } })
+    const audit = makeAudit()
+    const { guard } = makeGuard(prisma, makeMeter(), audit, enforcement)
+    return { guard, prisma, audit }
+  }
+
+  it('org 级：TRIAL 形态（marker + 0）→ 拒绝 + 一条 optimizations.denied 审计', async () => {
+    const { guard, audit } = guardWithLimits({ _optimizationsDisabled: true })
+    await expect(guard.assertOptimizationsAllowed('org-1')).rejects.toThrow(
+      OPTIMIZATIONS_DENIED_MESSAGE,
+    )
+    expect(audit.record).toHaveBeenCalledWith({
+      actorType: 'SYSTEM',
+      action: 'optimizations.denied',
+      organizationId: 'org-1',
+      diff: { organizationId: 'org-1' },
+    })
+    expect(audit.record).toHaveBeenCalledTimes(1)
+  })
+
+  it('org 级：marker + 正配额 → 放行且零审计', async () => {
+    const { guard, audit } = guardWithLimits({ _optimizationsDisabled: true, optimizationsPerMonth: 20 })
+    await expect(guard.assertOptimizationsAllowed('org-1')).resolves.toBeUndefined()
+    expect(audit.record).not.toHaveBeenCalled()
+  })
+
+  it('org 级：isOptimizationsAllowed 与 assert 同源（同一布尔，不漂移）', async () => {
+    const denied = guardWithLimits({ _optimizationsDisabled: true })
+    await expect(denied.guard.isOptimizationsAllowed('org-1')).resolves.toBe(false)
+    await expect(denied.guard.assertOptimizationsAllowed('org-1')).rejects.toThrow()
+
+    const allowed = guardWithLimits({ _optimizationsDisabled: true, optimizationsPerMonth: 5 })
+    await expect(allowed.guard.isOptimizationsAllowed('org-1')).resolves.toBe(true)
+    await expect(allowed.guard.assertOptimizationsAllowed('org-1')).resolves.toBeUndefined()
+  })
+
+  it('enforcement off → no-op 放行且不查 OE 行（依赖 §3.0 双开关部署约束）', async () => {
+    const prisma = makePrisma({
+      oeRow: { organizationId: 'org-1', limits: { ...ZERO_LIMITS, _optimizationsDisabled: true } },
+    })
+    const audit = makeAudit()
+    const { guard } = makeGuard(prisma, makeMeter(), audit, () => false)
+    await expect(guard.assertOptimizationsAllowed('org-1')).resolves.toBeUndefined()
+    await expect(guard.isOptimizationsAllowed('org-1')).resolves.toBe(true)
+    expect(prisma.organizationEntitlement.findUnique).not.toHaveBeenCalled()
+    expect(audit.record).not.toHaveBeenCalled()
+  })
+
+  it('存量 TRIAL org（迁移补的 OE 键形态）→ 拒绝', async () => {
+    // 迁移 SQL 的产物：OE.limits 带 _optimizationsDisabled 且 optimizationsPerMonth 为 0
+    const { guard } = guardWithLimits({ _optimizationsDisabled: true, optimizationsPerMonth: 0 })
+    await expect(guard.assertOptimizationsAllowed('org-1')).rejects.toThrow(OPTIMIZATIONS_DENIED_MESSAGE)
+  })
+
+  it('无 OE 行 → 兜底零对象 → 无 marker → 放行（正式租户未被误伤）', async () => {
+    const prisma = makePrisma({ oeRow: null })
+    const { guard } = makeGuard(prisma)
+    await expect(guard.isOptimizationsAllowed('org-1')).resolves.toBe(true)
+  })
+})
+
+describe('优化门禁入口装配（M2 §3.3）', () => {
+  function makeGateCtx(allowed: boolean) {
+    const guard = {
+      assertOptimizationsAllowed: vi.fn(async () => {
+        if (!allowed) throw new OptimizationsNotAllowedError('org-1')
+      }),
+      isOptimizationsAllowed: vi.fn(async () => allowed),
+    }
+    return {
+      ctx: {
+        workspace: { id: 'w1', organizationId: 'org-1' },
+        services: { billing: { guard } },
+      } as any,
+      guard,
+    }
+  }
+
+  it('拒绝时映射为 TRPCError FORBIDDEN + 规格文案（不泄漏企业 id）', async () => {
+    const { ctx } = makeGateCtx(false)
+    await expect(assertWorkspaceOptimizationsAllowed(ctx)).rejects.toThrow(OPTIMIZATIONS_DENIED_MESSAGE)
+    await expect(assertWorkspaceOptimizationsAllowed(ctx)).rejects.toMatchObject({ code: 'FORBIDDEN' })
+  })
+
+  it('放行时零抛错', async () => {
+    const { ctx, guard } = makeGateCtx(true)
+    await expect(assertWorkspaceOptimizationsAllowed(ctx)).resolves.toBeUndefined()
+    expect(guard.assertOptimizationsAllowed).toHaveBeenCalledWith('org-1')
+  })
+
+  it('workspaceOptimizationsAllowed 布尔与 assert 同源', async () => {
+    const { ctx } = makeGateCtx(false)
+    await expect(workspaceOptimizationsAllowed(ctx)).resolves.toBe(false)
+  })
+
+  it('billing 缺失 → no-op 放行（无计费机器在场时门禁无判定依据）', async () => {
+    const ctx = { workspace: { id: 'w1', organizationId: 'org-1' }, services: {} } as any
+    await expect(assertWorkspaceOptimizationsAllowed(ctx)).resolves.toBeUndefined()
+    await expect(workspaceOptimizationsAllowed(ctx)).resolves.toBe(true)
+  })
+
+  it('organizationId 缺失 → no-op 放行', async () => {
+    const ctx = { workspace: { id: 'w1' }, services: { billing: { guard: {} } } } as any
+    await expect(assertWorkspaceOptimizationsAllowed(ctx)).resolves.toBeUndefined()
+    await expect(workspaceOptimizationsAllowed(ctx)).resolves.toBe(true)
   })
 })

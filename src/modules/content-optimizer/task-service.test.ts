@@ -1,7 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createTaskService } from './task-service.js'
-import { createEntitlementGuard } from '../../platform/billing/entitlement-guard.js'
+import {
+  createEntitlementGuard,
+  OptimizationsNotAllowedError,
+} from '../../platform/billing/entitlement-guard.js'
 import { createUsageMeter } from '../../platform/billing/usage-meter.js'
+
+/** TRIAL 形态 OE 行：内部 marker 关闭优化 + 配额 0（门禁判定源） */
+const LIMITS_TRIAL = {
+  maxWorkspaces: 1,
+  maxQueries: 10,
+  maxPages: 5,
+  diagnosticRunsPerMonth: 0,
+  samplesPerRun: 1,
+  optimizationsPerMonth: 0,
+  allowedPlatforms: [],
+  _optimizationsDisabled: true,
+}
 
 function mockPrisma() {
   return {
@@ -228,6 +243,61 @@ describe('taskService.review 状态守卫（M2 §3.3）', () => {
     const { prisma, svc } = svcWithStatus('REVIEWED')
     await expect(svc.review('task-1', true)).rejects.toThrow()
     expect(prisma.optimizationTask.update).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.3 优化门禁兜底：绕过 router 直调 create（KG extractor 保留直连、SDK 内部调用）
+// 仍必须在写库之前拒绝，且软限/计量一并跳过——拒绝即零副作用。
+// ---------------------------------------------------------------------------
+
+describe('taskService.create 优化门禁兜底（M2 §3.3）', () => {
+  function assemble(allowed: boolean) {
+    const prisma = mockPrisma() as any
+    prisma.workspace = {
+      findUnique: vi.fn(async () => ({ id: 'w1', organizationId: 'org-trial' })),
+    }
+    // 放行形态：正式租户（无 marker，配额为正）；拒绝形态：TRIAL（marker + 0）
+    const limits = allowed
+      ? { ...LIMITS_TRIAL, _optimizationsDisabled: undefined, optimizationsPerMonth: 20 }
+      : LIMITS_TRIAL
+    if (allowed) delete (limits as Record<string, unknown>)._optimizationsDisabled
+    prisma.organizationEntitlement = {
+      findUnique: vi.fn(async () => ({ organizationId: 'org-trial', limits })),
+    }
+    const meterPrisma: any = { usageRecord: { createMany: vi.fn(), aggregate: vi.fn(async () => ({ _sum: { quantity: 0 } })) } }
+    const audit = { record: vi.fn(async () => {}) }
+    const meter = createUsageMeter({ prisma: meterPrisma })
+    const guard = createEntitlementGuard({
+      prisma,
+      meter,
+      audit: audit as any,
+      enforcement: () => true,
+    })
+    const svc = createTaskService({ prisma, billing: { guard, meter } })
+    return { prisma, svc }
+  }
+
+  it('被拒：零写库（create 未被调用）', async () => {
+    const { prisma, svc } = assemble(false)
+    await expect(
+      svc.create({ workspaceId: 'w1', type: 'REWRITE_CONTENT', pageId: 'page-1' }),
+    ).rejects.toThrow()
+    expect(prisma.optimizationTask.create).not.toHaveBeenCalled()
+  })
+
+  it('被拒：错误可被入口层识别为优化门禁（OptimizationsNotAllowedError）', async () => {
+    const { svc } = assemble(false)
+    await expect(
+      svc.create({ workspaceId: 'w1', type: 'REWRITE_CONTENT' }),
+    ).rejects.toBeInstanceOf(OptimizationsNotAllowedError)
+  })
+
+  it('放行：正常建任务（正式租户回归）', async () => {
+    const { prisma, svc } = assemble(true)
+    const task = await svc.create({ workspaceId: 'w1', type: 'REWRITE_CONTENT' })
+    expect(task.id).toBe('task-1')
+    expect(prisma.optimizationTask.create).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -386,6 +386,47 @@ describe('registerTrial：五件套单事务（逐项断言）', () => {
     })
   })
 
+  // M2 §3.3：优化门禁的内部标记由**注册流程注入**，不进目录——
+  // 目录是可编辑商品配置，管理端删掉 marker 也不该让新注册失去门禁（审查重点 #1 钉子）。
+  it('Subscription 快照注入 _optimizationsDisabled:true（目录未声明时同样注入）', async () => {
+    const { service, db } = makeService()
+    await service.registerTrial(input())
+    expect(db.state.subscriptions[0].entitlements._optimizationsDisabled).toBe(true)
+  })
+
+  it('目录残留 marker 也由注入值胜出（内部键不被商品配置漂移）', async () => {
+    const { service, db } = makeService({
+      db: makeDb({
+        product: {
+          id: 'prod_trial',
+          code: 'TRIAL',
+          name: '试用计划',
+          kind: 'SUBSCRIPTION',
+          active: true,
+          plans: [
+            {
+              id: 'plan_trial',
+              productId: 'prod_trial',
+              name: '试用套餐',
+              priceCents: 0,
+              billingPeriod: null,
+              entitlements: {
+                maxWorkspaces: 1,
+                maxQueries: 10,
+                allowedPlatforms: [],
+                monitorSampleCountMax: 3,
+                _optimizationsDisabled: false,
+              },
+              deliverables: [],
+            },
+          ],
+        },
+      }),
+    })
+    await service.registerTrial(input())
+    expect(db.state.subscriptions[0].entitlements._optimizationsDisabled).toBe(true)
+  })
+
   it('注册成功直接签发登录态（复用 login 的会话路径）', async () => {
     const { service, sessions } = makeService()
     const result = await service.registerTrial(input())

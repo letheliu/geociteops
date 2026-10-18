@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { citationRouter } from './router.js'
-import { QuotaExceededError } from '../../platform/billing/entitlement-guard.js'
+import { QuotaExceededError, OptimizationsNotAllowedError, OPTIMIZATIONS_DENIED_MESSAGE } from '../../platform/billing/entitlement-guard.js'
 
 function createCaller(ctx: any) {
   return citationRouter.createCaller(ctx)
@@ -626,5 +626,43 @@ describe('citation.runs.create × monitorSampleCountMax 硬检查', () => {
       runId: 'run-new',
     })
     expect(guard.checkMonitorSampleCountMax).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.3 优化门禁：citation.optimizeFromWeakPoint 入口。门禁必须先于
+// 任何 LLM 调用与写库（本任务为占位实现，任务 5 实装全流程），断言点因此可验证。
+// ---------------------------------------------------------------------------
+
+describe('citation router 优化门禁（M2 §3.3）', () => {
+  function makeGateCtx(deny: boolean) {
+    const guard = {
+      assertOptimizationsAllowed: vi.fn(async () => {
+        if (deny) throw new OptimizationsNotAllowedError('org-trial')
+      }),
+    }
+    const ctx: any = {
+      workspace: { id: 'w1', organizationId: 'org-trial', status: 'ACTIVE' },
+      actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
+      requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
+      services: { prisma: makeDb(), queryLibrary: {}, monitor: {}, billing: { guard, meter: {} } },
+    }
+    return { ctx, guard }
+  }
+
+  it('被拒：门禁抛错且不进入业务逻辑', async () => {
+    const { ctx, guard } = makeGateCtx(true)
+    await expect(createCaller(ctx).optimizeFromWeakPoint({ queryId: 'q1' })).rejects.toThrow(
+      OPTIMIZATIONS_DENIED_MESSAGE,
+    )
+    expect(guard.assertOptimizationsAllowed).toHaveBeenCalledWith('org-trial')
+  })
+
+  it('放行：门禁放行后才进入业务逻辑（此时为占位实现）', async () => {
+    const { ctx, guard } = makeGateCtx(false)
+    await expect(createCaller(ctx).optimizeFromWeakPoint({ queryId: 'q1' })).rejects.toMatchObject({
+      code: 'NOT_IMPLEMENTED',
+    })
+    expect(guard.assertOptimizationsAllowed).toHaveBeenCalledWith('org-trial')
   })
 })

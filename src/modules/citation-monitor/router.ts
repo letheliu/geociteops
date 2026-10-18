@@ -9,7 +9,11 @@ import {
   type RunListRow,
 } from './trend-query.js'
 import { MAX_SAMPLE_COUNT, MIN_SAMPLE_COUNT } from './monitor.js'
-import { QuotaExceededError, resolveWorkspaceOrganization } from '../../platform/billing/entitlement-guard.js'
+import {
+  QuotaExceededError,
+  assertWorkspaceOptimizationsAllowed,
+  resolveWorkspaceOrganization,
+} from '../../platform/billing/entitlement-guard.js'
 
 /**
  * 监测读路径（规格 §5）。
@@ -364,6 +368,21 @@ export const citationRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: '运行记录不存在' })
       }
       return run
+    }),
+
+  /**
+   * M2 §3.3 薄弱点一键优化（规格 §5/§6）。
+   * 本任务先落门禁前置断言（规格 §4 六入口之一，任务 5 实装建议生成全流程）：
+   * 门禁必须在任何 LLM 调用与写库之前，因此它先于业务逻辑执行。
+   */
+  optimizeFromWeakPoint: protectedProcedure
+    .input(z.object({ queryId: z.string().min(1) }))
+    .mutation(async ({ ctx }) => {
+      await assertWorkspaceOptimizationsAllowed(ctx)
+      throw new TRPCError({
+        code: 'NOT_IMPLEMENTED',
+        message: '薄弱点一键优化将在闭环建议生成任务实装',
+      })
     }),
 
   // query 库管理
