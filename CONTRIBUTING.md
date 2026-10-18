@@ -63,7 +63,7 @@ pnpm exec tsc -p tsconfig.build.json --noEmit
 
 ```bash
 pnpm exec tsc -p tsconfig.build.json --noEmit   # shipped code
-pnpm --filter geo-web exec vue-tsc -b           # web
+pnpm --filter geociteops-web exec vue-tsc -b   # web
 ```
 
 Both must pass before review.
@@ -99,7 +99,7 @@ Fill in the template, including the real `pnpm test` output. A PR description th
 CI requires, on `main`:
 
 1. `pnpm exec tsc -p tsconfig.build.json --noEmit`
-2. `pnpm --filter geo-web exec vue-tsc -b`
+2. `pnpm --filter geociteops-web exec vue-tsc -b`
 3. `pnpm test` against a dedicated pgvector database, after `prisma migrate deploy`
 
 ## Reporting bugs

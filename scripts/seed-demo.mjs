@@ -225,6 +225,9 @@ let eventCount = 0
 let runCount = 0
 
 // --- 3a. 每日一个物理 Run（最近 25 天）---
+// createdRuns 按时间升序（daysAgo 5→29），闭环种子用 daysAgoRun() 反查「N 天前那次」
+const createdRuns = []
+const daysAgoRun = (days) => createdRuns[createdRuns.length - 1 - days] ?? null
 for (let daysAgo = LEGACY_DAYS; daysAgo < TOTAL_DAYS; daysAgo++) {
   const startedAt = new Date(NOW - daysAgo * DAY + 2 * 3600000) // 模拟 02:00 触发
   const dayKey = shanghaiDayKey(startedAt)
@@ -246,6 +249,7 @@ for (let daysAgo = LEGACY_DAYS; daysAgo < TOTAL_DAYS; daysAgo++) {
     },
   })
   runCount++
+  createdRuns.push(run)
 
   const rows = []
   for (const query of createdQueries) {
@@ -389,6 +393,22 @@ for (const p of PAGES) {
 }
 console.log(`✅ ContentPage 已填充: ${createdPages.length} 个页面（首页/功能/定价/博客）`)
 
+// === 4b. 查询 → 页面映射（M2 §3.3）===
+// 一键优化的前提是查询已映射页面（optimizeFromWeakPoint 按 mappedPageUrl 解析页面，
+// 映射缺失/失效会被拒并引导重新关联）。演示数据给前 3 条查询挂上页面。
+const QUERY_PAGE_MAPPING = [
+  { queryIndex: 0, pageIndex: 0 },
+  { queryIndex: 1, pageIndex: 1 },
+  { queryIndex: 4, pageIndex: 0 },
+]
+for (const m of QUERY_PAGE_MAPPING) {
+  await prisma.citationQuery.update({
+    where: { id: createdQueries[m.queryIndex].id },
+    data: { mappedPageUrl: createdPages[m.pageIndex].url },
+  })
+}
+console.log(`✅ 查询-页面映射已建立: ${QUERY_PAGE_MAPPING.length} 条（供「一键优化」使用）`)
+
 // === 5. OptimizationTask（体现「监测 → 优化建议」闭环）===
 const TASKS = [
   {
@@ -441,6 +461,100 @@ for (const t of TASKS) {
   })
 }
 console.log(`✅ OptimizationTask 已填充: ${TASKS.length} 个任务（${TASKS.filter(t => t.status === 'PENDING').length} 待审 / ${TASKS.filter(t => t.status === 'IN_PROGRESS').length} 进行中）`)
+
+// === 5b. 闭环记录（M2 §3.3）：2 条 VERIFIED（已回填）+ 1 条 AWAITING_VERIFICATION ===
+// 演示「发布 → 后续监测回填 → Δ」链路：publishedAt/baselineRunId/verifiedRunId/
+// 两对指标/validSamples/originalContent 齐，看板一进去就有内容可读。
+// 指标为演示值（不逐点对齐真实 run 聚合），口径字段名与后端一致。
+const CLOSED_LOOP_TASKS = [
+  {
+    queryIndex: 2, // 'Midjourney 中文替代品'
+    pageIndex: 0,
+    status: 'VERIFIED',
+    publishedAgoDays: 6,
+    baselineRunDaysAgo: 6,
+    verifiedRunDaysAgo: 1,
+    baselineSovMean: 0.12,
+    baselineMentionRate: 0.08,
+    baselineValidSamples: 24,
+    verifiedSovMean: 0.28,
+    verifiedMentionRate: 0.42,
+    verifiedValidSamples: 24,
+    verifiedAgoDays: 1,
+    suggestion: 'Midjourney 中文替代品「AI 图像生成工具推荐」下 ZoomerAI 的 SOV 仅 12%。建议在首页补齐：价格区间、支持的中文提示词数量、画布编辑能力，并给出「ZoomerAI 是一款……」定义句与 2026 年用户规模数据。',
+    originalContent: '（发布前原文）首页原正文：介绍 ZoomerAI 产品与功能。',
+  },
+  {
+    queryIndex: 5, // '免费的 AI 画图工具'
+    pageIndex: 2, // 定价页
+    status: 'VERIFIED',
+    publishedAgoDays: 10,
+    baselineRunDaysAgo: 10,
+    verifiedRunDaysAgo: 2,
+    baselineSovMean: 0.09,
+    baselineMentionRate: 0.05,
+    baselineValidSamples: 24,
+    verifiedSovMean: 0.19,
+    verifiedMentionRate: 0.25,
+    verifiedValidSamples: 24,
+    verifiedAgoDays: 2,
+    suggestion: '「免费的 AI 画图工具」是价格敏感型查询，定价页缺少免费额度说明。建议补充：免费点数、有效期、是否需要绑定支付方式，并明确与竞品的额度对比。',
+    originalContent: '（发布前原文）定价页原正文：列出套餐与价格。',
+  },
+  {
+    queryIndex: 7, // 'AI 绘画哪个效果好'
+    pageIndex: 3, // 博客
+    status: 'AWAITING_VERIFICATION',
+    publishedAgoDays: 1,
+    baselineRunDaysAgo: 1,
+    baselineSovMean: 0.15,
+    baselineMentionRate: 0.1,
+    baselineValidSamples: 24,
+    suggestion: '「AI 绘画哪个效果好」对比型查询中 ZoomerAI 几乎未被提及。建议在博客补一篇带实测数据的对比文章，给出各工具在同一提示词下的出图评分。',
+    originalContent: '（发布前原文）博客原正文：产品更新记录。',
+  },
+]
+
+for (const t of CLOSED_LOOP_TASKS) {
+  const publishedAt = new Date(NOW - t.publishedAgoDays * DAY)
+  const baselineRun = daysAgoRun(t.baselineRunDaysAgo)
+  const verifiedRun = t.verifiedRunDaysAgo !== undefined ? daysAgoRun(t.verifiedRunDaysAgo) : null
+  await prisma.optimizationTask.create({
+    data: {
+      workspaceId: WS_ID,
+      type: 'OPTIMIZE_FOR_QUERY',
+      queryId: createdQueries[t.queryIndex].id,
+      pageId: createdPages[t.pageIndex].id,
+      status: t.status,
+      beforeScore: 41,
+      afterScore: 68,
+      publishedAt,
+      baselineRunId: baselineRun?.id ?? null,
+      verifiedRunId: verifiedRun?.id ?? null,
+      baselineSovMean: t.baselineSovMean,
+      baselineMentionRate: t.baselineMentionRate,
+      baselineValidSamples: t.baselineValidSamples,
+      verifiedSovMean: t.verifiedSovMean ?? null,
+      verifiedMentionRate: t.verifiedMentionRate ?? null,
+      verifiedValidSamples: t.verifiedValidSamples ?? null,
+      verifiedAt: t.verifiedAgoDays !== undefined ? new Date(NOW - t.verifiedAgoDays * DAY) : null,
+      result: {
+        suggestion: t.suggestion,
+        originalContent: t.originalContent,
+        context: {
+          queryText: createdQueries[t.queryIndex].queryText,
+          baselineSovMean: t.baselineSovMean,
+          baselineMentionRate: t.baselineMentionRate,
+          topCompetitor: 'Midjourney',
+          runId: baselineRun?.id ?? null,
+        },
+      },
+    },
+  })
+}
+console.log(
+  `✅ 闭环记录已填充: ${CLOSED_LOOP_TASKS.length} 条（${CLOSED_LOOP_TASKS.filter((t) => t.status === 'VERIFIED').length} VERIFIED / ${CLOSED_LOOP_TASKS.filter((t) => t.status === 'AWAITING_VERIFICATION').length} 待验证）`,
+)
 
 // === 6. SchemaRecord（JSON-LD 结构化数据）===
 const SCHEMAS = [
