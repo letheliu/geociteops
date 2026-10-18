@@ -15,8 +15,7 @@ import type { IdentityService } from './service.js'
 import { createLoginRateLimiter } from './rate-limiter.js'
 import { createMemberService } from '../tenancy/member-service.js'
 import { clearSessionCookie, serializeSessionCookie } from './cookie.js'
-
-const usernameSchema = z.string().min(3).max(64)
+import { usernameSchema } from './username-schema.js'
 
 let defaultService: IdentityService | undefined
 

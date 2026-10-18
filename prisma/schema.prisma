@@ -626,6 +626,8 @@ model Organization {
   status          OrganizationStatus @default(ACTIVE)
   billingProfile  Json               @default("{}") // 开票抬头、税号、地址电话、开户行
   ownerOperatorId String? // 客户经理（平台员工）
+  /// 租户来源：TRIAL（自助注册试用租户）/ PLATFORM（默认，平台直销建户）
+  source          String             @default("PLATFORM")
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   workspaces      Workspace[]
@@ -1012,6 +1014,8 @@ enum PaymentMethod {
   CONTRACT_CREDIT
   WECHAT
   ALIPAY
+  /// 试用开通（$0 零元单，paidAt 为 null，不进入财务口径）
+  TRIAL
 }
 
 enum PaymentStatus {
