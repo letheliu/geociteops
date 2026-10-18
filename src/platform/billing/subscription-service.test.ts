@@ -2,7 +2,9 @@ import { describe, expect, it, vi, afterEach } from 'vitest'
 import {
   EXPIRE_REMINDER_WINDOW_DAYS,
   SUBSCRIPTION_EXPIRED_SUSPEND_REASON,
+  resolveSubscriptionGraceDays,
   runExpireCheck,
+  suppressExpireReminder,
 } from './subscription-service.js'
 
 // ---------------------------------------------------------------------------
@@ -602,5 +604,158 @@ describe('runExpireCheck 批量上限', () => {
     const takes = db.prisma.subscription.findMany.mock.calls.map((c) => c[0].take)
     expect(takes).toHaveLength(3)
     expect(takes.every((t) => t === 500)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.0 TTL 快照键：_graceDays（宽限天数）与 _suppressReminder（到期提醒抑制）
+//
+// 语义钉死（规格 §5）：
+// - 宽限天数优先级：subscription.entitlements._graceDays ?? ctx.graceDays ?? env 全局。
+//   试用快照写 90 天，因此 endAt 之后仍持续可用（GRACE 只读），满 90 天才 EXPIRED；
+//   正式套餐快照无此键，仍按全局 7 天（回归）。
+// - _suppressReminder=true 的订阅不写 expire_reminder 审计：7 天试用从第一天起
+//   就进 15 天提醒窗口是纯噪音。
+// ---------------------------------------------------------------------------
+
+describe('runExpireCheck ① _suppressReminder（到期提醒抑制）', () => {
+  it('_suppressReminder=true 的订阅不产生 expire_reminder 审计', async () => {
+    const db = makeDb({
+      subscriptions: [
+        makeSubscription({
+          id: 'sub-trial',
+          endAt: daysFromNow(5),
+          entitlements: { maxWorkspaces: 1, _graceDays: 90, _suppressReminder: true },
+        }),
+      ],
+    })
+    const audit = { record: vi.fn(async () => {}) }
+
+    const result = await runExpireCheck({ prisma: db.prisma, audit, now: FIXED_NOW })
+
+    expect(result.reminded).toBe(0)
+    expect(actionsOf(audit)).not.toContain('subscription.expire_reminder')
+  })
+
+  it('同批中无该键的正式订阅照常提醒（抑制只按行生效）', async () => {
+    const db = makeDb({
+      subscriptions: [
+        makeSubscription({ id: 'sub-trial', endAt: daysFromNow(5), entitlements: { _suppressReminder: true } }),
+        makeSubscription({ id: 'sub-normal', endAt: daysFromNow(5), entitlements: { maxWorkspaces: 3 } }),
+      ],
+    })
+    const audit = { record: vi.fn(async () => {}) }
+
+    const result = await runExpireCheck({ prisma: db.prisma, audit, now: FIXED_NOW })
+
+    expect(result.reminded).toBe(1)
+    const reminders = audit.record.mock.calls.filter((c) => c[0].action === 'subscription.expire_reminder')
+    expect(reminders).toHaveLength(1)
+    expect(reminders[0][0].target).toBe('Subscription:sub-normal')
+  })
+})
+
+describe('runExpireCheck ③ _graceDays（快照宽限天数）', () => {
+  /** TRIAL 订阅：endAt 已过 7 天，快照声明宽限 90 天 */
+  function trialFixture() {
+    return makeDb({
+      subscriptions: [
+        makeSubscription({
+          id: 'sub-trial',
+          status: 'GRACE',
+          endAt: daysFromNow(-7),
+          entitlements: { maxWorkspaces: 1, maxQueries: 10, _graceDays: 90, _suppressReminder: true },
+        }),
+      ],
+      workspaces: [makeWorkspace()],
+    })
+  }
+
+  it('endAt 后第 7 天（全局宽限期已满）：_graceDays=90 优先 → 仍 GRACE，不 EXPIRED', async () => {
+    const db = trialFixture()
+    const audit = { record: vi.fn(async () => {}) }
+
+    const result = await runExpireCheck({ prisma: db.prisma, audit, now: FIXED_NOW, graceDays: 7 })
+
+    expect(result.expired).toBe(0)
+    expect(db.store.subscriptions[0].status).toBe('GRACE')
+    expect(db.store.workspaces[0].status).toBe('ACTIVE')
+  })
+
+  it('endAt 后第 91 天（快照宽限满）→ EXPIRED + workspace SUSPENDED', async () => {
+    const db = makeDb({
+      subscriptions: [
+        makeSubscription({
+          id: 'sub-trial',
+          status: 'GRACE',
+          endAt: daysFromNow(-91),
+          entitlements: { maxWorkspaces: 1, _graceDays: 90, _suppressReminder: true },
+        }),
+      ],
+      workspaces: [makeWorkspace()],
+    })
+    const audit = { record: vi.fn(async () => {}) }
+
+    const result = await runExpireCheck({ prisma: db.prisma, audit, now: FIXED_NOW, graceDays: 7 })
+
+    expect(result.expired).toBe(1)
+    expect(db.store.subscriptions[0].status).toBe('EXPIRED')
+    // EXPIRED 后 workspace 置 SUSPENDED（数据不删，只读保留）
+    expect(db.store.workspaces[0]).toMatchObject({
+      status: 'SUSPENDED',
+      suspendReason: '订阅到期',
+    })
+  })
+
+  it('回归：快照无 _graceDays 的正式订阅仍按全局宽限天数过期', async () => {
+    const db = makeDb({
+      subscriptions: [
+        makeSubscription({
+          id: 'sub-normal',
+          status: 'GRACE',
+          endAt: daysFromNow(-8),
+          entitlements: { maxWorkspaces: 3 },
+        }),
+      ],
+      workspaces: [makeWorkspace()],
+    })
+    const audit = { record: vi.fn(async () => {}) }
+
+    const result = await runExpireCheck({ prisma: db.prisma, audit, now: FIXED_NOW, graceDays: 7 })
+
+    expect(result.expired).toBe(1)
+    expect(db.store.subscriptions[0].status).toBe('EXPIRED')
+  })
+
+  it('混合批：只有带更宽快照宽限的那行被跳过，其余照常过期', async () => {
+    const db = makeDb({
+      subscriptions: [
+        makeSubscription({ id: 'sub-trial', status: 'GRACE', endAt: daysFromNow(-8), entitlements: { _graceDays: 90 } }),
+        makeSubscription({ id: 'sub-normal', status: 'GRACE', endAt: daysFromNow(-8), entitlements: { maxWorkspaces: 3 } }),
+      ],
+      workspaces: [makeWorkspace({ id: 'ws-trial', organizationId: 'org-trial' }), makeWorkspace()],
+    })
+    db.store.subscriptions[0].organizationId = 'org-trial'
+    const audit = { record: vi.fn(async () => {}) }
+
+    const result = await runExpireCheck({ prisma: db.prisma, audit, now: FIXED_NOW, graceDays: 7 })
+
+    expect(result.expired).toBe(1)
+    expect(db.store.subscriptions.find((s) => s.id === 'sub-trial')!.status).toBe('GRACE')
+    expect(db.store.subscriptions.find((s) => s.id === 'sub-normal')!.status).toBe('EXPIRED')
+  })
+
+  it('resolveSubscriptionGraceDays：快照键优先，其次 ctx/env 回落；脏值按回落处理', async () => {
+    expect(resolveSubscriptionGraceDays({ entitlements: { _graceDays: 90 } }, 7)).toBe(90)
+    expect(resolveSubscriptionGraceDays({ entitlements: { maxWorkspaces: 1 } }, 7)).toBe(7)
+    expect(resolveSubscriptionGraceDays({ entitlements: { _graceDays: 'many' } }, 7)).toBe(7)
+    expect(resolveSubscriptionGraceDays({ entitlements: { _graceDays: -1 } }, 7)).toBe(7)
+    expect(resolveSubscriptionGraceDays({ entitlements: null }, 7)).toBe(7)
+  })
+
+  it('suppressExpireReminder：仅显式 true 才抑制（truthy 非布尔同样抑制）', () => {
+    expect(suppressExpireReminder({ entitlements: { _suppressReminder: true } })).toBe(true)
+    expect(suppressExpireReminder({ entitlements: { _suppressReminder: false } })).toBe(false)
+    expect(suppressExpireReminder({ entitlements: {} })).toBe(false)
   })
 })

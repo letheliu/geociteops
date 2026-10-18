@@ -168,6 +168,32 @@ Demo behaviour to confirm by hand:
 - [ ] The homepage states that live monitoring / content optimization are unavailable on the demo,
       with the "self-host or contact us for a trial" wording
 
+### 3.1 Self-serve registration stays off on the demo (M2 §3.0)
+
+The demo is a public, shared tenant. **Both switches must stay `off`** — they are shipped that way
+(`REGISTRATION_ENABLED=off`, `BILLING_ENFORCEMENT=off` in `docker-compose.yml` defaults):
+
+```bash
+# Verify on the host / in the container env
+docker compose exec app sh -c 'echo "REGISTRATION_ENABLED=$REGISTRATION_ENABLED BILLING_ENFORCEMENT=$BILLING_ENFORCEMENT"'
+# 期望：REGISTRATION_ENABLED=off BILLING_ENFORCEMENT=off
+```
+
+Why both:
+
+- `REGISTRATION_ENABLED=off` keeps `/register` closed (the page shows the closed notice) and hides the
+  "注册试用" entry on the login page.
+- `BILLING_ENFORCEMENT=on` is **required** for registration to work at all — the two are linked
+  fail-closed. With enforcement off, quotas and subscription expiry are inert, so an open registration
+  would hand out unlimited, never-expiring tenants.
+
+To enable later (only after the demo account is retired and memory headroom is verified):
+
+1. Apply `prisma/migrations/20261018100000_m2_self_serve_trial` (idempotent TRIAL catalog seed).
+2. Set `BILLING_ENFORCEMENT=on` **and** `REGISTRATION_ENABLED=on`, then restart the `app` service.
+3. Register one account by hand and confirm: workspace `monitorSampleCount=3`, `$0` order with
+   `paidAt=null`, and the "试用中" banner in the console.
+
 ---
 
 ## 4. Daily reset cron — `pnpm demo:reset`

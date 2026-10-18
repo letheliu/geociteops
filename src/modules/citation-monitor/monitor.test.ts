@@ -7,6 +7,7 @@ import {
   DEFAULT_PLATFORM_CONCURRENCY,
 } from './monitor.js'
 import type { PlatformResult } from './platform-adapters/types.js'
+import { QuotaExceededError } from '../../platform/billing/entitlement-guard.js'
 
 const OK_RESULT: PlatformResult = {
   answer: '推荐 zoomer AI，详见 https://zoomer.top',
@@ -633,5 +634,73 @@ describe('failStaleRunningRuns：孤儿 RUNNING 回收（评审修复）', () =>
     const cutoff = db.callLog.runUpdateMany.at(-1)!.where.startedAt.lt as Date
     expect(cutoff.getTime()).toBeGreaterThan(before - 2 * 30 * 60 * 1000 - 5_000)
     expect(cutoff.getTime()).toBeLessThan(before - 2 * 30 * 60 * 1000 + 5_000)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.0：调度路径的 N 软钳制（monitorSampleCountMax 的第三生效点）
+// 调度是系统行为——超配时取配额上限继续跑，而不是把整批扇出打失败。
+// ---------------------------------------------------------------------------
+
+describe('monitor 调度 × monitorSampleCountMax（生效点三）', () => {
+  function quotaBilling(declared: number | undefined) {
+    return {
+      guard: {
+        checkMonitorSampleCountMax: vi.fn(async (_orgId: string, requested: number) => {
+          if (declared === undefined) return
+          if (requested > declared) {
+            throw new QuotaExceededError({
+              field: 'monitorSampleCountMax',
+              limit: declared,
+              current: requested,
+              organizationId: 'org-1',
+            })
+          }
+        }),
+      },
+      meter: {},
+    } as any
+  }
+
+  function monitorWithQuota(declared: number | undefined, workspaceOverrides: Record<string, unknown>) {
+    const localDb = makePrisma({
+      workspace: { id: 'w1', organizationId: 'org-1', monitorSampleCount: 5, ...workspaceOverrides },
+    })
+    return {
+      db: localDb,
+      monitor: createMonitor({
+        prisma: localDb.prisma,
+        registry: registryOf({ openai: okAdapter() }),
+        queryLibrary: stubQueryLibrary(),
+        competitors: [],
+        billing: quotaBilling(declared),
+      }),
+    }
+  }
+
+  it('声明 3：工作区 N=5 被钳到 3（Run 落 3，failureReason 记钳制）', async () => {
+    const { db, monitor } = monitorWithQuota(3, {})
+    const result = await monitor.startScheduledRun({ workspaceId: 'w1', platforms: ['openai'], slotKey: SLOT })
+
+    expect(result.runId).not.toBeNull()
+    const run = db.prisma.citationRun.create.mock.calls[0][0].data
+    expect(run.sampleCount).toBe(3)
+    expect(run.failureReason).toContain('N clamped 5→3')
+    expect(run.failureReason).toContain('quota monitorSampleCountMax')
+  })
+
+  it('键缺失（未声明上限）：N=5 原样生效，不受限', async () => {
+    const { db, monitor } = monitorWithQuota(undefined, {})
+    await monitor.startScheduledRun({ workspaceId: 'w1', platforms: ['openai'], slotKey: SLOT })
+    const run = db.prisma.citationRun.create.mock.calls[0][0].data
+    expect(run.sampleCount).toBe(5)
+    expect(run.failureReason).toBeNull()
+  })
+
+  it('声明 10（宽于工作区 N=5）：仍取工作区配置 5', async () => {
+    const { db, monitor } = monitorWithQuota(10, {})
+    await monitor.startScheduledRun({ workspaceId: 'w1', platforms: ['openai'], slotKey: SLOT })
+    const run = db.prisma.citationRun.create.mock.calls[0][0].data
+    expect(run.sampleCount).toBe(5)
   })
 })

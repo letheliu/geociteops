@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NCard, NForm, NFormItem, NInput, NButton, useMessage } from 'naive-ui'
+import { NButton, NCard, NForm, NFormItem, NInput, NSpace, NText, useMessage } from 'naive-ui'
+import { trpc } from '../composables/useTrpc'
 import { useSessionStore } from '../stores/session'
 import { postLoginTarget } from '../utils/post-login'
 
@@ -12,6 +13,17 @@ const sessionStore = useSessionStore()
 
 const form = ref({ username: '', password: '' })
 const loading = ref(false)
+
+/** 自助注册入口显隐（M2 §3.0）：服务端 auth.registrationEnabled 为 false 时不展示 */
+const registrationEnabled = ref(false)
+
+onMounted(async () => {
+  try {
+    registrationEnabled.value = await trpc.auth.registrationEnabled.query()
+  } catch {
+    registrationEnabled.value = false
+  }
+})
 
 async function handleLogin() {
   const username = form.value.username.trim()
@@ -54,6 +66,10 @@ async function handleLogin() {
           />
         </NFormItem>
         <NButton type="primary" block :loading="loading" @click="handleLogin">登录</NButton>
+        <NSpace v-if="registrationEnabled" justify="center" align="center" :size="6">
+          <NText depth="3" style="font-size: 13px">还没有账号？</NText>
+          <NButton text type="primary" @click="router.push({ name: 'register' })">注册试用</NButton>
+        </NSpace>
       </NForm>
     </NCard>
   </div>

@@ -19,6 +19,12 @@ export const router = createRouter({
       meta: { public: true },
     },
     {
+      path: '/register',
+      name: 'register',
+      component: () => import('../views/auth/Register.vue'),
+      meta: { public: true },
+    },
+    {
       path: '/change-password',
       name: 'change-password',
       component: () => import('../views/ChangePassword.vue'),
@@ -337,6 +343,7 @@ router.beforeEach(async (to) => {
 
 const TITLE_MAP: Record<string, string> = {
   login: '登录',
+  register: '注册试用',
   'change-password': '修改密码',
   forbidden: '无权限',
   'console-home': '我的 Workspace',

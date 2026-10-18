@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Self-serve trial channel (M2 §3.0)** — `auth.register` (public, CSRF-guarded) opens a 7-day trial
+  tenant in one transaction (User / Organization / Workspace / Order + OrderItem / Subscription) and
+  signs the visitor straight in. `Organization.source='TRIAL'` and a `$0` order with `paidAt=null` are
+  the zero-instrumentation anchors for the M4 conversion funnel.
+- **`REGISTRATION_ENABLED` × `BILLING_ENFORCEMENT`, linked fail-closed** — self-serve registration only
+  works when both are `on`, because trial quotas and TTL hang off the entitlement machine. New public
+  query `auth.registrationEnabled` drives the login-page entry and the `/register` closed notice.
+- **Trial catalog seed** — idempotent `Product`(`code='TRIAL'`)/`ProductPlan` rows with
+  `{maxWorkspaces:1, maxQueries:10, allowedPlatforms:[], monitorSampleCountMax:3}`; registration fails
+  closed (no rows written) if the plan is missing, deactivated, or not a `SUBSCRIPTION`.
+- **`monitorSampleCountMax` capacity key** — hard-checked `EntitlementGuard.checkMonitorSampleCountMax`
+  at three points: registration clamp, `org.workspaces.update`, and `citation.runs.create` (manual
+  override); the scheduler clamps instead of failing. Missing key means "unlimited".
+- **Trial TTL snapshot keys** — `_graceDays` (90) and `_suppressReminder` in the subscription
+  entitlements: expiry falls to a 90-day grace and the 15-day expiry reminders are skipped.
+  Read-only retention after expiry (GRACE → EXPIRED + workspace `SUSPENDED`); data is never deleted.
+- **Registration rate limiting** — shared sliding-window limiter (extracted from the login limiter)
+  with a per-IP 3/hour and a global 50/24h window.
+- **Web** — `/register` page, login-page entry gated by `auth.registrationEnabled`, trial banner in the
+  console (days left / grace / expired), `PaymentMethod.TRIAL` label, and a "上限 N / —" quota row for
+  `monitorSampleCountMax`.
+
+### Security / cost
+
+- LLM query generation is refused for `TRIAL` organizations ("试用版请手动添加查询"), keeping platform
+  LLM spend at zero for trials. Manual query entry stays open (soft `maxQueries` limit: audited and
+  metered, never blocked).
+
 M2 §3.1 "monitoring credibility". Monitoring used to mean "one fetch, one row"; it now means
 "one **run** = N samples", and every reported number is a read-time aggregate over that run.
 

@@ -1,6 +1,7 @@
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import {
   CAPACITY_FIELDS,
+  OPTIONAL_CAPACITY_FIELDS,
   mergeEntitlements,
   normalizeEntitlements,
   shanghaiMonthWindow,
@@ -447,5 +448,90 @@ describe('normalizeEntitlements', () => {
     expect(normalized.maxPages).toBe(10)
     expect(warnSpy).toHaveBeenCalledTimes(1)
     warnSpy.mockRestore()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// monitorSampleCountMax（M2 §3.0 试用单次运行采样数 N 上限）：与六个必填容量键语义
+// 不同——**未声明 = 不限**（键不存在），而不是按 0 处理（0 会把没有 N 声明的正式租户
+// 全部拦死）。因此它不进 CAPACITY_FIELDS 的 0 基线合并，走独立的存在性合并。
+// ---------------------------------------------------------------------------
+
+describe('OPTIONAL_CAPACITY_FIELDS（可选容量键清单）', () => {
+  it('常量与裁定清单一致（monitorSampleCountMax 单键，不混入必填容量键）', () => {
+    expect([...OPTIONAL_CAPACITY_FIELDS]).toEqual(['monitorSampleCountMax'])
+  })
+})
+
+describe('mergeEntitlements：monitorSampleCountMax（缺失=不限）', () => {
+  it('TRIAL 计划声明 3 → 合并结果不丢该键', () => {
+    const merged = mergeEntitlements(
+      [sub({ entitlements: { maxWorkspaces: 1, maxQueries: 10, monitorSampleCountMax: 3 } })],
+      NOW,
+    )
+    expect(merged.monitorSampleCountMax).toBe(3)
+  })
+
+  it('未声明 → 键不存在（undefined，非 0）：合并/默认对象/存储投影三处一致', () => {
+    expect(mergeEntitlements([sub({ entitlements: { maxWorkspaces: 1 } })], NOW).monitorSampleCountMax).toBeUndefined()
+    expect(mergeEntitlements([], NOW).monitorSampleCountMax).toBeUndefined()
+    expect(zeroEntitlements().monitorSampleCountMax).toBeUndefined()
+    expect('monitorSampleCountMax' in zeroEntitlements()).toBe(false)
+    expect(normalizeEntitlements({ maxWorkspaces: 1 }).monitorSampleCountMax).toBeUndefined()
+  })
+
+  it('多订阅取 max（与容量键同基数规则），ADDON 叠加', () => {
+    const merged = mergeEntitlements(
+      [
+        sub({ entitlements: { monitorSampleCountMax: 3 } }),
+        sub({ entitlements: { monitorSampleCountMax: 10 } }),
+        sub({ planKind: 'ADDON', entitlements: { monitorSampleCountMax: 2 } }),
+      ],
+      NOW,
+    )
+    expect(merged.monitorSampleCountMax).toBe(12)
+  })
+
+  it('过期订阅声明的 N 不进基数', () => {
+    const merged = mergeEntitlements(
+      [
+        sub({ entitlements: { monitorSampleCountMax: 3 } }),
+        sub({ entitlements: { monitorSampleCountMax: 10 }, status: 'EXPIRED' }),
+      ],
+      NOW,
+    )
+    expect(merged.monitorSampleCountMax).toBe(3)
+  })
+
+  it('normalizeEntitlements：存储值 3 原样投影（不丢、不被 0 覆盖）', () => {
+    expect(normalizeEntitlements({ maxWorkspaces: 1, monitorSampleCountMax: 3 }).monitorSampleCountMax).toBe(3)
+  })
+
+  it('normalizeEntitlements：脏数值按 0 容错（warn，与 samplesPerRun 同约定）', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(normalizeEntitlements({ monitorSampleCountMax: 'many' }).monitorSampleCountMax).toBe(0)
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    warnSpy.mockRestore()
+  })
+
+  it('订阅快照的下划线内部键原样进入合并结果（_graceDays/_suppressReminder 不被丢弃）', () => {
+    const merged = mergeEntitlements(
+      [sub({ entitlements: { monitorSampleCountMax: 3, _graceDays: 90, _suppressReminder: true } })],
+      NOW,
+    )
+    expect(merged._graceDays).toBe(90)
+    expect(merged._suppressReminder).toBe(true)
+  })
+
+  it('normalizeEntitlements：下划线内部键原样透传（非下划线未知键仍忽略）', () => {
+    const projected = normalizeEntitlements({
+      maxWorkspaces: 1,
+      _graceDays: 90,
+      _suppressReminder: true,
+      unknownKey: 'x',
+    })
+    expect(projected._graceDays).toBe(90)
+    expect(projected._suppressReminder).toBe(true)
+    expect('unknownKey' in projected).toBe(false)
   })
 })

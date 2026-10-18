@@ -4,6 +4,11 @@ import type { QueryLibraryService } from './query-library.js'
 import { analyzeCitation, type Competitor } from './analyzer.js'
 import { sanitizeMessage } from '../../core/lib/sanitize-message.js'
 import { deriveRunStatus } from './aggregate.js'
+import {
+  QuotaExceededError,
+  resolveWorkspaceOrganization,
+  type BillingCheckpoints,
+} from '../../platform/billing/entitlement-guard.js'
 
 /**
  * 监测编排：一次运行 = 一个 CitationRun = N 次采样（规格 §4/§6）。
@@ -45,6 +50,11 @@ export interface MonitorDeps {
   now?: () => Date
   /** 解密 platformConfig（信封）；未注入时回退到库中原值（兼容旧数据/测试） */
   resolveConfig?: (workspaceId: string) => Promise<any>
+  /**
+   * 计费检查点（可选注入）：monitorSampleCountMax 硬上限（M2 §3.0）。
+   * 调度路径取 min(工作区 N, 声明上限)，手动路径（runs.create）在 router 层硬拒。
+   */
+  billing?: BillingCheckpoints
 }
 
 export interface StartScheduledRunInput {
@@ -180,6 +190,30 @@ export function createMonitor(deps: MonitorDeps): Monitor {
 
   function clampFailureReason(from: number, to: number): string {
     return `N clamped ${from}→${to}: unit cap ${maxRunUnits}`
+  }
+
+  /**
+   * 调度路径的 N 软钳制（M2 §3.0）：effectiveN = min(工作区 N, 配额声明的
+   * monitorSampleCountMax)。调度是系统行为，不能因为超配就把整批扇出打失败，
+   * 因此这里取配额上限（QuotaExceededError 带 limit 字段）而不是抛错。
+   * 键缺失（未声明）→ guard 放行 → 原样返回，受 1..10/MAX_RUN_UNITS 既有钳制约束。
+   */
+  async function clampSampleCountByQuota(
+    workspaceId: string,
+    wanted: number,
+  ): Promise<number> {
+    if (!deps.billing) return wanted
+    const organizationId = await resolveWorkspaceOrganization(deps.prisma, workspaceId)
+    if (!organizationId) return wanted
+    try {
+      await deps.billing.guard.checkMonitorSampleCountMax(organizationId, wanted)
+      return wanted
+    } catch (err) {
+      if (err instanceof QuotaExceededError && err.field === 'monitorSampleCountMax') {
+        return Math.max(MIN_SAMPLE_COUNT, err.limit)
+      }
+      throw err
+    }
   }
 
   /** 采样落行：唯一键 upsert——at-least-once 重试不会重写已有样本 */
@@ -405,10 +439,17 @@ export function createMonitor(deps: MonitorDeps): Monitor {
     snapshot: QuerySnapshotItem[]
     sampleCount: number
     clampedFrom: number | null
+    /** 钳制来源说明（配额钳制与 unit cap 钳制文案不同，缺省按 unit cap 生成） */
+    clampReason?: string | null
     slotKey?: string | null
   }): Promise<StartRunResult> {
     const plannedUnits = input.sampleCount * input.snapshot.length * input.platforms.length
-    const failureReason = input.clampedFrom !== null ? clampFailureReason(input.clampedFrom, input.sampleCount) : null
+    const failureReason =
+      input.clampReason !== undefined
+        ? input.clampReason
+        : input.clampedFrom !== null
+          ? clampFailureReason(input.clampedFrom, input.sampleCount)
+          : null
 
     try {
       const run = await deps.prisma.citationRun.create({
@@ -455,7 +496,12 @@ export function createMonitor(deps: MonitorDeps): Monitor {
         return { runId: null, skipped: true, resumed: false, status: 'SKIPPED' }
       }
 
-      const { n, clampedFrom } = effectiveSampleCount(workspace.monitorSampleCount, queries.length, input.platforms.length)
+      const quotaN = await clampSampleCountByQuota(input.workspaceId, workspace.monitorSampleCount)
+      const { n, clampedFrom } = effectiveSampleCount(quotaN, queries.length, input.platforms.length)
+      const quotaClampReason =
+        quotaN !== workspace.monitorSampleCount && n < workspace.monitorSampleCount
+          ? `N clamped ${workspace.monitorSampleCount}→${n}: quota monitorSampleCountMax`
+          : undefined
       const created = await createRun({
         workspaceId: input.workspaceId,
         trigger: 'SCHEDULED',
@@ -463,6 +509,7 @@ export function createMonitor(deps: MonitorDeps): Monitor {
         snapshot: queries.map((q) => ({ id: q.id, text: q.queryText })),
         sampleCount: n,
         clampedFrom,
+        clampReason: quotaClampReason,
         slotKey: input.slotKey,
       })
       if (created.skipped || created.runId === null) return created

@@ -366,3 +366,48 @@ describe('entitlementGuard.checkSamplesPerRun（enforcement on）', () => {
     await expect(guard.checkSamplesPerRun('org-1', 6)).rejects.toThrow(QuotaExceededError)
   })
 })
+
+// ---------------------------------------------------------------------------
+// monitorSampleCountMax 硬检查（M2 §3.0）：N 是单次运行参数而非月度累计，
+// 因此走硬检查（抛错拒绝）而不是 softCheck（只审计）。
+// ---------------------------------------------------------------------------
+
+describe('entitlementGuard.checkMonitorSampleCountMax（enforcement on）', () => {
+  it('requested == 声明值放行（边界含等）', async () => {
+    const prisma = makePrisma({
+      oeRow: { organizationId: 'org-1', limits: { ...ZERO_LIMITS, monitorSampleCountMax: 3 } },
+    })
+    const { guard } = makeGuard(prisma)
+    await guard.checkMonitorSampleCountMax('org-1', 3)
+  })
+
+  it('requested > 声明值抛 QuotaExceededError（field=monitorSampleCountMax）', async () => {
+    const prisma = makePrisma({
+      oeRow: { organizationId: 'org-1', limits: { ...ZERO_LIMITS, monitorSampleCountMax: 3 } },
+    })
+    const { guard } = makeGuard(prisma)
+    await expect(guard.checkMonitorSampleCountMax('org-1', 4)).rejects.toThrow(QuotaExceededError)
+  })
+
+  it('键缺失 = 不限：任意 N 放行（正式租户未声明 N 上限时不被拦死）', async () => {
+    const prisma = makePrisma({
+      oeRow: { organizationId: 'org-1', limits: { ...ZERO_LIMITS } },
+    })
+    const { guard } = makeGuard(prisma)
+    await guard.checkMonitorSampleCountMax('org-1', 10)
+  })
+
+  it('无 OE 行 = 不限（兜底同零对象语义）', async () => {
+    const { guard } = makeGuard(makePrisma({ oeRow: null }))
+    await guard.checkMonitorSampleCountMax('org-1', 10)
+  })
+
+  it('enforcement off → 全放行且不查 OE 行', async () => {
+    const prisma = makePrisma({
+      oeRow: { organizationId: 'org-1', limits: { ...ZERO_LIMITS, monitorSampleCountMax: 3 } },
+    })
+    const { guard } = makeGuard(prisma, makeMeter(), makeAudit(), () => false)
+    await guard.checkMonitorSampleCountMax('org-1', 9999)
+    expect(prisma.organizationEntitlement.findUnique).not.toHaveBeenCalled()
+  })
+})

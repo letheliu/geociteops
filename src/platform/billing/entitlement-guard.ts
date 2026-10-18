@@ -135,6 +135,12 @@ export interface EntitlementGuard {
   checkPlatforms(organizationId: string, platforms: string[]): Promise<void>
   /** samplesPerRun 上限校验：samples > limits.samplesPerRun 抛 QuotaExceededError */
   checkSamplesPerRun(organizationId: string, samples: number): Promise<void>
+  /**
+   * monitorSampleCountMax 上限校验（M2 §3.0）：N 是单次运行参数而非月度累计，
+   * 因此走硬检查（抛错拒绝动作）而非 softCheck（只审计不拦）。
+   * 键缺失 = 不限（正式租户未声明该键时全量放行）。enforcement off → 放行。
+   */
+  checkMonitorSampleCountMax(organizationId: string, requested: number): Promise<void>
 }
 
 export interface EntitlementGuardDeps {
@@ -320,6 +326,21 @@ export function createEntitlementGuard(deps: EntitlementGuardDeps): EntitlementG
           field: 'samplesPerRun',
           limit: limits.samplesPerRun,
           current: samples,
+          organizationId,
+        })
+      }
+    },
+
+    async checkMonitorSampleCountMax(organizationId, requested) {
+      if (!enforcement()) return
+      const limits = await readLimits(organizationId)
+      const limit = limits.monitorSampleCountMax
+      if (limit === undefined) return
+      if (requested > limit) {
+        throw new QuotaExceededError({
+          field: 'monitorSampleCountMax',
+          limit,
+          current: requested,
           organizationId,
         })
       }

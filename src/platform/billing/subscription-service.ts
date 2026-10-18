@@ -56,6 +56,54 @@ export const SUBSCRIPTION_EXPIRED_SUSPEND_REASON = '订阅到期'
 // 此处 re-export 供 cron 装配/测试消费，避免两处字面量漂移
 export { subscriptionGraceDays }
 
+// ---------------------------------------------------------------------------
+// 订阅快照的策略内部键（M2 §3.0 试用租户）：
+//   _graceDays        —— 该订阅的宽限天数（试用 90 天；正式套餐不写 → 回落全局）
+//   _suppressReminder —— 抑制 ① 段到期提醒（7 天试用从第一天就进 15 天窗口是纯噪音）
+// 快照是开通时刻固化的，写死在快照里而不是全局 env——不同租户的 TTL 策略互不影响。
+// ---------------------------------------------------------------------------
+
+/** 宽限天数内部键（Subscription.entitlements） */
+export const GRACE_DAYS_ENTITLEMENT_KEY = '_graceDays'
+/** 到期提醒抑制内部键（Subscription.entitlements） */
+export const SUPPRESS_REMINDER_ENTITLEMENT_KEY = '_suppressReminder'
+
+/** 只读取下划线内部键的最小订阅形状（runExpireCheck 的扫描行天然满足） */
+interface EntitlementSnapshotRow {
+  entitlements?: unknown
+}
+
+/** 快照里的下划线键取值（非对象/缺键 → undefined） */
+function readInternalKey(row: EntitlementSnapshotRow, key: string): unknown {
+  const raw = row.entitlements
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  return (raw as Record<string, unknown>)[key]
+}
+
+/**
+ * 该订阅实际生效的宽限天数：快照 _graceDays 优先，其次回落全局（ctx/env）。
+ * 脏值（非有限数字、负数、字符串）按回落处理并 warn——宁可沿用保守的全局值，
+ * 也不让一个坏键把订阅永久钉在 GRACE（等于永不过期的只读僵尸订阅）。
+ */
+export function resolveSubscriptionGraceDays(
+  row: EntitlementSnapshotRow,
+  fallbackDays: number,
+): number {
+  const raw = readInternalKey(row, GRACE_DAYS_ENTITLEMENT_KEY)
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw >= 0) return raw
+  if (raw !== undefined) {
+    console.warn(
+      `[subscription.expire-check] 快照 ${GRACE_DAYS_ENTITLEMENT_KEY} 非法（${String(raw)}），回落全局宽限 ${fallbackDays} 天`,
+    )
+  }
+  return fallbackDays
+}
+
+/** 该订阅是否抑制到期提醒（仅显式 truthy 抑制） */
+export function suppressExpireReminder(row: EntitlementSnapshotRow): boolean {
+  return Boolean(readInternalKey(row, SUPPRESS_REMINDER_ENTITLEMENT_KEY))
+}
+
 export interface ExpireCheckContext {
   prisma: PrismaClient
   /** 审计；缺省用 prisma 自建 */
@@ -146,7 +194,11 @@ export async function runExpireCheck(ctx: ExpireCheckContext): Promise<ExpireChe
     orderBy: { endAt: 'asc' },
     take: EXPIRE_CHECK_BATCH_LIMIT,
   })
+  let remindedCount = 0
   for (const sub of upcoming) {
+    // 快照写了 _suppressReminder 的订阅（7 天试用）跳过提醒——提醒窗口对它没有意义
+    if (suppressExpireReminder(sub)) continue
+    remindedCount += 1
     await audit.record({
       actorType: 'SYSTEM',
       action: 'subscription.expire_reminder',
@@ -221,6 +273,7 @@ export async function runExpireCheck(ctx: ExpireCheckContext): Promise<ExpireChe
   // -----------------------------------------------------------------------
   const graceDeadline = new Date(nowValue.getTime() - graceDays * DAY_MS)
   const overdue = await prisma.subscription.findMany({
+    // 扫描下界用全局宽限（快照可声明更宽的宽限，见下），逐行再按各自快照判定
     where: { status: 'GRACE', endAt: { lte: graceDeadline } },
     orderBy: { endAt: 'asc' },
     take: EXPIRE_CHECK_BATCH_LIMIT,
@@ -231,6 +284,12 @@ export async function runExpireCheck(ctx: ExpireCheckContext): Promise<ExpireChe
   let expireFailed = 0
   for (const sub of overdue) {
     try {
+      // 逐行宽限：快照 _graceDays 优先于全局（试用 90 天 → endAt+90 才过期）；
+      // 扫描下界只保证不会漏行，这里才是真正的时间判定
+      const subGraceDays = resolveSubscriptionGraceDays(sub, graceDays)
+      const subDeadline = sub.endAt.getTime() + subGraceDays * DAY_MS
+      if (subDeadline > nowValue.getTime()) continue
+
       const moved = await prisma.subscription.updateMany({
         where: { id: sub.id, status: 'GRACE' },
         data: { status: 'EXPIRED' },
@@ -340,7 +399,7 @@ export async function runExpireCheck(ctx: ExpireCheckContext): Promise<ExpireChe
   }
 
   return {
-    reminded: upcoming.length,
+    reminded: remindedCount,
     enteredGrace,
     graceSkipped,
     expired,

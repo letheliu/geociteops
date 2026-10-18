@@ -474,6 +474,28 @@ describe('createContextWithServices：requestMeta 与 res', () => {
     expect(raw.requestMeta.ip).toBe('10.0.0.1')
   })
 
+  it('IP 信任边界现状语义：XFF 首值无条件优先（直连部署下可被伪造，按 IP 的限速随之失效）', async () => {
+    // 本条钉死的是**现状**而非期望：部署前提是"恒在清洗 XFF 的反代之后"。
+    // 若将来引入 trustProxy / 多级 XFF 解析，本断言应随之改写——它是部署形态的哨兵。
+    const { deps } = makeDeps()
+    const ctx = await createContextWithServices(
+      makeOpts(
+        { 'X-Forwarded-For': '198.51.100.66, 10.0.0.1' },
+        // socket 地址与 XFF 首值完全不同，说明取的是 XFF 而非连接来源
+        { ip: '10.0.0.9' },
+      ),
+      deps as any,
+    )
+    expect(ctx.requestMeta.ip).toBe('198.51.100.66')
+
+    // 无 XFF 时才回落连接地址（反代场景下即反代自身 IP）
+    const noHeader = await createContextWithServices(
+      makeOpts({}, { ip: '10.0.0.9' }),
+      deps as any,
+    )
+    expect(noHeader.requestMeta.ip).toBe('10.0.0.9')
+  })
+
   it('headers 值为数组时取首项，无对应头时为 undefined', async () => {
     const { deps } = makeDeps()
     const ctx = await createContextWithServices(

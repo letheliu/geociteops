@@ -17,6 +17,21 @@ export const CAPACITY_FIELDS = [
 
 export type CapacityField = (typeof CAPACITY_FIELDS)[number]
 
+/**
+ * 可选容量键（M2 §3.0 monitorSampleCountMax）：**未声明 = 不限**（键不存在），
+ * 与必填容量键的"缺失按 0"语义相反——N 上限缺失若按 0 处理，会把没有声明该键的
+ * 正式租户全部拦死。因此它不进 CAPACITY_FIELDS 的 0 基线合并，走存在性合并。
+ */
+export const OPTIONAL_CAPACITY_FIELDS = ['monitorSampleCountMax'] as const
+
+export type OptionalCapacityField = (typeof OPTIONAL_CAPACITY_FIELDS)[number]
+
+/** 容量键全集（必填 ∪ 可选），供下游遍历型消费方（如 billing-router 配额投影）使用 */
+export type CapacityKey = CapacityField | OptionalCapacityField
+
+/** 下划线内部键前缀：_graceDays / _suppressReminder 等策略键，原样透传不参与合并 */
+const INTERNAL_KEY_PREFIX = '_'
+
 /** 集合型字段（裁定）：平台集合仅来自有效订阅的并集，ADDON 不扩 */
 export const SET_FIELDS = ['allowedPlatforms'] as const
 
@@ -40,10 +55,20 @@ export interface MergedEntitlements {
   samplesPerRun: number
   optimizationsPerMonth: number
   allowedPlatforms: string[]
+  /** 单次运行采样数 N 上限；键缺失 = 不限（区别于必填容量键的 0） */
+  monitorSampleCountMax?: number
+  /**
+   * 下划线内部键（_graceDays / _suppressReminder 等）原样透传。
+   * 它们是策略快照而非配额，不参与 §6.4 合并规则，但也不该在投影时被丢弃——
+   * 订阅快照写了什么，企业级快照就留什么。
+   */
+  [internalKey: `_${string}`]: unknown
 }
 
 /** 全 0 默认对象（无任何有效项 / 新建 OE 行 / getLimits 无行兜底共用） */
 export function zeroEntitlements(): MergedEntitlements {
+  // 注意：不含 monitorSampleCountMax——该键"缺失 = 不限"，写 0 会把未声明 N 上限的
+  // 租户全部拦死（且 zeroEntitlements 同时是新 OE 行的建行值，扩散面更大）
   return {
     maxWorkspaces: 0,
     maxQueries: 0,
@@ -83,6 +108,15 @@ function readNumber(value: unknown, field: string, source: string): number {
 function readPlatforms(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.filter((item): item is string => typeof item === 'string')
+}
+
+/** 抽出以 _ 开头的内部键（策略键），非下划线未知键按原裁定忽略 */
+function pickInternalKeys(source: Record<string, unknown>): Record<string, unknown> {
+  const picked: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(source)) {
+    if (key.startsWith(INTERNAL_KEY_PREFIX)) picked[key] = value
+  }
+  return picked
 }
 
 /** 订阅在 now 时刻是否有效：status ACTIVE/GRACE 且 endAt > now（带周期加购随 endAt 失效） */
@@ -128,6 +162,33 @@ export function mergeEntitlements(
   }
   merged.allowedPlatforms = [...platforms].sort()
 
+  // 可选容量键：存在性 + 与必填容量键同规则（订阅 max + ADDON 求和），
+  // **无任何有效项声明则键不存在**（= 不限）
+  for (const field of OPTIONAL_CAPACITY_FIELDS) {
+    const base = effectivePlans.reduce((max, sub) => {
+      if (sub.entitlements[field] === undefined) return max
+      const value = readNumber(sub.entitlements[field], field, '订阅 entitlements')
+      return max === undefined ? value : Math.max(max, value)
+    }, undefined as number | undefined)
+    const addonSum = effectiveAddons.reduce(
+      (sum, sub) => sum + (sub.entitlements[field] === undefined
+        ? 0
+        : readNumber(sub.entitlements[field], field, '加购 entitlements')),
+      0,
+    )
+    const addonDeclared = effectiveAddons.some((sub) => sub.entitlements[field] !== undefined)
+    if (base !== undefined || addonDeclared) merged[field] = (base ?? 0) + addonSum
+  }
+
+  // 内部键原样透传：首个声明者胜出（策略键无可加性，取值与遍历顺序强相关，
+  // 因此固定"先到先得"而非叠加，避免多订阅场景下 TTL 宽限天数值漂移）
+  for (const sub of effective) {
+    const internal = pickInternalKeys(sub.entitlements)
+    for (const [key, value] of Object.entries(internal)) {
+      if (!(key in merged)) merged[key as `_${string}`] = value
+    }
+  }
+
   return merged
 }
 
@@ -142,7 +203,12 @@ export function normalizeEntitlements(raw: unknown): MergedEntitlements {
   for (const field of CAPACITY_FIELDS) {
     merged[field] = readNumber(record[field], field, 'OrganizationEntitlement.limits')
   }
+  for (const field of OPTIONAL_CAPACITY_FIELDS) {
+    if (record[field] === undefined) continue
+    merged[field] = readNumber(record[field], field, 'OrganizationEntitlement.limits')
+  }
   merged.allowedPlatforms = [...new Set(readPlatforms(record.allowedPlatforms))].sort()
+  Object.assign(merged, pickInternalKeys(record))
   return merged
 }
 

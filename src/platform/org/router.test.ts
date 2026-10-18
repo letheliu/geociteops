@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import type { PrismaClient, User } from '@prisma/client'
 import { orgRouter } from './router.js'
+import { QuotaExceededError } from '../billing/entitlement-guard.js'
 import { createOrgService } from './service.js'
 import { ApiCredentialNotRevokableError } from '../tenancy/api-credentials.js'
 import type { IdentityService } from '../identity/service.js'
@@ -1111,5 +1112,75 @@ describe('orgRouter.credentials.revoke', () => {
     })
     expect(credentials.revoke).toHaveBeenCalledWith('cred-1', 'user-1')
     expect(audit.record).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M2 §3.0：org.workspaces.update 保存 N 时的配额硬检查（monitorSampleCountMax 生效点一）
+// ---------------------------------------------------------------------------
+
+describe('orgRouter.workspaces.update × monitorSampleCountMax（生效点一）', () => {
+  function quotaBilling(declared: number | undefined) {
+    return {
+      guard: {
+        checkMonitorSampleCountMax: vi.fn(async (_orgId: string, requested: number) => {
+          if (declared === undefined) return
+          if (requested > declared) {
+            throw new QuotaExceededError({
+              field: 'monitorSampleCountMax',
+              limit: declared,
+              current: requested,
+              organizationId: 'org-1',
+            })
+          }
+        }),
+      },
+      meter: {},
+    } as any
+  }
+
+  function ctxWithBilling(declared: number | undefined) {
+    const ctx = ctxWithOrgRole('ORG_OWNER')
+    prisma.workspace.findUnique.mockResolvedValue(wsRef('org-1'))
+    workspaceAdmin.update.mockResolvedValue(adminWorkspaceView())
+    ctx.services.billing = quotaBilling(declared)
+    return ctx
+  }
+
+  it('TRIAL org（声明 3）保存 monitorSampleCount=5 → 拒，且不落到 workspaceAdmin.update', async () => {
+    const ctx = ctxWithBilling(3)
+    const caller = orgRouter.createCaller(ctx)
+    await expect(
+      caller.workspaces.update({ workspaceId: 'ws-1', monitorSampleCount: 5 }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining('超出套餐上限') })
+    expect(ctx.services.billing.guard.checkMonitorSampleCountMax).toHaveBeenCalledWith('org-1', 5)
+    expect(workspaceAdmin.update).not.toHaveBeenCalled()
+  })
+
+  it('声明 3 保存 3 → 放行', async () => {
+    const ctx = ctxWithBilling(3)
+    const caller = orgRouter.createCaller(ctx)
+    await caller.workspaces.update({ workspaceId: 'ws-1', monitorSampleCount: 3 })
+    expect(workspaceAdmin.update).toHaveBeenCalled()
+    expect(workspaceAdmin.update).toHaveBeenCalledWith(
+      'ws-1',
+      expect.objectContaining({ monitorSampleCount: 3 }),
+      expect.any(String),
+    )
+  })
+
+  it('键缺失（未声明上限）→ 保存 10 放行', async () => {
+    const ctx = ctxWithBilling(undefined)
+    const caller = orgRouter.createCaller(ctx)
+    await caller.workspaces.update({ workspaceId: 'ws-1', monitorSampleCount: 10 })
+    expect(workspaceAdmin.update).toHaveBeenCalled()
+  })
+
+  it('不带 monitorSampleCount 的更新不触发配额检查', async () => {
+    const ctx = ctxWithBilling(3)
+    const caller = orgRouter.createCaller(ctx)
+    await caller.workspaces.update({ workspaceId: 'ws-1', name: '新名字' })
+    expect(ctx.services.billing.guard.checkMonitorSampleCountMax).not.toHaveBeenCalled()
+    expect(workspaceAdmin.update).toHaveBeenCalled()
   })
 })
