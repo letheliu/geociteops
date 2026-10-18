@@ -9,6 +9,12 @@ import {
 import { dayStart } from './aggregate.js'
 
 /**
+ * 基线读所需的最小 db 形状——交互式事务的 tx 客户端天然满足
+ * （发布事务要在同一事务内读基线，规格 §6.3）。
+ */
+export type WeakPointsDb = Pick<PrismaClient, 'citationQuery' | 'citationRun' | 'citationEvent'>
+
+/**
  * 薄弱点识别（M2 §3.3 规格 §5）。
  *
  * 口径钉死（与 §5/§7 同源，杜绝"看板一张口径、趋势图另一张"）：
@@ -45,6 +51,16 @@ export interface WeakPointsInput {
   workspaceId: string
   fromDay: string
   toDay: string
+  /**
+   * 只取该查询的基线（发布事务用）。给出时不按 ACTIVE 过滤——
+   * 查询在任务创建与发布之间被暂停，不应该让已建任务失去基线。
+   */
+  queryId?: string
+  /**
+   * Run 收尾时刻上界（发布事务用 publishedAt 传入）：并发收尾的 Run 不进基线，
+   * 否则"发布后 5 秒才跑完的 run"会被当成发布前的基线。
+   */
+  finishedBefore?: Date
 }
 
 /** 一个 (Run × 查询) 的查询级结果——§5 weakPoints 与 §7 基线/验证共用同一形状 */
@@ -117,15 +133,17 @@ export interface QueryBaseline {
  * 基线就是最近一次有数据的运行。
  */
 export async function loadQueryBaselines(
-  prisma: PrismaClient,
+  prisma: WeakPointsDb,
   input: WeakPointsInput,
 ): Promise<Map<string, QueryBaseline>> {
-  const { workspaceId, fromDay, toDay } = input
+  const { workspaceId, fromDay, toDay, queryId, finishedBefore } = input
   const from = dayStart(fromDay)
   const toExclusive = new Date(dayStart(toDay).getTime() + 86_400_000)
 
   const queries = await prisma.citationQuery.findMany({
-    where: { workspaceId, status: 'ACTIVE' },
+    where: queryId
+      ? { id: queryId, workspaceId }
+      : { workspaceId, status: 'ACTIVE' },
     select: { id: true, queryText: true, mappedPageUrl: true },
   })
   const baselines = new Map<string, QueryBaseline>()
@@ -137,7 +155,7 @@ export async function loadQueryBaselines(
       workspaceId,
       startedAt: { gte: from, lt: toExclusive },
       status: { in: ['COMPLETED', 'PARTIAL'] },
-      finishedAt: { not: null },
+      finishedAt: finishedBefore ? { lte: finishedBefore, not: null } : { not: null },
     },
     orderBy: { finishedAt: 'desc' },
     select: { id: true, finishedAt: true },
@@ -202,7 +220,7 @@ export async function loadQueryBaselines(
  * 取薄弱点列表。数据通道与趋势读路径**独立**（不共享 select），
  * 但口径函数全部复用 aggregate.ts——竞品分母与品牌指标同源由 groupAggregate 保证。
  */
-export async function loadWeakPoints(prisma: PrismaClient, input: WeakPointsInput): Promise<WeakPoint[]> {
+export async function loadWeakPoints(prisma: WeakPointsDb, input: WeakPointsInput): Promise<WeakPoint[]> {
   const baselines = await loadQueryBaselines(prisma, input)
   const weakPoints: WeakPoint[] = []
 
