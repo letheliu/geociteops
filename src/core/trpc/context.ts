@@ -68,6 +68,14 @@ function snapshotHeaders(headers: Record<string, string | string[] | undefined>)
   return result
 }
 
+/**
+ * 提取客户端 IP（**信任边界**）：
+ * x-forwarded-for 首值无条件优先——前提是服务恒部署在会清洗/重写 XFF 的反代之后
+ * （宝塔 nginx、compose web 均满足）。若服务被直连暴露，攻击者可任意伪造该头
+ * 绕过按 IP 的限速（登录限流、自助注册限速都建立在此 ip 上）。
+ * 现状裁定：不改造成 trustProxy 多级解析（部署形态未收口），而是把前提写在代码里，
+ * 后续若出现直连/多实例场景需升级信任链。
+ */
 function extractIp(
   req: CreateContextOptions['req'],
   headers: Record<string, string | undefined>,
