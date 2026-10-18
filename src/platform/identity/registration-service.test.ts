@@ -215,6 +215,9 @@ function makeDb(opts: {
         return row
       },
     },
+    // 财务口径钉子（M2 §3.0）：五件套里没有收款动作——注册不该产生任何支付流水，
+    // 任何对 paymentTransaction 的调用都会在此抛错（mock 刻意只挂计数器）
+    paymentTransaction: { createCalls: 0 },
     subscription: {
       create: async ({ data }: any) => {
         const row = { id: id('sub'), createdAt: REG_NOW, updatedAt: REG_NOW, ...data }
@@ -388,6 +391,12 @@ describe('registerTrial：五件套单事务（逐项断言）', () => {
     const result = await service.registerTrial(input())
     expect(sessions.create).toHaveBeenCalledWith(result.user.id, { ip: '203.0.113.9' })
     expect(result.token).toBe('tok-new')
+  })
+
+  it('零元试用单不产生支付流水（paymentTransaction 全程未被触达）', async () => {
+    const { service, db } = makeService()
+    await service.registerTrial(input())
+    expect(db.prisma.paymentTransaction.createCalls).toBe(0)
   })
 
   it('审计五事件各一条（auth.register/organization.create/workspace.create/order.create/subscription.create）', async () => {

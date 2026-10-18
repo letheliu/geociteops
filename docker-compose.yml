@@ -75,7 +75,13 @@ services:
       # 裸 IP + 纯 http 部署登录会静默失效，须改 GEO_COOKIE_NAME=geo_sid（见 README）
       GEO_COOKIE_NAME: ${GEO_COOKIE_NAME:-__Host-geo_sid}
       SESSION_IDLE_PLATFORM_HOURS: ${SESSION_IDLE_PLATFORM_HOURS:-8}
+      # 计费强制执行（P2 已落地：配额/服务状态/到期只读均生效）。
+      # 与 REGISTRATION_ENABLED 双开关联动——开自助注册时本项必须 on。
       BILLING_ENFORCEMENT: ${BILLING_ENFORCEMENT:-off}
+      # 自助注册（M2 §3.0）：默认 off。开启需与 BILLING_ENFORCEMENT 同时 on。
+      REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-off}
+      # 订阅到期全局宽限天数（缺省 7；试用快照自带 _graceDays=90 不受此项影响）
+      SUBSCRIPTION_GRACE_DAYS: ${SUBSCRIPTION_GRACE_DAYS:-7}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       PAYMENT_BANK_INFO: ${PAYMENT_BANK_INFO:-}
 
