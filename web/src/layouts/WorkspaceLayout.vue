@@ -63,6 +63,8 @@ const menuOptions: MenuOption[] = [
       { label: '查询库', key: 'citation-queries', icon: renderIcon('🔍') } as MenuOption,
       { label: '引用报告', key: 'citation-reports', icon: renderIcon('📋') } as MenuOption,
       { label: 'SOV 分析', key: 'citation-sov', icon: renderIcon('📈') } as MenuOption,
+      // 引用覆盖矩阵(PUBLISHED 页 × 平台,盲区/域级证据/意图落空)
+      { label: '引用覆盖', key: 'citation-coverage', icon: renderIcon('🧭') } as MenuOption,
       { label: '效果对比', key: 'citation-effect', icon: renderIcon('⚖️') } as MenuOption,
       // M2 §3.3 闭环看板
       { label: '闭环看板', key: 'citation-loop', icon: renderIcon('🔁') } as MenuOption,

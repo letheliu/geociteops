@@ -197,6 +197,12 @@ export const router = createRouter({
               name: 'citation-sov',
               component: () => import('../views/citation/SovAnalytics.vue'),
             },
+            // 引用覆盖矩阵:页面 × 平台被引、盲区、意图落空(见 docs/METRICS.md)
+            {
+              path: 'citation/coverage',
+              name: 'citation-coverage',
+              component: () => import('../views/citation/CoverageMatrix.vue'),
+            },
             {
               path: 'citation/effect',
               name: 'citation-effect',
@@ -376,6 +382,7 @@ const TITLE_MAP: Record<string, string> = {
   'citation-queries': '查询库',
   'citation-reports': '引用报告',
   'citation-sov': 'SOV 分析',
+  'citation-coverage': '引用覆盖',
   'citation-effect': '效果对比',
   'citation-loop': '闭环看板',
   'content-pages': '内容页面',

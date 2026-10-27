@@ -16,6 +16,7 @@ import {
   workspaceOptimizationsAllowed,
 } from '../../platform/billing/entitlement-guard.js'
 import { loadWeakPoints } from './weak-points.js'
+import { loadCoverage } from './coverage.js'
 import { QueryNotOptimizableError } from './closed-loop-service.js'
 
 /**
@@ -387,6 +388,18 @@ export const citationRouter = router({
         workspaceOptimizationsAllowed(ctx),
       ])
       return { weakPoints, optimizationsAllowed }
+    }),
+
+  /**
+   * 引用覆盖矩阵（docs/specs/引用覆盖-设计.md）：PUBLISHED 页面 × 平台的被引状态、
+   * 盲区页与意图落空清单。只读。归因证据分层 EXACT/NORMALIZED/DOMAIN——
+   * 域级证据不计入页面覆盖（对应「UA 声明不足以确认来源」的严谨性），口径见 docs/METRICS.md。
+   */
+  coverage: protectedProcedure
+    .input(z.object({ dateRange: dateRangeInput }))
+    .query(async ({ ctx, input }) => {
+      const { fromDay, toDay } = resolveRange(input.dateRange)
+      return loadCoverage(ctx.services.prisma, { workspaceId: ctx.workspace.id, fromDay, toDay })
     }),
 
   /**
