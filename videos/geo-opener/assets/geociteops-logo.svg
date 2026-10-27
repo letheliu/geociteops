@@ -1,0 +1,55 @@
+<svg width="880" height="240" viewBox="0 0 880 240" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">GeoCiteOps logo</title>
+  <desc id="desc">A professional SaaS logo combining a compass mark, citation nodes, and the GeoCiteOps wordmark.</desc>
+  <defs>
+    <linearGradient id="markGradient" x1="54" y1="36" x2="190" y2="202" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0EA5A4"/>
+      <stop offset="0.54" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="accentGradient" x1="71" y1="61" x2="160" y2="159" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7DD3FC"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+    <filter id="softShadow" x="20" y="18" width="196" height="204" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="10"/>
+      <feGaussianBlur stdDeviation="14"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.037 0 0 0 0 0.099 0 0 0 0 0.235 0 0 0 0.16 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+  </defs>
+
+  <rect width="880" height="240" rx="40" fill="#F8FAFC"/>
+  <g filter="url(#softShadow)">
+    <rect x="50" y="42" width="148" height="156" rx="36" fill="white"/>
+    <path d="M124 58C157.137 58 184 84.8629 184 118C184 151.137 157.137 178 124 178C90.8629 178 64 151.137 64 118C64 84.8629 90.8629 58 124 58Z" fill="url(#markGradient)"/>
+    <path d="M137.763 85.6832C141.967 83.6311 146.295 87.959 144.243 92.1625L130.372 120.575C129.921 121.499 129.175 122.245 128.251 122.696L99.8375 136.567C95.634 138.619 91.3061 134.291 93.3582 130.087L107.229 101.675C107.68 100.751 108.426 100.005 109.35 99.5538L137.763 85.6832Z" fill="white"/>
+    <path d="M122.105 110.851C126.075 108.913 130.162 113 128.224 116.97L124.479 124.641C124.053 125.514 123.348 126.219 122.475 126.645L114.804 130.39C110.834 132.328 106.747 128.241 108.685 124.271L112.43 116.6C112.856 115.727 113.561 115.022 114.434 114.596L122.105 110.851Z" fill="url(#accentGradient)"/>
+    <circle cx="83" cy="89" r="8" fill="#DFF8F6"/>
+    <circle cx="165" cy="147" r="8" fill="#DBEAFE"/>
+    <circle cx="87" cy="155" r="6" fill="#DCFCE7"/>
+    <path d="M90 92L110 103" stroke="white" stroke-width="4" stroke-linecap="round" opacity="0.72"/>
+    <path d="M137 128L160 145" stroke="white" stroke-width="4" stroke-linecap="round" opacity="0.72"/>
+    <path d="M92 153L111 130" stroke="white" stroke-width="4" stroke-linecap="round" opacity="0.72"/>
+  </g>
+
+  <g>
+    <text x="244" y="112" fill="#0F172A" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="58" font-weight="760" letter-spacing="0">GeoCiteOps</text>
+    <text x="247" y="154" fill="#475569" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="23" font-weight="500" letter-spacing="0">AI citation intelligence and optimization platform</text>
+    <g transform="translate(248 176)">
+      <rect width="152" height="28" rx="14" fill="#E0F2FE"/>
+      <circle cx="20" cy="14" r="5" fill="#0284C7"/>
+      <text x="34" y="19" fill="#075985" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="700" letter-spacing="0">Monitor</text>
+      <rect x="164" width="150" height="28" rx="14" fill="#DCFCE7"/>
+      <circle cx="184" cy="14" r="5" fill="#16A34A"/>
+      <text x="198" y="19" fill="#166534" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="700" letter-spacing="0">Optimize</text>
+      <rect x="326" width="150" height="28" rx="14" fill="#EDE9FE"/>
+      <circle cx="346" cy="14" r="5" fill="#7C3AED"/>
+      <text x="360" y="19" fill="#5B21B6" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="700" letter-spacing="0">Structure</text>
+    </g>
+  </g>
+</svg>

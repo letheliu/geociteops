@@ -1,0 +1,329 @@
+{
+  "category": "logo-reveal",
+  "duration_s": 10,
+  "fps": 30,
+  "canvas": {
+    "w": 1920,
+    "h": 1080,
+    "aspect": "16:9"
+  },
+  "style": "Dark, precise, cinematic tech editorial. A deep navy void (#0F172A falling off to #111827) with soft volumetric teal-blue glow, a faint grain field, and generous negative space; the compass mark is the hero. Single dominant motif: citation-signal propagation. One continuous drawing gesture starts at three citation nodes, draws the compass ring and needle, then propagates outward into the wordmark wipe, the tagline rise and the three capability pills, so every element reads as emitted by the same citation signal. Crisp geometry, restrained glow, confident pacing, and a 2.2s dead-held final lockup. A 10-second brand opener with room to breathe, not a rushed 3-second sting.",
+  "palette": [
+    "#0F172A",
+    "#111827",
+    "#0EA5A4",
+    "#2563EB",
+    "#7DD3FC",
+    "#22C55E",
+    "#F8FAFC",
+    "#475569"
+  ],
+  "font": "Inter",
+  "font_stack": "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
+  "beats": [18, 84, 138, 186, 240],
+  "export": "mp4",
+  "asset_needs": [
+    {
+      "role": "hero",
+      "kind": "logo",
+      "source": "D:/MyProjects/zoomer-geo/videos/geo-opener/assets/geociteops-logo.svg",
+      "treatment": "none",
+      "provenance": "D:/MyProjects/zoomer-geo/docs/assets/geociteops-logo.svg",
+      "usage": "Inline only the mark group: outer compass disc path, white needle path, accent pointer path, three citation-node circles and three connector strokes. Crop the SVG to viewBox 64 58 120 120. Drop the off-white card rect, the white rounded-square rect and the softShadow filter. Do not use the SVG text elements."
+    }
+  ],
+  "block": "hand-authored",
+  "customize": {
+    "strategy": "hand-authored",
+    "details": "Full build directives live in content.customize; this build is hand-authored around the supplied SVG mark with catalog motion principles, not a reuse of logo-outro."
+  },
+  "content": {
+    "block": "hand-authored",
+    "block_references": [
+      {
+        "block": "logo-outro",
+        "role": "structure reference only",
+        "use": "Borrow its lockup architecture (aura bloom behind the mark, tagline arriving after the mark, low-contrast supporting chips) and its glow-bloom intensity discipline. Its 6s piece-by-piece assembly is not reused."
+      },
+      {
+        "block": "svg-stroke-trace",
+        "role": "primary motion rule",
+        "use": "Adopt measured path draw-on for the compass ring, needle outline and three connector lines: measure getTotalLength() once at mount, then animate stroke-dashoffset from L to 0; filled shapes fade in once the stroke front closes."
+      },
+      {
+        "block": "per-word-rise",
+        "role": "tagline motion",
+        "use": "Blur-to-sharp staggered rise: each Chinese chunk from y 26, opacity 0, blur 8px to rest; stagger 0.12s; power3.out."
+      },
+      {
+        "block": "spring-pop",
+        "role": "pill and node motion",
+        "use": "Scale from 0.86 to 1 with one overshoot (back.out(1.8)) and opacity 0 to 1; dots follow 0.06s later with back.out(3)."
+      },
+      {
+        "block": "caption-clip-wipe",
+        "role": "wordmark wipe",
+        "use": "Left-to-right clip-path inset wipe is the recipe for the live-text wordmark; do not use its per-word caption layout."
+      },
+      {
+        "block": "titlecard-lockup",
+        "role": "final hold reference",
+        "use": "Calm dead-center lockup discipline and a completely still readable hold."
+      },
+      {
+        "block": "vignette",
+        "role": "polish",
+        "use": "Static radial vignette at 0.28 strength to pull focus to the lockup."
+      },
+      {
+        "block": "grain-overlay",
+        "role": "polish",
+        "use": "Very low intensity animated grain, 0.035 to 0.05 opacity, to keep the navy field from banding."
+      }
+    ],
+    "considered_not_used": [
+      {
+        "block": "particle-image-reveal",
+        "reason": "A dense seeded particle field is the wrong scale for three citation nodes; the logo's own node-and-line geometry carries the convergence more precisely and cheaply."
+      },
+      {
+        "block": "logo-sting",
+        "reason": "Slam, impact ring and white impact frame are too punchy for a 10s editorial opener."
+      },
+      {
+        "block": "svg-mask-reveal",
+        "reason": "It reveals media through a wordmark-shaped mask; there is no media and the wordmark must stay live text."
+      },
+      {
+        "block": "logo-brand-close",
+        "reason": "Letter-by-letter cascade conflicts with the specified single left-to-right wordmark wipe."
+      }
+    ],
+    "customize": {
+      "reuse_decision": {
+        "mode": "hand-authored",
+        "summary": "Hand-author the composition around the supplied SVG mark and borrow catalog motion principles; do not add and edit logo-outro.",
+        "why": "logo-outro is a 6s generic-logo assembly with its own piece-by-piece build, tagline fade and URL pill. This piece is 10s, needs the supplied mark's own sub-paths (disc, needle, accent pointer, three nodes, three connectors) to be the assembly gesture, stacks the lockup vertically for 16:9, rebuilds the wordmark as live Inter text, drops the URL pill (no URL supplied), and adds three Chinese capability pills. That is most of the block's internals replaced, so add-and-edit would cost more than authoring against the block's structure.",
+        "borrowed": "logo-outro's bloom-behind-mark, tagline-after-mark timing discipline, and low-contrast supporting-chip treatment. svg-stroke-trace's measured draw-on. per-word-rise's rise. spring-pop's pill pop. caption-clip-wipe's wipe. titlecard-lockup's dead-still hold."
+      },
+      "timing": {
+        "unit": "seconds unless marked frame; 30fps; 300 total frames",
+        "beat_anchors_s": [0.6, 2.8, 4.6, 6.2, 8.0],
+        "beat_anchors_frames": [18, 84, 138, 186, 240]
+      },
+      "dominant_motif": "Citation-signal propagation: light energy travels from the three citation nodes through the connector lines into the compass ring and needle, then outward into the wordmark wipe front, the tagline rise and the pill landings. Every entrance is a continuation of that one gesture. No second motif.",
+      "stage": {
+        "background": "radial-gradient(ellipse 120% 100% at 50% 40%, #13203A 0%, #0F172A 50%, #111827 100%)",
+        "aura": "One soft bloom layer behind the mark: 900x900 radial gradient rgba(14,165,164,0.16) to rgba(37,99,235,0.08) to transparent, blur 80px. Base opacity 0.30, peak 0.55 at 2.80s, settle 0.34 by 4.20s, final breathe 0.34 to 0.38.",
+        "vignette": "Static radial vignette, 0.28 strength, edges to rgba(0,0,0,0.55).",
+        "grain": "Animated grain overlay at 0.035 to 0.05 opacity, deterministic loop; never above 0.06.",
+        "camera": "None. No push, zoom, pan, parallax or shake anywhere."
+      },
+      "layout": {
+        "safe_margin_px": 96,
+        "safe_box": [96, 96, 1824, 984],
+        "optical_note": "The lockup group spans y 248 to 786, centering at y 517, a deliberate 23px lift above the true frame center so the held brand sits high and stable.",
+        "stacking": "Vertical centered lockup: mark, then wordmark, then a short hairline, then the Chinese tagline, then the capability pill row. The supplied logo is horizontal; this intentionally re-flows it as a stacked hero lockup for 16:9.",
+        "zones": {
+          "mark": {
+            "center": [960, 368],
+            "box": [840, 248, 240, 240],
+            "note": "120x120 SVG viewBox rendered at 2x."
+          },
+          "wordmark": {
+            "center": [960, 566],
+            "font_size": 112,
+            "box_approx": [635, 510, 650, 112],
+            "baseline_y": 594
+          },
+          "hairline": {
+            "center": [960, 628],
+            "size": [160, 1],
+            "note": "Grows from center outward; color #475569 at 0.5 opacity, with a #7DD3FC core at 0.35."
+          },
+          "tagline": {
+            "center": [960, 670],
+            "font_size": 36,
+            "box_approx": [750, 652, 420, 36]
+          },
+          "capabilities": {
+            "center": [960, 762],
+            "height": 48,
+            "gap": 16,
+            "box_approx": [752, 738, 416, 48],
+            "note": "Three equal-height pills on one horizontal rail; total width must stay under 520px."
+          }
+        },
+        "hierarchy": [
+          "1. Mark: 240px, highest luminance and the only element with a saturated gradient.",
+          "2. Wordmark: 112px Inter 800 off-white, second contrast tier.",
+          "3. Tagline: 36px, #F8FAFC at 0.72 opacity, muted third tier.",
+          "4. Capability pills: 48px tall, dark translucent chips, lowest contrast; support only."
+        ]
+      },
+      "mark_svg_plan": {
+        "source": "assets/geociteops-logo.svg",
+        "inline": "Inline the mark group as SVG; keep original path coordinates untouched so the gradients stay aligned. Remove the outer off-white card rect (width 880, height 240, rx 40, fill #F8FAFC), the white rounded-square rect (x 50, y 42, width 148, height 156, rx 36), and the filter attribute url(#softShadow). Do not inline the SVG text elements.",
+        "viewBox": "64 58 120 120",
+        "render_size": [240, 240],
+        "top_left": [840, 248],
+        "scale": 2,
+        "geometry_layers_draw_order": [
+          "mark-aura (HTML div behind the SVG, not part of the SVG).",
+          "mark-disc: the original outer circle path M124 58 C157.137 58 184 84.8629 184 118 C184 151.137 157.137 178 124 178 C90.8629 178 64 151.137 64 118 C64 84.8629 90.8629 58 124 58 Z, filled with url(#markGradientDark). Opacity 0 until 2.05s, fades to 1 by 2.60s.",
+          "mark-ring: a duplicate of that same path with fill none, stroke #7DD3FC, stroke-width 0.7 SVG units (1.4 comp px), stroke-opacity 0.45, linecap round. Draw-on from 12 o'clock: stroke-dasharray 377, stroke-dashoffset 377 to 0 over 1.0s, power2.inOut, 1.40s to 2.40s. This rim keeps the gradient's navy tail legible on the dark stage.",
+          "mark-lines: the three connector paths, stroke #7DD3FC, stroke-width 3 SVG units (6 comp px), stroke-opacity 0.70, linecap round. Each draws node-to-needle: line A M90 92 L110 103, line B reverse the authored direction to M160 145 L137 128 so it grows from the node inward, line C M92 153 L111 130. Stagger starts 0.70s, 0.85s, 1.00s; 0.55s each; power2.inOut.",
+          "node-a: circle cx 83 cy 89 r 8, original fill #DFF8F6, comp center (878, 310), comp radius 16.",
+          "node-b: circle cx 165 cy 147 r 8, original fill #DBEAFE, comp center (1042, 426), comp radius 16.",
+          "node-c: circle cx 87 cy 155 r 6, original fill #DCFCE7, comp center (886, 442), comp radius 12.",
+          "node halos: one blurred circle behind each node, radius 1.6x the node, fills #0EA5A4 (A), #2563EB (B), #22C55E (C), blur 6px, opacity 0.45; they bloom with each node pop.",
+          "needle-main: the original white pointer path M137.763 85.6832 ... Z. Author it twice: needle-main-stroke (fill none, stroke #F8FAFC, stroke-width 0.8 SVG units, draw-on 2.45s to 3.15s) beneath needle-main-fill (fill #F8FAFC, opacity 0 to 1 between 2.95s and 3.35s).",
+          "needle-accent: the original small pointer path M122.105 110.851 ... Z, fill url(#accentGradient), unchanged #7DD3FC to #22C55E. Pop from scale 0.6 and opacity 0 to scale 1 and opacity 1 between 3.10s and 3.45s with back.out(2.2). Scale around SVG user-space point (54.5, 60.6) relative to the cropped viewBox origin, equivalently comp point (948, 369); set transform-box and transform-origin explicitly.",
+          "mark settle: whole mark group scales 1.04 to 1.00 from 3.55s to 3.95s, power2.out; then holds."
+        ],
+        "gradient_dark_stage": {
+          "markGradientDark": {
+            "id": "markGradientDark",
+            "x1": 54,
+            "y1": 36,
+            "x2": 190,
+            "y2": 202,
+            "stops": [
+              ["0%", "#0EA5A4"],
+              ["54%", "#2563EB"],
+              ["100%", "#1E3A8A"]
+            ],
+            "note": "The supplied last stop #111827 is nearly the stage color (#0F172A to #111827) and would erase the disc's lower-right edge. Lift it to #1E3A8A and add the #7DD3FC rim so the full gradient remains readable."
+          },
+          "accentGradient": "Keep exactly as supplied: x1 71 y1 61 x2 160 y2 159, stops #7DD3FC 0% and #22C55E 100%.",
+          "node_fills": "Keep the supplied pale tints (#DFF8F6, #DBEAFE, #DCFCE7); they read as luminous on navy. Saturated color is carried by the halos, not by recoloring the nodes.",
+          "needle": "Switch nothing; the supplied white pointer stays #F8FAFC.",
+          "rim": "1.4 comp px #7DD3FC rim at 0.45 opacity is required, not optional, to preserve the mark silhouette."
+        }
+      },
+      "element_directives": {
+        "wordmark": {
+          "content": "GeoCiteOps",
+          "type": "live HTML text, single line",
+          "font": "Inter 800 (the SVG uses 760; round up to the nearest locally available weight)",
+          "size_px": 112,
+          "letter_spacing": "-0.02em",
+          "line_height": 1,
+          "color": "#F8FAFC",
+          "white_space": "nowrap",
+          "reveal": "clip-path inset(0 100% 0 0) to inset(0 -2% 0 0) over 0.70s, power3.inOut, starting 3.90s; the text itself does not move, so the wipe stays a pure horizontal reveal.",
+          "wipe_edge": "A 2px wide, 1.2em tall vertical sliver of linear-gradient(#7DD3FC, rgba(125,211,252,0)) rides the clip front from x 635 to x 1285 across 3.90s to 4.60s, opacity 0 to 0.9 by 4.10s then to 0 by 4.60s. This is the visible signal front; remove it the instant the wipe completes.",
+          "svg_text": "Do not use the supplied SVG wordmark text (x 244, y 112, fill #0F172A). Its navy fill is invisible on the dark stage; the wordmark is rebuilt as live off-white Inter text."
+        },
+        "hairline": {
+          "reveal": "scaleX 0 to 1 from center, transform-origin 50% 50%, over 0.40s power2.out starting 4.70s; 160px wide, 1px tall.",
+          "color": "#475569 at 0.5 opacity with a 1px #7DD3FC core at 0.35 opacity.",
+          "exit": "None; holds through the end."
+        },
+        "tagline": {
+          "content": "让 AI 答案，引用你的品牌",
+          "chunks": ["让", "AI 答案，", "引用", "你的品牌"],
+          "type": "live HTML text, four inline-block spans, white-space nowrap",
+          "font": "Inter with the generic fallback chain; Chinese glyphs resolve through ui-sans-serif/system-ui/sans-serif (Microsoft YaHei UI on this host). Do not name a CJK family.",
+          "size_px": 36,
+          "weight": 500,
+          "letter_spacing": "0.02em",
+          "color": "#F8FAFC at 0.72 opacity",
+          "entrance": "Each chunk from y 26, opacity 0, blur 8px to y 0, opacity 1, blur 0; duration 0.55s; stagger 0.12s; power3.out; chunk starts 5.30s, 5.42s, 5.54s, 5.66s; last chunk lands 6.21s.",
+          "exit": "None. The tagline stays for the full hold."
+        },
+        "capabilities": {
+          "labels": ["监测", "优化", "结构化"],
+          "layout": "One centered flex row, gap 16px, height 48px, total width target 416px, max 520px.",
+          "pill_style": "border-radius 999px; padding 0 24px; background rgba(17,24,39,0.72); border 1px solid rgba(125,211,252,0.22); box-shadow 0 8px 24px rgba(0,0,0,0.25).",
+          "dot_style": "6px circle with a 10px halo at 0.5 opacity; 监测 #0EA5A4, 优化 #2563EB, 结构化 #22C55E; margin-right 10px.",
+          "text_style": "Inter then system sans for CJK; weight 600; size 20px; letter-spacing 0.08em; color #F8FAFC at 0.92 opacity.",
+          "entrance": "Each pill from scale 0.86, y 10, opacity 0 to scale 1, y 0, opacity 1; duration 0.45s; back.out(1.8); stagger 0.22s; starts 6.90s, 7.12s, 7.34s; last lands 7.79s. Each dot pops 0.06s after its pill with back.out(3).",
+          "english_labels": "Do not render Monitor / Optimize / Structure; the Chinese labels carry the row.",
+          "exit": "None."
+        },
+        "url_pill": {
+          "render": false,
+          "note": "No URL was supplied. logo-outro's URL pill is deliberately omitted."
+        },
+        "english_tagline": {
+          "render": false,
+          "note": "The supplied English descriptor is kept as reference only; a fifth hierarchy tier would crowd the 10s lockup."
+        }
+      },
+      "beat_sheet": [
+        { "t": 0.0, "frame": 0, "event": "Black frame; stage crossfades up to the navy falloff and grain by 0.55s." },
+        { "t": 0.5, "frame": 15, "event": "Node A pops at (878, 310) with its teal halo; signal ignites." },
+        { "t": 0.6, "frame": 18, "event": "BEAT 1: first citation node lands." },
+        { "t": 0.64, "frame": 19, "event": "Node B pops at (1042, 426)." },
+        { "t": 0.7, "frame": 21, "event": "Line A begins drawing node to needle." },
+        { "t": 0.78, "frame": 23, "event": "Node C pops at (886, 442)." },
+        { "t": 0.85, "frame": 26, "event": "Line B begins drawing from its node inward." },
+        { "t": 1.0, "frame": 30, "event": "Line C begins drawing." },
+        { "t": 1.4, "frame": 42, "event": "Compass ring draw-on begins at 12 o'clock." },
+        { "t": 1.55, "frame": 47, "event": "All three connector lines have reached the needle core." },
+        { "t": 2.05, "frame": 62, "event": "Disc fill begins fading in under the drawing ring." },
+        { "t": 2.35, "frame": 71, "event": "Aura bloom begins to rise." },
+        { "t": 2.4, "frame": 72, "event": "Ring closes; full compass silhouette reads." },
+        { "t": 2.45, "frame": 74, "event": "Needle main outline begins drawing." },
+        { "t": 2.8, "frame": 84, "event": "BEAT 2: aura bloom peaks and the needle stroke passes center." },
+        { "t": 2.95, "frame": 89, "event": "Needle fill fades in." },
+        { "t": 3.1, "frame": 93, "event": "Accent pointer spring-pops." },
+        { "t": 3.35, "frame": 101, "event": "Accent pointer glow pulse; mark fully built." },
+        { "t": 3.55, "frame": 107, "event": "Mark settles from 1.04 to 1.00." },
+        { "t": 3.9, "frame": 117, "event": "Wordmark clip wipe begins; leading #7DD3FC sliver appears." },
+        { "t": 4.6, "frame": 138, "event": "BEAT 3: wordmark fully wiped; sliver gone." },
+        { "t": 4.7, "frame": 141, "event": "Hairline grows from center." },
+        { "t": 5.3, "frame": 159, "event": "Tagline chunk 1 rises; chunks follow every 0.12s." },
+        { "t": 6.2, "frame": 186, "event": "BEAT 4: tagline fully landed." },
+        { "t": 6.9, "frame": 207, "event": "Pill 1 (监测) springs in." },
+        { "t": 7.12, "frame": 214, "event": "Pill 2 (优化) springs in." },
+        { "t": 7.34, "frame": 220, "event": "Pill 3 (结构化) springs in." },
+        { "t": 7.79, "frame": 234, "event": "All pills locked." },
+        { "t": 7.85, "frame": 236, "event": "Lockup glow pulse begins." },
+        { "t": 8.0, "frame": 240, "event": "BEAT 5: final lock; every element at rest." },
+        { "t": 8.35, "frame": 251, "event": "Hold breath begins on the whole lockup." },
+        { "t": 10.0, "frame": 300, "event": "End on the held lockup; no fade-out." }
+      ],
+      "motion_rules": [
+        "Draw-on (rules/svg-path-draw, svg-stroke-trace): measure getTotalLength() once per stroke path at mount; animate stroke-dashoffset L to 0. Never animate a filled path's stroke without duplicating it as fill none.",
+        "Wipe (caption-clip-wipe recipe): wordmark uses clip-path inset; the wipe front is the only moving accent during 3.90 to 4.60s.",
+        "Rise (per-word-rise): tagline chunks animate y, opacity and blur only; no scale, no rotation.",
+        "Pop (spring-pop): pills and nodes share one overshoot curve; no bounce repeat, no elastic wobble.",
+        "Bloom (logo-outro discipline): one aura behind the mark; opacity and scale only; peak 0.55, never a screen-blend flash.",
+        "Emphasis: exactly one accent pulse on the accent pointer at 3.35s and one lockup glow pulse at 8.0s; nothing else pulses.",
+        "Hold (hold_breath): from 8.35s to 10.0s the lockup scales 1.000 to 1.012 with sine.inOut; the aura breathes plus or minus 0.04 opacity; grain continues.",
+        "No exits anywhere. The piece ends on the held lockup.",
+        "Beats may be anticipated by 0.08 to 0.12s for perceived sync; do not delay them."
+      ],
+      "dark_stage_adaptation": {
+        "mark_gradient": "Replace the supplied final stop #111827 with #1E3A8A; keep #0EA5A4 at 0% and #2563EB at 54%. Add the #7DD3FC rim at 0.45 opacity. Without both, the disc's lower-right quadrant disappears into #0F172A.",
+        "card_removal": "The supplied logo sits on an #F8FAFC rounded card with a white inner square and a softShadow filter. All three are dropped; the mark sits directly on the navy stage with the aura bloom instead of a drop shadow.",
+        "wordmark_color": "The supplied wordmark and English descriptor are #0F172A and #475569 on the light card. The live wordmark becomes #F8FAFC; the English descriptor is not rendered.",
+        "slate_usage": "#475569 is a hairline and edge color only on this stage; it never carries text.",
+        "node_readability": "Pale node fills stay; saturated halos (#0EA5A4, #2563EB, #22C55E) provide the color signal at 16px radius."
+      },
+      "do_not": [
+        "Do not add or edit the logo-outro block; this build is hand-authored.",
+        "Do not render the SVG card, white rounded square, softShadow filter or SVG text elements.",
+        "Do not name a CJK font family; use the generic system sans fallback.",
+        "Do not add particles, camera motion, lens flare, light leak, glitch, RGB split, scanlines or a second accent pulse.",
+        "Do not render a URL pill or the English tagline.",
+        "Do not fade to black at the end; hold the final lockup to frame 300.",
+        "Do not use #475569 for text on this background.",
+        "Do not exceed grain 0.06 opacity or aura 0.55 peak."
+      ]
+    },
+    "logo": "D:/MyProjects/zoomer-geo/videos/geo-opener/assets/geociteops-logo.svg",
+    "wordmark": "GeoCiteOps",
+    "tagline": "让 AI 答案，引用你的品牌",
+    "tagline_en": "AI citation intelligence and optimization platform",
+    "tagline_en_render": false,
+    "capabilities": ["监测", "优化", "结构化"],
+    "capabilities_en": ["Monitor", "Optimize", "Structure"],
+    "capabilities_en_render": false,
+    "url": "",
+    "font_fallback_zh": "generic system sans-serif through ui-sans-serif, system-ui, sans-serif (Microsoft YaHei UI on this Windows host); no named CJK family",
+    "logo_note": "The supplied SVG is a full lockup (mark + wordmark + English descriptor + three English pills) on an off-white rounded card. Inline only the mark: crop to viewBox 64 58 120 120, drop the card, the white rounded square and the softShadow filter, and keep the disc, needle, accent pointer, three nodes and three connector strokes with their original coordinates. Remap the mark gradient's final stop from #111827 to #1E3A8A and add a #7DD3FC rim so the mark survives the navy stage. Rebuild the wordmark as live Inter 800 off-white text, the Chinese tagline and the three Chinese pills as live text so they stay crisp and animatable. The mark is drawn on first (nodes, connectors, ring, needle, accent pointer), then the wordmark wipes in, the tagline rises, and the pills click into place."
+  }
+}
