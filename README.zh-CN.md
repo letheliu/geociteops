@@ -116,6 +116,8 @@ docker compose up -d
 
 > 要部署到自己服务器（演示站、DNS + HTTPS、每日重置 cron、ghcr 镜像、npm 发布）？
 > 见 [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)。
+>
+> 每个指标如何计算（SOV、薄弱点、引用归因分层、覆盖率、闭环 Δ）→ [docs/METRICS.md](./docs/METRICS.md)。
 
 创建首个平台超级管理员后登录：
 

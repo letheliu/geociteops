@@ -116,6 +116,8 @@ The stack runs four services — `db` (PostgreSQL + pgvector), `migrate` (one-sh
 
 > Deploying to your own server (demo site, DNS + HTTPS, daily reset cron, ghcr images, npm publish)?
 > See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
+>
+> How every metric is computed (SOV, weak points, citation attribution tiers, coverage, loop Δ) → [docs/METRICS.md](./docs/METRICS.md).
 
 Create your first platform administrator, then sign in:
 

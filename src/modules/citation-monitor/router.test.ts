@@ -84,6 +84,7 @@ function makeDb(seed: {
         if (where.workspaceId) list = list.filter((q) => q.workspaceId === where.workspaceId)
         if (where.status) list = list.filter((q) => q.status === where.status)
         if (where.id?.in) list = list.filter((q) => where.id.in.includes(q.id))
+        if (where.mappedPageUrl?.not === null) list = list.filter((q) => q.mappedPageUrl !== null)
         return list
       }),
       findFirst: vi.fn(async ({ where }: any) => {
@@ -97,6 +98,12 @@ function makeDb(seed: {
       }),
     },
     contentPage: {
+      findMany: vi.fn(async ({ where }: any) => {
+        let list = pages.slice()
+        if (where.workspaceId) list = list.filter((p) => p.workspaceId === where.workspaceId)
+        if (where.status) list = list.filter((p) => p.status === where.status)
+        return list
+      }),
       findFirst: vi.fn(async ({ where }: any) => {
         const hit = pages.find((p) => p.id === where.id && (!where.workspaceId || p.workspaceId === where.workspaceId))
         return hit ? { ...hit } : null
@@ -952,5 +959,55 @@ describe('citation loopBoard 端点（M2 §3.3）', () => {
     const result = await createCaller(ctx).loopBoard()
     expect(result.optimizationsAllowed).toBe(false)
     expect(guard.isOptimizationsAllowed).toHaveBeenCalledWith('org-1')
+  })
+})
+
+describe('citation router · coverage', () => {
+  it('矩阵口径:EXACT+NORMALIZED 计覆盖、DOMAIN 不计、只统计 OK 事件、PUBLISHED 页全集', async () => {
+    const db = makeDb({
+      pages: [
+        { id: 'p1', workspaceId: 'w1', url: 'https://ex.com/p1', citabilityScore: 0.8, status: 'PUBLISHED' },
+        { id: 'p2', workspaceId: 'w1', url: 'https://ex.com/p2', citabilityScore: 0.5, status: 'PUBLISHED' },
+        { id: 'p3', workspaceId: 'w1', url: 'https://ex.com/p3', citabilityScore: null, status: 'DRAFT' },
+      ],
+      events: [
+        { workspaceId: 'w1', queryId: 'q1', platform: 'doubao', capturedAt: new Date('2026-10-10T10:00:00+08:00'), citedUrls: ['https://ex.com/p1'] },
+        { workspaceId: 'w1', queryId: 'q1', platform: 'openai', capturedAt: new Date('2026-10-11T10:00:00+08:00'), citedUrls: ['http://www.ex.com/p2/'] },
+        { workspaceId: 'w1', queryId: 'q1', platform: 'qwen', status: 'FAILED', capturedAt: new Date('2026-10-12T10:00:00+08:00'), citedUrls: ['https://ex.com/p1'] },
+      ],
+      queries: [
+        { id: 'q1', workspaceId: 'w1', queryText: '品牌词', mappedPageUrl: 'https://ex.com/p1', status: 'ACTIVE' },
+        { id: 'q2', workspaceId: 'w1', queryText: '落空词', mappedPageUrl: 'https://ex.com/p2', status: 'ACTIVE' },
+      ],
+    })
+    const ctx: any = {
+      workspace: { id: 'w1', defaultBrandName: 'zoomer AI', status: 'ACTIVE' },
+      services: { prisma: db, monitor: {}, queryLibrary: {} },
+    }
+
+    const result = await createCaller(ctx).coverage({ dateRange: { start: '2026-10-01', end: '2026-10-31' } })
+
+    expect(result.platforms).toEqual(['doubao', 'openai'])
+    expect(result.summary.totalPages).toBe(2)
+    expect(result.summary.coveredPages).toBe(2)
+    expect(result.summary.blindSpotCount).toBe(0)
+    const byId = new Map(result.rows.map((r: any) => [r.pageId, r]))
+    expect(byId.get('p1').perPlatform.doubao).toMatchObject({ cites: 1, tier: 'EXACT' })
+    expect(byId.get('p2').perPlatform.openai).toMatchObject({ cites: 1, tier: 'NORMALIZED' })
+
+    const intent = new Map(result.intentRows.map((r: any) => [r.queryId, r]))
+    expect(intent.get('q1')).toMatchObject({ cites: 1, miss: false })
+    // q2 映射 p2 但自身从未运行——意图落空(p2 的覆盖来自 q1 的事件,不救 q2)
+    expect(intent.get('q2')).toMatchObject({ cites: 0, miss: true })
+  })
+
+  it('以 ctx.workspace.id 限定(事件读取强制 okEventsWhere)', async () => {
+    const db = makeDb()
+    const ctx: any = {
+      workspace: { id: 'w1', defaultBrandName: 'zoomer AI', status: 'ACTIVE' },
+      services: { prisma: db, monitor: {}, queryLibrary: {} },
+    }
+    await createCaller(ctx).coverage({ dateRange: { start: '2026-10-01', end: '2026-10-31' } })
+    expect(db.citationEvent.findMany.mock.calls[0][0].where).toMatchObject({ status: 'OK', workspaceId: 'w1' })
   })
 })
