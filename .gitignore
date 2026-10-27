@@ -37,3 +37,7 @@ docs/claude-seo-reference/
 # 私有规格（含服务器信息与商业策略，不提交公开仓库）
 docs/specs/
 .serena/
+
+# hyperframes 视频工程的可再生缓存（缩略图/波形）
+videos/**/.thumbnails/
+videos/**/.waveform-cache/

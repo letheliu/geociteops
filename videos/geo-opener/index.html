@@ -1,0 +1,1042 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>GeoCiteOps — citation-signal opener</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      :root {
+        /* palette — every hex is declared once */
+        --c-bg-deep: #0f172a;
+        --c-bg-void: #111827;
+        --c-bg-lift: #13203a;
+        --c-teal: #0ea5a4;
+        --c-blue: #2563eb;
+        --c-sky: #7dd3fc;
+        --c-green: #22c55e;
+        --c-white: #f8fafc;
+        --c-slate: #475569;
+        --c-navylift: #1e3a8a;
+        --c-node-a: #dff8f6;
+        --c-node-b: #dbeafe;
+        --c-node-c: #dcfce7;
+        --c-black: #000000;
+        --c-aura-teal: rgba(14, 165, 164, 0.16);
+        --c-aura-blue: rgba(37, 99, 235, 0.08);
+        --c-lockup-glow: rgba(125, 211, 252, 0.18);
+        --c-pill-bg: rgba(17, 24, 39, 0.72);
+        --c-pill-border: rgba(125, 211, 252, 0.22);
+        --c-pill-shadow: rgba(0, 0, 0, 0.25);
+        --c-white-72: rgba(248, 250, 252, 0.72);
+        --c-white-92: rgba(248, 250, 252, 0.92);
+        --c-slate-50: rgba(71, 85, 105, 0.5);
+        --c-sky-35: rgba(125, 211, 252, 0.35);
+        --c-halo-teal: rgba(14, 165, 164, 0.5);
+        --c-halo-blue: rgba(37, 99, 235, 0.5);
+        --c-halo-green: rgba(34, 197, 94, 0.5);
+        --c-edge-fade: rgba(125, 211, 252, 0);
+        --c-vignette-edge: rgba(0, 0, 0, 0.55);
+      }
+
+      @font-face {
+        font-family: "Inter";
+        font-style: normal;
+        font-weight: 400;
+        font-display: block;
+        src: url("./assets/fonts/inter-400.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Inter";
+        font-style: normal;
+        font-weight: 500;
+        font-display: block;
+        src: url("./assets/fonts/inter-500.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Inter";
+        font-style: normal;
+        font-weight: 600;
+        font-display: block;
+        src: url("./assets/fonts/inter-600.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Inter";
+        font-style: normal;
+        font-weight: 700;
+        font-display: block;
+        src: url("./assets/fonts/inter-700.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Inter";
+        font-style: normal;
+        font-weight: 800;
+        font-display: block;
+        src: url("./assets/fonts/inter-800.woff2") format("woff2");
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--c-black);
+      }
+
+      #stage {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--c-black);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+
+      .clip {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+      }
+
+      /* ---------- stage layers ---------- */
+
+      #stage-bg {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        opacity: 0;
+      }
+
+      #bg {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse 120% 100% at 50% 40%,
+          var(--c-bg-lift) 0%,
+          var(--c-bg-deep) 50%,
+          var(--c-bg-void) 100%
+        );
+      }
+
+      #vignette {
+        position: absolute;
+        inset: 0;
+        opacity: 0.28;
+        background: radial-gradient(
+          ellipse at center,
+          transparent 42%,
+          var(--c-vignette-edge) 100%
+        );
+      }
+
+      #aura {
+        position: absolute;
+        left: 510px;
+        top: -82px;
+        width: 900px;
+        height: 900px;
+        z-index: 1;
+        border-radius: 50%;
+        opacity: 0;
+        filter: blur(80px);
+        background: radial-gradient(
+          circle at 50% 50%,
+          var(--c-aura-teal) 0%,
+          var(--c-aura-blue) 50%,
+          transparent 75%
+        );
+        pointer-events: none;
+      }
+
+      #lockup-glow {
+        position: absolute;
+        left: 360px;
+        top: 207px;
+        width: 1200px;
+        height: 620px;
+        z-index: 2;
+        opacity: 0;
+        filter: blur(60px);
+        background: radial-gradient(
+          ellipse at 50% 50%,
+          var(--c-lockup-glow) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+
+      #grain {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        opacity: 0.035;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.55'/%3E%3C/svg%3E");
+        background-repeat: repeat;
+        background-size: 220px 220px;
+        pointer-events: none;
+      }
+
+      /* ---------- lockup ---------- */
+
+      #lockup-zone {
+        position: absolute;
+        inset: 0;
+        z-index: 3;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding-bottom: 46px;
+      }
+
+      #lockup {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      #mark-slot {
+        width: 240px;
+        height: 240px;
+      }
+
+      #mark-svg {
+        display: block;
+        width: 240px;
+        height: 240px;
+        overflow: visible;
+      }
+
+      #wordmark-row {
+        position: relative;
+        margin-top: 22px;
+      }
+
+      #wordmark {
+        display: block;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+        font-weight: 800;
+        font-size: 112px;
+        line-height: 1;
+        letter-spacing: -0.02em;
+        color: var(--c-white);
+        white-space: nowrap;
+        clip-path: inset(-14% 100% -14% 0%);
+      }
+
+      #wipe-edge {
+        position: absolute;
+        top: 50%;
+        left: 0;
+        margin-top: -67.2px;
+        width: 2px;
+        height: 134.4px;
+        opacity: 0;
+        background: linear-gradient(180deg, var(--c-sky), var(--c-edge-fade));
+        pointer-events: none;
+      }
+
+      #hairline {
+        position: relative;
+        width: 160px;
+        height: 1px;
+        margin-top: 6px;
+        background: var(--c-slate-50);
+      }
+
+      #hairline::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 20%;
+        right: 20%;
+        height: 1px;
+        background: var(--c-sky-35);
+      }
+
+      #tagline {
+        margin-top: 23px;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+        font-size: 36px;
+        font-weight: 500;
+        line-height: 1;
+        letter-spacing: 0.02em;
+        color: var(--c-white-72);
+        white-space: nowrap;
+      }
+
+      .tag-chunk {
+        display: inline-block;
+        vertical-align: top;
+        line-height: 1;
+        opacity: 0;
+      }
+
+      #pills {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        height: 48px;
+        margin-top: 50px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        height: 48px;
+        padding: 0 24px;
+        border-radius: 999px;
+        background: var(--c-pill-bg);
+        border: 1px solid var(--c-pill-border);
+        box-shadow: 0 8px 24px var(--c-pill-shadow);
+        opacity: 0;
+      }
+
+      #pill-1 {
+        --dot: var(--c-teal);
+        --dot-halo: var(--c-halo-teal);
+      }
+      #pill-2 {
+        --dot: var(--c-blue);
+        --dot-halo: var(--c-halo-blue);
+      }
+      #pill-3 {
+        --dot: var(--c-green);
+        --dot-halo: var(--c-halo-green);
+      }
+
+      .pill-dot {
+        display: block;
+        flex: 0 0 auto;
+        width: 6px;
+        height: 6px;
+        margin-right: 10px;
+        border-radius: 50%;
+        background: var(--dot);
+        box-shadow: 0 0 10px var(--dot-halo);
+        opacity: 0;
+      }
+
+      .pill-label {
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+        font-size: 20px;
+        font-weight: 600;
+        line-height: 1;
+        letter-spacing: 0.08em;
+        color: var(--c-white-92);
+        white-space: nowrap;
+      }
+
+      /* ---------- SVG mark ---------- */
+
+      #markGradientDark stop:nth-child(1) {
+        stop-color: var(--c-teal);
+      }
+      #markGradientDark stop:nth-child(2) {
+        stop-color: var(--c-blue);
+      }
+      #markGradientDark stop:nth-child(3) {
+        stop-color: var(--c-navylift);
+      }
+      #accentGradient stop:nth-child(1) {
+        stop-color: var(--c-sky);
+      }
+      #accentGradient stop:nth-child(2) {
+        stop-color: var(--c-green);
+      }
+
+      #mark-disc {
+        opacity: 0;
+      }
+
+      #mark-ring {
+        fill: none;
+        stroke: var(--c-sky);
+        stroke-width: 0.7;
+        stroke-opacity: 0.45;
+        stroke-linecap: round;
+      }
+
+      .mark-line {
+        fill: none;
+        stroke: var(--c-sky);
+        stroke-width: 3;
+        stroke-opacity: 0.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .node-a {
+        fill: var(--c-node-a);
+        opacity: 0;
+      }
+      .node-b {
+        fill: var(--c-node-b);
+        opacity: 0;
+      }
+      .node-c {
+        fill: var(--c-node-c);
+        opacity: 0;
+      }
+      .node-halo-a {
+        fill: var(--c-teal);
+        opacity: 0;
+      }
+      .node-halo-b {
+        fill: var(--c-blue);
+        opacity: 0;
+      }
+      .node-halo-c {
+        fill: var(--c-green);
+        opacity: 0;
+      }
+
+      #needle-main-stroke {
+        fill: none;
+        stroke: var(--c-white);
+        stroke-width: 0.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      #needle-main-fill {
+        fill: var(--c-white);
+        opacity: 0;
+      }
+
+      #accent-group {
+        opacity: 0;
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+
+      #needle-accent {
+        fill: url(#accentGradient);
+      }
+
+      #accent-glow {
+        fill: var(--c-sky);
+        opacity: 0;
+        filter: url(#accentGlowBlur);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Standalone root composition: the shot plan named compositions/index.html,
+         but the renderer reads the project root index.html, so the single
+         composition lives here. Composition id: main. -->
+    <div data-hf-id="hf-33ip"
+      id="stage"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="10"
+      data-fps="30"
+      data-width="1920"
+      data-height="1080"
+    >
+      <audio data-hf-id="hf-kpsx"
+        id="ambient-bed"
+        src="assets/audio/ambient-bed.wav"
+        data-start="0"
+        data-duration="10"
+        data-track-index="10"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":0},{"t":1.2,"v":0.9},{"t":8.4,"v":0.9},{"t":10,"v":0}]}]}'
+      ></audio>
+
+      <section data-hf-id="hf-4oi8"
+        id="lockup-clip"
+        class="clip"
+        data-start="0"
+        data-duration="10"
+        data-track-index="0"
+      >
+        <div data-hf-id="hf-ze7k" id="stage-bg" aria-hidden="true">
+          <div data-hf-id="hf-2xc0" id="bg"></div>
+          <div data-hf-id="hf-h7i3" id="vignette"></div>
+        </div>
+
+        <div data-hf-id="hf-4r06" id="aura" aria-hidden="true" data-layout-allow-overflow="true"></div>
+        <div data-hf-id="hf-3q76" id="lockup-glow" aria-hidden="true"></div>
+
+        <div data-hf-id="hf-ceui" id="lockup-zone">
+          <div data-hf-id="hf-mlav" id="lockup">
+            <div data-hf-id="hf-dqjf" id="mark-slot">
+              <svg data-hf-id="hf-p09r"
+                id="mark-svg"
+                width="240"
+                height="240"
+                viewBox="64 58 120 120"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                role="img"
+                aria-label="GeoCiteOps compass mark"
+              >
+                <defs data-hf-id="hf-mh0t">
+                  <linearGradient data-hf-id="hf-3fwj"
+                    id="markGradientDark"
+                    x1="54"
+                    y1="36"
+                    x2="190"
+                    y2="202"
+                    gradientUnits="userSpaceOnUse"
+                  >
+                    <stop data-hf-id="hf-boyk" offset="0" />
+                    <stop data-hf-id="hf-ydv1" offset="0.54" />
+                    <stop data-hf-id="hf-cgmd" offset="1" />
+                  </linearGradient>
+                  <linearGradient data-hf-id="hf-oipx"
+                    id="accentGradient"
+                    x1="71"
+                    y1="61"
+                    x2="160"
+                    y2="159"
+                    gradientUnits="userSpaceOnUse"
+                  >
+                    <stop data-hf-id="hf-urkk" offset="0" />
+                    <stop data-hf-id="hf-5ncp" offset="1" />
+                  </linearGradient>
+                  <filter data-hf-id="hf-0r7k"
+                    id="haloBlur"
+                    x="-150%"
+                    y="-150%"
+                    width="400%"
+                    height="400%"
+                    color-interpolation-filters="sRGB"
+                  >
+                    <feGaussianBlur data-hf-id="hf-qw3h" stdDeviation="3" />
+                  </filter>
+                  <filter data-hf-id="hf-p1ij"
+                    id="accentGlowBlur"
+                    x="-120%"
+                    y="-120%"
+                    width="340%"
+                    height="340%"
+                    color-interpolation-filters="sRGB"
+                  >
+                    <feGaussianBlur data-hf-id="hf-yod8" stdDeviation="2.2" />
+                  </filter>
+                </defs>
+
+                <g data-hf-id="hf-gi7k" id="mark-g">
+                  <path data-hf-id="hf-n982"
+                    id="mark-disc"
+                    d="M124 58C157.137 58 184 84.8629 184 118C184 151.137 157.137 178 124 178C90.8629 178 64 151.137 64 118C64 84.8629 90.8629 58 124 58Z"
+                    fill="url(#markGradientDark)"
+                  />
+                  <path data-hf-id="hf-v3xt"
+                    id="mark-ring"
+                    d="M124 58C157.137 58 184 84.8629 184 118C184 151.137 157.137 178 124 178C90.8629 178 64 151.137 64 118C64 84.8629 90.8629 58 124 58Z"
+                  />
+
+                  <g data-hf-id="hf-ywhi" id="mark-lines">
+                    <path data-hf-id="hf-3c80" id="line-a" class="mark-line" d="M90 92L110 103" />
+                    <path data-hf-id="hf-n3f0" id="line-b" class="mark-line" d="M160 145L137 128" />
+                    <path data-hf-id="hf-w7rp" id="line-c" class="mark-line" d="M92 153L111 130" />
+                  </g>
+
+                  <g data-hf-id="hf-0543" id="node-group-a">
+                    <circle data-hf-id="hf-r5dq"
+                      id="halo-a"
+                      class="node-halo-a"
+                      cx="83"
+                      cy="89"
+                      r="12.8"
+                      filter="url(#haloBlur)"
+                    />
+                    <circle data-hf-id="hf-xfp7" id="node-a" class="node-a" cx="83" cy="89" r="8" />
+                  </g>
+                  <g data-hf-id="hf-p9mg" id="node-group-b">
+                    <circle data-hf-id="hf-nu3a"
+                      id="halo-b"
+                      class="node-halo-b"
+                      cx="165"
+                      cy="147"
+                      r="12.8"
+                      filter="url(#haloBlur)"
+                    />
+                    <circle data-hf-id="hf-okd3" id="node-b" class="node-b" cx="165" cy="147" r="8" />
+                  </g>
+                  <g data-hf-id="hf-q1a9" id="node-group-c">
+                    <circle data-hf-id="hf-wlp8"
+                      id="halo-c"
+                      class="node-halo-c"
+                      cx="87"
+                      cy="155"
+                      r="9.6"
+                      filter="url(#haloBlur)"
+                    />
+                    <circle data-hf-id="hf-ugg9" id="node-c" class="node-c" cx="87" cy="155" r="6" />
+                  </g>
+
+                  <path data-hf-id="hf-m3e3"
+                    id="needle-main-stroke"
+                    d="M137.763 85.6832C141.967 83.6311 146.295 87.959 144.243 92.1625L130.372 120.575C129.921 121.499 129.175 122.245 128.251 122.696L99.8375 136.567C95.634 138.619 91.3061 134.291 93.3582 130.087L107.229 101.675C107.68 100.751 108.426 100.005 109.35 99.5538L137.763 85.6832Z"
+                  />
+                  <path data-hf-id="hf-wn18"
+                    id="needle-main-fill"
+                    d="M137.763 85.6832C141.967 83.6311 146.295 87.959 144.243 92.1625L130.372 120.575C129.921 121.499 129.175 122.245 128.251 122.696L99.8375 136.567C95.634 138.619 91.3061 134.291 93.3582 130.087L107.229 101.675C107.68 100.751 108.426 100.005 109.35 99.5538L137.763 85.6832Z"
+                  />
+
+                  <g data-hf-id="hf-g8bn" id="accent-group">
+                    <path data-hf-id="hf-k6ha"
+                      id="accent-glow"
+                      d="M122.105 110.851C126.075 108.913 130.162 113 128.224 116.97L124.479 124.641C124.053 125.514 123.348 126.219 122.475 126.645L114.804 130.39C110.834 132.328 106.747 128.241 108.685 124.271L112.43 116.6C112.856 115.727 113.561 115.022 114.434 114.596L122.105 110.851Z"
+                    />
+                    <path data-hf-id="hf-bw2e"
+                      id="needle-accent"
+                      d="M122.105 110.851C126.075 108.913 130.162 113 128.224 116.97L124.479 124.641C124.053 125.514 123.348 126.219 122.475 126.645L114.804 130.39C110.834 132.328 106.747 128.241 108.685 124.271L112.43 116.6C112.856 115.727 113.561 115.022 114.434 114.596L122.105 110.851Z"
+                    />
+                  </g>
+                </g>
+              </svg>
+            </div>
+
+            <div data-hf-id="hf-77k5" id="wordmark-row">
+              <div data-hf-id="hf-as0k" id="wordmark">GeoCiteOps</div>
+              <span data-hf-id="hf-iiw0" id="wipe-edge" aria-hidden="true"></span>
+            </div>
+
+            <div data-hf-id="hf-n78s" id="hairline" aria-hidden="true"></div>
+
+            <div data-hf-id="hf-vin9" id="tagline"
+              ><span data-hf-id="hf-rayy" class="tag-chunk">让</span>&#32;<span data-hf-id="hf-zm81" class="tag-chunk"
+                >AI 答案，</span
+              ><span data-hf-id="hf-w456" class="tag-chunk">引用</span><span data-hf-id="hf-dulq" class="tag-chunk"
+                >你的品牌</span
+              ></div
+            >
+
+            <div data-hf-id="hf-9c8n" id="pills">
+              <span data-hf-id="hf-ptsl" class="pill" id="pill-1">
+                <span data-hf-id="hf-rimx" class="pill-dot" aria-hidden="true"></span>
+                <span data-hf-id="hf-y82x" class="pill-label">监测</span>
+              </span>
+              <span data-hf-id="hf-trwm" class="pill" id="pill-2">
+                <span data-hf-id="hf-zg8d" class="pill-dot" aria-hidden="true"></span>
+                <span data-hf-id="hf-876n" class="pill-label">优化</span>
+              </span>
+              <span data-hf-id="hf-xq0n" class="pill" id="pill-3">
+                <span data-hf-id="hf-0n5g" class="pill-dot" aria-hidden="true"></span>
+                <span data-hf-id="hf-q66g" class="pill-label">结构化</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div data-hf-id="hf-ftr7" id="grain" aria-hidden="true"></div>
+      </section>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        var tl = gsap.timeline({ paused: true });
+
+        /* ---- measured path draw-on ---- */
+        function primeStroke(selector) {
+          var el = document.querySelector(selector);
+          var len = el.getTotalLength();
+          el.style.strokeDasharray = String(len);
+          el.style.strokeDashoffset = String(len);
+          return len;
+        }
+
+        var ringLen = primeStroke("#mark-ring");
+        var lineALen = primeStroke("#line-a");
+        var lineBLen = primeStroke("#line-b");
+        var lineCLen = primeStroke("#line-c");
+        var needleLen = primeStroke("#needle-main-stroke");
+        var wordmarkWidth = document
+          .getElementById("wordmark-row")
+          .getBoundingClientRect().width;
+
+        /* ---- held initial states (safe for non-linear seeks) ---- */
+        tl.set("#stage-bg", { opacity: 0 }, 0);
+        tl.set("#aura", { opacity: 0 }, 0);
+        tl.set("#lockup-glow", { opacity: 0 }, 0);
+        tl.set("#mark-ring", { strokeDashoffset: ringLen }, 0);
+        tl.set("#line-a", { strokeDashoffset: lineALen }, 0);
+        tl.set("#line-b", { strokeDashoffset: lineBLen }, 0);
+        tl.set("#line-c", { strokeDashoffset: lineCLen }, 0);
+        tl.set("#mark-disc", { opacity: 0 }, 0);
+        tl.set("#node-a", { scale: 0.86, opacity: 0, svgOrigin: "83 89" }, 0);
+        tl.set("#node-b", { scale: 0.86, opacity: 0, svgOrigin: "165 147" }, 0);
+        tl.set("#node-c", { scale: 0.86, opacity: 0, svgOrigin: "87 155" }, 0);
+        tl.set("#halo-a", { scale: 0.6, opacity: 0, svgOrigin: "83 89" }, 0);
+        tl.set("#halo-b", { scale: 0.6, opacity: 0, svgOrigin: "165 147" }, 0);
+        tl.set("#halo-c", { scale: 0.6, opacity: 0, svgOrigin: "87 155" }, 0);
+        tl.set(
+          "#needle-main-stroke",
+          { strokeDashoffset: needleLen },
+          0
+        );
+        tl.set("#needle-main-fill", { opacity: 0 }, 0);
+        tl.set(
+          "#accent-group",
+          { scale: 0.6, opacity: 0, svgOrigin: "118.5 118.6" },
+          0
+        );
+        tl.set("#accent-glow", { opacity: 0 }, 0);
+        tl.set("#mark-svg", { scale: 1 }, 0);
+        tl.set(
+          "#wordmark",
+          { clipPath: "inset(-14% 100% -14% 0%)" },
+          0
+        );
+        tl.set("#wipe-edge", { x: 0, opacity: 0 }, 0);
+        tl.set("#hairline", { scaleX: 0 }, 0);
+        tl.set(
+          ".tag-chunk",
+          { y: 26, opacity: 0, filter: "blur(8px)" },
+          0
+        );
+        tl.set(".pill", { scale: 0.86, y: 10, opacity: 0 }, 0);
+        tl.set(".pill-dot", { scale: 0.4, opacity: 0 }, 0);
+        tl.set("#lockup", { scale: 1 }, 0);
+
+        /* ---- stage and aura ---- */
+        tl.fromTo(
+          "#stage-bg",
+          { opacity: 0 },
+          { opacity: 1, duration: 0.55, ease: "power2.out" },
+          0
+        );
+        tl.fromTo(
+          "#aura",
+          { opacity: 0 },
+          { opacity: 0.3, duration: 0.55, ease: "power2.out" },
+          0
+        );
+        tl.fromTo(
+          "#aura",
+          { opacity: 0.3 },
+          {
+            opacity: 0.55,
+            duration: 0.45,
+            ease: "sine.out",
+            immediateRender: false,
+          },
+          2.35
+        );
+        tl.fromTo(
+          "#aura",
+          { opacity: 0.55 },
+          {
+            opacity: 0.34,
+            duration: 1.4,
+            ease: "sine.inOut",
+            immediateRender: false,
+          },
+          2.8
+        );
+        tl.fromTo(
+          "#aura",
+          { opacity: 0.34 },
+          {
+            opacity: 0.38,
+            duration: 1.65,
+            ease: "sine.inOut",
+            immediateRender: false,
+          },
+          8.35
+        );
+
+        /* ---- citation nodes and halos ---- */
+        tl.fromTo(
+          "#node-a",
+          { scale: 0.86, opacity: 0 },
+          {
+            scale: 1,
+            opacity: 1,
+            duration: 0.35,
+            ease: "back.out(1.8)",
+            svgOrigin: "83 89",
+          },
+          0.5
+        );
+        tl.fromTo(
+          "#halo-a",
+          { scale: 0.6, opacity: 0 },
+          {
+            scale: 1,
+            opacity: 0.45,
+            duration: 0.45,
+            ease: "back.out(1.8)",
+            svgOrigin: "83 89",
+          },
+          0.5
+        );
+        tl.fromTo(
+          "#node-b",
+          { scale: 0.86, opacity: 0 },
+          {
+            scale: 1,
+            opacity: 1,
+            duration: 0.35,
+            ease: "back.out(1.8)",
+            svgOrigin: "165 147",
+          },
+          0.64
+        );
+        tl.fromTo(
+          "#halo-b",
+          { scale: 0.6, opacity: 0 },
+          {
+            scale: 1,
+            opacity: 0.45,
+            duration: 0.45,
+            ease: "back.out(1.8)",
+            svgOrigin: "165 147",
+          },
+          0.64
+        );
+        tl.fromTo(
+          "#node-c",
+          { scale: 0.86, opacity: 0 },
+          {
+            scale: 1,
+            opacity: 1,
+            duration: 0.35,
+            ease: "back.out(1.8)",
+            svgOrigin: "87 155",
+          },
+          0.78
+        );
+        tl.fromTo(
+          "#halo-c",
+          { scale: 0.6, opacity: 0 },
+          {
+            scale: 1,
+            opacity: 0.45,
+            duration: 0.45,
+            ease: "back.out(1.8)",
+            svgOrigin: "87 155",
+          },
+          0.78
+        );
+
+        /* ---- connectors ---- */
+        tl.fromTo(
+          "#line-a",
+          { strokeDashoffset: lineALen },
+          { strokeDashoffset: 0, duration: 0.55, ease: "power2.inOut" },
+          0.7
+        );
+        tl.fromTo(
+          "#line-b",
+          { strokeDashoffset: lineBLen },
+          { strokeDashoffset: 0, duration: 0.55, ease: "power2.inOut" },
+          0.85
+        );
+        tl.fromTo(
+          "#line-c",
+          { strokeDashoffset: lineCLen },
+          { strokeDashoffset: 0, duration: 0.55, ease: "power2.inOut" },
+          1.0
+        );
+
+        /* ---- ring, disc, needle ---- */
+        tl.fromTo(
+          "#mark-ring",
+          { strokeDashoffset: ringLen },
+          { strokeDashoffset: 0, duration: 1.0, ease: "power2.inOut" },
+          1.4
+        );
+        tl.fromTo(
+          "#mark-disc",
+          { opacity: 0 },
+          { opacity: 1, duration: 0.55, ease: "power2.out" },
+          2.05
+        );
+        tl.fromTo(
+          "#needle-main-stroke",
+          { strokeDashoffset: needleLen },
+          { strokeDashoffset: 0, duration: 0.7, ease: "power2.inOut" },
+          2.45
+        );
+        tl.fromTo(
+          "#needle-main-fill",
+          { opacity: 0 },
+          { opacity: 1, duration: 0.4, ease: "power2.out" },
+          2.95
+        );
+
+        /* ---- accent pointer spring + one glow pulse ---- */
+        tl.fromTo(
+          "#accent-group",
+          { scale: 0.6, opacity: 0 },
+          {
+            scale: 1,
+            opacity: 1,
+            duration: 0.35,
+            ease: "back.out(2.2)",
+            transformOrigin: "50% 50%",
+          },
+          3.1
+        );
+        tl.fromTo(
+          "#accent-glow",
+          { opacity: 0 },
+          { opacity: 0.55, duration: 0.1, ease: "sine.out" },
+          3.25
+        );
+        tl.fromTo(
+          "#accent-glow",
+          { opacity: 0.55 },
+          {
+            opacity: 0.1,
+            duration: 0.45,
+            ease: "sine.inOut",
+            immediateRender: false,
+          },
+          3.35
+        );
+
+        /* ---- mark settle ---- */
+        tl.fromTo(
+          "#mark-svg",
+          { scale: 1.04 },
+          { scale: 1.0, duration: 0.4, ease: "power2.out" },
+          3.55
+        );
+
+        /* ---- wordmark clip wipe ---- */
+        tl.fromTo(
+          "#wordmark",
+          { clipPath: "inset(-14% 100% -14% 0%)" },
+          {
+            clipPath: "inset(-14% -2% -14% 0%)",
+            duration: 0.7,
+            ease: "power3.inOut",
+          },
+          3.9
+        );
+        tl.fromTo(
+          "#wipe-edge",
+          { x: 0 },
+          { x: wordmarkWidth, duration: 0.7, ease: "power3.inOut" },
+          3.9
+        );
+        tl.fromTo(
+          "#wipe-edge",
+          { opacity: 0 },
+          { opacity: 0.9, duration: 0.2, ease: "power1.out" },
+          3.9
+        );
+        tl.to(
+          "#wipe-edge",
+          { opacity: 0, duration: 0.5, ease: "power2.in" },
+          4.1
+        );
+
+        /* ---- hairline ---- */
+        tl.fromTo(
+          "#hairline",
+          { scaleX: 0 },
+          {
+            scaleX: 1,
+            duration: 0.4,
+            ease: "power2.out",
+            transformOrigin: "50% 50%",
+          },
+          4.7
+        );
+
+        /* ---- tagline chunks ---- */
+        tl.fromTo(
+          ".tag-chunk",
+          { y: 26, opacity: 0, filter: "blur(8px)" },
+          {
+            y: 0,
+            opacity: 1,
+            filter: "blur(0px)",
+            duration: 0.55,
+            ease: "power3.out",
+            stagger: 0.12,
+          },
+          5.3
+        );
+
+        /* ---- capability pills + dots ---- */
+        tl.fromTo(
+          ".pill",
+          { scale: 0.86, y: 10, opacity: 0 },
+          {
+            scale: 1,
+            y: 0,
+            opacity: 1,
+            duration: 0.45,
+            ease: "back.out(1.8)",
+            stagger: 0.22,
+          },
+          6.9
+        );
+        tl.fromTo(
+          ".pill-dot",
+          { scale: 0.4, opacity: 0 },
+          {
+            scale: 1,
+            opacity: 1,
+            duration: 0.45,
+            ease: "back.out(3)",
+            stagger: 0.22,
+          },
+          6.96
+        );
+
+        /* ---- one lockup glow pulse ---- */
+        tl.fromTo(
+          "#lockup-glow",
+          { opacity: 0 },
+          { opacity: 0.32, duration: 0.2, ease: "sine.out" },
+          7.8
+        );
+        tl.fromTo(
+          "#lockup-glow",
+          { opacity: 0.32 },
+          {
+            opacity: 0.1,
+            duration: 0.7,
+            ease: "sine.inOut",
+            immediateRender: false,
+          },
+          8.0
+        );
+
+        /* ---- held breath into the final lockup ---- */
+        tl.fromTo(
+          "#lockup",
+          { scale: 1.0 },
+          { scale: 1.012, duration: 1.65, ease: "sine.inOut" },
+          8.35
+        );
+
+        /* ---- deterministic grain loop ---- */
+        tl.fromTo(
+          "#grain",
+          { opacity: 0.035 },
+          {
+            opacity: 0.05,
+            duration: 0.5,
+            yoyo: true,
+            repeat: 19,
+            ease: "sine.inOut",
+          },
+          0
+        );
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["main"] = tl;
+        tl.seek(0);
+      })();
+    </script>
+  </body>
+</html>
