@@ -9,7 +9,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "dev:web": "pnpm --filter geo-web dev",
+    "dev:web": "pnpm --filter geociteops-web dev",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/src/server.js",
     "test": "vitest run",
