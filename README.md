@@ -25,22 +25,28 @@ GeoCiteOps is an end-to-end **Generative Engine Optimization (GEO)** platform. I
 
 > GEO improves how likely your content is to be cited by AI answer engines, just as SEO improves visibility on search results pages.
 
-## Demo
+## Screenshots
 
-<!--
-  Demo recording slot — asciinema SVG cast (preferred over GIF: does not bloat the repo).
+Captured from the bundled demo dataset with the read-only demo account.
 
-  How to record (with the stack running locally):
-
-    asciinema rec -c "pnpm demo:reset && pnpm dev" demo.cast
-    svg-term --in=demo.cast --out=docs/assets/demo.svg --theme=monokai
-
-  Save the artifact to docs/assets/demo.svg, then uncomment the line below:
-
-  <img src="./docs/assets/demo.svg" alt="GeoCiteOps demo: citation monitoring to SOV report" width="800" />
-
-  Live read-only demo: https://geo.gsgroup.club
--->
+<table>
+  <tr>
+    <td width="50%" align="center"><img src="./docs/screenshots/dashboard.png" alt="Dashboard" width="440" /><br /><sub><b>Dashboard</b> — SOV trend, monitoring coverage, pending reviews</sub></td>
+    <td width="50%" align="center"><img src="./docs/screenshots/citation-sov.png" alt="SOV analytics" width="440" /><br /><sub><b>SOV analytics</b> — share of voice and mentions by AI engine</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="./docs/screenshots/query-library.png" alt="Query library" width="440" /><br /><sub><b>Query library</b> — monitored prompts, source and schedule</sub></td>
+    <td width="50%" align="center"><img src="./docs/screenshots/citation-effect.png" alt="Effect comparison" width="440" /><br /><sub><b>Effect comparison</b> — before/after SOV and mention-rate deltas</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="./docs/screenshots/loop-board.png" alt="Closed-loop board" width="440" /><br /><sub><b>Closed-loop board</b> — weak query → action → verification → Δ</sub></td>
+    <td width="50%" align="center"><img src="./docs/screenshots/content-tasks.png" alt="Optimization tasks" width="440" /><br /><sub><b>Optimization tasks</b> — review and publish pipeline with score deltas</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="./docs/screenshots/content-pages.png" alt="Content pages" width="440" /><br /><sub><b>Content pages</b> — pages under optimization with GEO scores</sub></td>
+    <td width="50%" align="center"><img src="./docs/screenshots/kg-graph.png" alt="Knowledge graph" width="440" /><br /><sub><b>Knowledge graph</b> — entity/relation graph with JSON-LD export</sub></td>
+  </tr>
+</table>
 
 ## Why GeoCiteOps
 
@@ -114,7 +120,7 @@ docker compose up -d
 
 The stack runs four services — `db` (PostgreSQL + pgvector), `migrate` (one-shot `prisma migrate deploy`), `app` (API + all background workers), and `web` (nginx serving the built console). Open **http://localhost:5170/login**.
 
-> Deploying to your own server (demo site, DNS + HTTPS, daily reset cron, ghcr images, npm publish)?
+> Deploying to your own server (DNS + HTTPS, daily reset cron, ghcr images, npm publish)?
 > See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
 >
 > How every metric is computed (SOV, weak points, citation attribution tiers, coverage, loop Δ) → [docs/METRICS.md](./docs/METRICS.md).
@@ -145,7 +151,7 @@ The session cookie is named `__Host-geo_sid` by default (`src/platform/identity/
 | --- | --- |
 | `http://localhost:5170` | Works as-is. Browsers treat localhost as a secure context. |
 | Bare IP over HTTP, e.g. `http://203.0.113.10:5170` | **Set `GEO_COOKIE_NAME=geo_sid`** in `.env` (drop the `__Host-` prefix), or put the deployment behind HTTPS. |
-| HTTPS (e.g. `geo.gsgroup.club`) | Keep the default `__Host-geo_sid` — it is strictly more protective. |
+| HTTPS (e.g. `geo.example.com`) | Keep the default `__Host-geo_sid` — it is strictly more protective. |
 
 ### Option B — Local development with pnpm
 
@@ -386,6 +392,13 @@ pnpm test:watch
 ## Contributing
 
 Issues and pull requests are welcome. Please open an issue first to discuss large changes — see [CONTRIBUTING.md](./CONTRIBUTING.md) for branch naming, commit style, and the test requirements for new code. By contributing, you agree that your contributions are licensed under the MIT License.
+
+## Contact
+
+For questions, bug reports, or collaboration:
+
+- QQ: **395112951**
+- Email: **letheliuxin@agent.qq.com**
 
 ## License
 

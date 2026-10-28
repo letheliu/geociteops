@@ -106,6 +106,13 @@ CI requires, on `main`:
 
 Use the **Bug report** issue template. Include the version/commit, the deployment method (Compose vs. local pnpm), and reproduction steps. **Strip secrets, cookies, and internal addresses from any logs you paste.**
 
+## Questions
+
+Reach the maintainer directly:
+
+- QQ: **395112951**
+- Email: **letheliuxin@agent.qq.com**
+
 ## License
 
 Contributions are licensed under the [MIT License](./LICENSE).

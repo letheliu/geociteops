@@ -25,22 +25,28 @@ GeoCiteOps 是一套端到端的**生成式引擎优化（Generative Engine Opti
 
 > GEO 优化的是内容被 AI 回答引擎引用的概率，正如 SEO 优化的是网页在搜索结果页中的可见性。
 
-## 演示
+## 截图
 
-<!--
-  演示录像位——asciinema SVG cast（优先于 GIF：不膨胀仓库体积）。
+以下截图来自内置演示数据集（使用只读演示账号）。
 
-  录制方式（本地起好栈后执行）：
-
-    asciinema rec -c "pnpm demo:reset && pnpm dev" demo.cast
-    svg-term --in=demo.cast --out=docs/assets/demo.svg --theme=monokai
-
-  产物放到 docs/assets/demo.svg 后，取消下面这行的注释：
-
-  <img src="./docs/assets/demo.svg" alt="GeoCiteOps 演示：引用监测到 SOV 报告" width="800" />
-
-  在线只读演示站：https://geo.gsgroup.club
--->
+<table>
+  <tr>
+    <td width="50%" align="center"><img src="./docs/screenshots/dashboard.png" alt="仪表盘" width="440" /><br /><sub><b>仪表盘</b> — SOV 趋势、监测覆盖与待审核</sub></td>
+    <td width="50%" align="center"><img src="./docs/screenshots/citation-sov.png" alt="SOV 分析" width="440" /><br /><sub><b>SOV 分析</b> — 各 AI 引擎的声音份额与提及统计</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="./docs/screenshots/query-library.png" alt="查询库" width="440" /><br /><sub><b>查询库</b> — 监测问题、来源与定时配置</sub></td>
+    <td width="50%" align="center"><img src="./docs/screenshots/citation-effect.png" alt="效果对比" width="440" /><br /><sub><b>效果对比</b> — 优化前后 SOV 与提及率变化</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="./docs/screenshots/loop-board.png" alt="闭环看板" width="440" /><br /><sub><b>闭环看板</b> — 薄弱查询 → 动作 → 验证 → Δ</sub></td>
+    <td width="50%" align="center"><img src="./docs/screenshots/content-tasks.png" alt="优化任务" width="440" /><br /><sub><b>优化任务</b> — 审核与发布流水线及分数变化</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="./docs/screenshots/content-pages.png" alt="内容页面" width="440" /><br /><sub><b>内容页面</b> — 待优化页面与 GEO 评分</sub></td>
+    <td width="50%" align="center"><img src="./docs/screenshots/kg-graph.png" alt="图谱可视化" width="440" /><br /><sub><b>图谱可视化</b> — 实体/关系图与 JSON-LD 导出</sub></td>
+  </tr>
+</table>
 
 ## 为什么需要 GeoCiteOps
 
@@ -114,7 +120,7 @@ docker compose up -d
 
 整栈四个服务：`db`（PostgreSQL + pgvector）、`migrate`（一次性 `prisma migrate deploy`）、`app`（API + 全部后台 worker）、`web`（nginx 托管前端产物）。浏览器打开 **http://localhost:5170/login**。
 
-> 要部署到自己服务器（演示站、DNS + HTTPS、每日重置 cron、ghcr 镜像、npm 发布）？
+> 要部署到自己服务器（DNS + HTTPS、每日重置 cron、ghcr 镜像、npm 发布）？
 > 见 [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)。
 >
 > 每个指标如何计算（SOV、薄弱点、引用归因分层、覆盖率、闭环 Δ）→ [docs/METRICS.md](./docs/METRICS.md)。
@@ -145,7 +151,7 @@ docker compose exec app tsx scripts/reset-demo.mjs
 | --- | --- |
 | `http://localhost:5170` | 保持默认即可，浏览器把 localhost 视为可信上下文。 |
 | 裸 IP + 纯 HTTP，如 `http://203.0.113.10:5170` | **必须**在 `.env` 设 `GEO_COOKIE_NAME=geo_sid`（去掉 `__Host-` 前缀），或改走 HTTPS。 |
-| HTTPS（如 `geo.gsgroup.club`） | 保持默认 `__Host-geo_sid`，保护更强，不要改。 |
+| HTTPS（如 `geo.example.com`） | 保持默认 `__Host-geo_sid`，保护更强，不要改。 |
 
 ### 方式 B：本机 pnpm 开发
 
@@ -385,6 +391,13 @@ pnpm test:watch
 ## 参与贡献
 
 欢迎提交 Issue 和 Pull Request。较大的改动请先开 Issue 讨论——分支命名、commit 风格、新代码的测试要求见 [CONTRIBUTING.md](./CONTRIBUTING.md)。提交贡献即表示你同意以 MIT 协议授权。
+
+## 联系方式
+
+有问题、想反馈 Bug 或洽谈合作，欢迎联系：
+
+- QQ：**395112951**
+- 邮箱：**letheliuxin@agent.qq.com**
 
 ## 许可证
 
