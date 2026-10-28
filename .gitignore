@@ -41,3 +41,6 @@ docs/specs/
 # hyperframes 视频工程的可再生缓存（缩略图/波形）
 videos/**/.thumbnails/
 videos/**/.waveform-cache/
+.video-creater-tmp/
+videos/
+
