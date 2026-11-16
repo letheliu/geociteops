@@ -59,6 +59,9 @@ function makeServices() {
     agentReadiness: {
       list: vi.fn().mockResolvedValue([]),
     },
+    geoHealth: {
+      list: vi.fn().mockResolvedValue([]),
+    },
   }
 }
 
@@ -166,6 +169,15 @@ describe('SDK 通道兼容（真实 appRouter.createCaller + apiKey actor）', (
     await caller.agentReadiness.list({ limit: 5 })
 
     expect(services.agentReadiness.list).toHaveBeenCalledWith('ws-1', 5)
+  })
+
+  it('geoHealth.list 收到的 workspaceId 来自 ctx.workspace.id', async () => {
+    const services = makeServices()
+    const caller = makeSdkCaller(services)
+
+    await caller.geoHealth.list({ limit: 5 })
+
+    expect(services.geoHealth.list).toHaveBeenCalledWith('ws-1', 5)
   })
 
   it('diagnostic.projects.list 收到的 workspaceId 来自 ctx.workspace.id', async () => {

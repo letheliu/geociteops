@@ -56,6 +56,11 @@ const menuOptions: MenuOption[] = [
     icon: renderIcon('📊'),
   } as MenuOption,
   {
+    label: 'GEO 体检',
+    key: 'geo-health',
+    icon: renderIcon('🩺'),
+  } as MenuOption,
+  {
     label: '引用监测',
     key: 'citation-group',
     type: 'group',

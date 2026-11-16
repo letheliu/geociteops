@@ -260,6 +260,11 @@ export const router = createRouter({
               component: () => import('../views/kg/Graph.vue'),
             },
             {
+              path: 'geo-health',
+              name: 'geo-health',
+              component: () => import('../views/geo-health/Check.vue'),
+            },
+            {
               path: 'agent-readiness',
               name: 'agent-readiness',
               component: () => import('../views/agent-readiness/Audit.vue'),
@@ -400,6 +405,7 @@ const TITLE_MAP: Record<string, string> = {
   'kg-relations': '关系管理',
   'kg-graph': '图谱可视化',
   settings: '设置',
+  'geo-health': 'GEO 体检',
   'agent-readiness': 'Agent 就绪',
   'diagnostic-projects': '诊断项目',
   'diagnostic-project-create': '新建项目',

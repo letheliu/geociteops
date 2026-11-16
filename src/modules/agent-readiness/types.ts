@@ -1,8 +1,8 @@
 /**
  * Versioned audit report.
  *
- * Step 2 (one-click GEO health check) should embed this object as
- * `agentReadiness: AgentReadinessReport` instead of flattening checks.
+ * The GEO health check embeds this object as
+ * `pillars.agentReadiness.report` instead of flattening checks.
  * Bump `version` if a field changes meaning.
  */
 export const AGENT_READINESS_REPORT_VERSION = 1 as const

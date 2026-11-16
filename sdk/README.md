@@ -42,7 +42,14 @@ const task = await geo.content.optimize.mutate({ pageId: '...' })
 
 // Queue an Agent Readiness audit, then read the stored report
 const audit = await geo.agentReadiness.start.mutate({ url: 'https://example.com/' })
-const report = await geo.agentReadiness.get.query({ id: audit.id })
+const readiness = await geo.agentReadiness.get.query({ id: audit.id })
+
+// One-click GEO health check. Poll geo.geoHealth.get until status is SUCCEEDED or PARTIAL.
+const check = await geo.geoHealth.start.mutate({
+  brandName: 'Acme',
+  siteUrl: 'https://acme.example/',
+})
+const health = await geo.geoHealth.get.query({ id: check.id })
 ```
 
 ## Authentication

@@ -50,6 +50,7 @@ GeoCiteOps is an end-to-end **Generative Engine Optimization (GEO)** platform. I
 | Make content easier to cite | Break long-form pages into citable atoms, score them, rewrite weak segments, and generate FAQ-style answers. |
 | Publish machine-readable context | Generate Schema.org JSON-LD, `llms.txt`, and knowledge graph exports for AI crawlers and downstream systems. |
 | Know if AI crawlers can use the site | Run an Agent Readiness audit: robots.txt per crawler, `llms.txt`, sitemap, page signals, markdown, and whether a bot user-agent is blocked. |
+| See the whole picture on day one | Run a GEO health check: readiness, a one-shot citation snapshot, citability of key pages, and Schema.org / llms.txt, with a short action list. See [docs/geo-health.md](./docs/geo-health.md). |
 
 ## Core Capabilities
 
@@ -59,6 +60,7 @@ GeoCiteOps is an end-to-end **Generative Engine Optimization (GEO)** platform. I
 | Content optimization | Atomization, AI-friendliness scoring, rewriting, FAQ generation, and E-E-A-T checks. |
 | Structured signals | Schema.org builders for `SoftwareApplication`, `Organization`, `FAQPage`, and more, plus `llms.txt` generation. |
 | Agent Readiness | Score a URL for AI crawlers and answer engines, with prioritized fixes. See [docs/agent-readiness.md](./docs/agent-readiness.md). |
+| GEO health check | One form, one report: readiness, citations, citability, and structured signals, plus the top actions. See [docs/geo-health.md](./docs/geo-health.md). |
 | Knowledge graph | Entity and relation extraction with JSON / RDF export. |
 | Multi-tenant runtime | Workspace isolation, per-workspace platform credentials, API keys, and typed SDK access. |
 
@@ -67,18 +69,19 @@ GeoCiteOps is an end-to-end **Generative Engine Optimization (GEO)** platform. I
 ```text
 ┌──────────────────────────────────────────────────────┐
 │ Web Console (Vue 3 + Naive UI + Vite)                │
-│ Dashboard · Query Library · Reports · Content · KG   │
-│ Agent Readiness                                      │
+│ Dashboard · GEO Health · Query Library · Reports     │
+│ Content · KG · Agent Readiness                       │
 ├──────────────────────────────────────────────────────┤
 │ API Gateway (Fastify + tRPC)                         │
 │ workspace · citation · content · tasks · schema · kg │
-│ agentReadiness                                       │
+│ agentReadiness · geoHealth                           │
 ├──────────────────────────────────────────────────────┤
 │ Core Services                                        │
 │ Citation Monitor + Platform Adapters                 │
 │ Content Optimizer (atomize → score → rewrite)        │
 │ Schema Generator (JSON-LD + llms.txt)                │
 │ Agent Readiness (crawler audit + scored report)      │
+│ GEO Health Check (one-shot onboarding report)        │
 │ Knowledge Graph (entity / relation extraction)       │
 │ LLM Provider · Vector Store (Zvec) · Queue (pg-boss) │
 ├──────────────────────────────────────────────────────┤
@@ -364,8 +367,9 @@ src/
 │   ├── content-optimizer/# atomizer, scoring, rewriter, FAQ, E-E-A-T, orchestrator
 │   ├── schema-generator/ # JSON-LD builder, llms.txt builder, validator, registry
 │   ├── agent-readiness/  # crawler audit, SSRF-safe fetch, scored report
+│   ├── geo-health/       # one-click health check, score, action list
 │   └── knowledge-graph/  # extractor, repository, exporter
-├── workers/              # citation scheduler, agent-readiness audit (pg-boss)
+├── workers/              # citation scheduler, readiness audit, health check (pg-boss)
 └── router.ts             # root tRPC router
 sdk/                      # typed tRPC client (@geociteops/sdk)
 web/                      # Vue 3 admin console (geo-web)
@@ -385,6 +389,7 @@ pnpm test:watch
 - [x] Content atomization, scoring, and rewriting
 - [x] JSON-LD and `llms.txt` generation
 - [x] Agent Readiness audit (robots, llms.txt, sitemap, page signals, markdown, bot access)
+- [x] One-click GEO health check (readiness + citations + citability + structured signals)
 - [x] Knowledge graph extraction and export
 - [x] Containerized one-command deployment (Docker Compose, four services)
 - [ ] Closed-loop automation: monitoring → optimization suggestion → publish

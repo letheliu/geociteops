@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { NCard, NGrid, NGridItem, NStatistic, NSpace, NEmpty, NSpin, NTag, NRadioGroup, NRadioButton, NButton } from 'naive-ui'
+import { NCard, NGrid, NGridItem, NStatistic, NSpace, NEmpty, NSpin, NTag, NRadioGroup, NRadioButton, NButton, NText } from 'naive-ui'
+import { useRouter } from 'vue-router'
 import { trpc } from '../composables/useTrpc'
 import TrendChart, { type TrendPoint } from '../components/TrendChart.vue'
 
+const router = useRouter()
 const loading = ref(true)
 const sovScore = ref<number>(0)
 const mentionRate = ref<number | null>(null)
@@ -62,8 +64,17 @@ onMounted(() => loadData(7))
           <NRadioButton :value="30">近 30 天</NRadioButton>
           <NRadioButton :value="90">近 90 天</NRadioButton>
         </NRadioGroup>
-        <NButton quaternary @click="loadData()">🔄 刷新</NButton>
+        <NSpace>
+          <NButton type="primary" secondary @click="router.push({ name: 'geo-health' })">GEO 体检</NButton>
+          <NButton quaternary @click="loadData()">🔄 刷新</NButton>
+        </NSpace>
       </NSpace>
+      <NCard v-if="!loading && queryCount === 0 && validSamples === 0" title="先做一次 GEO 体检" style="margin-bottom: 8px">
+        <NText depth="3" style="display: block; margin-bottom: 12px">
+          新工作区不用先把监测配齐。填品牌名和官网，几分钟内得到总分、引用快照和一份按影响排序的行动清单。没配凭证的引擎会跳过，并写在报告里。
+        </NText>
+        <NButton type="primary" @click="router.push({ name: 'geo-health' })">开始体检</NButton>
+      </NCard>
       <NGrid :cols="4" :x-gap="16" :y-gap="16" responsive="screen" item-responsive>
         <NGridItem span="4 m:2 l:1">
           <NCard>

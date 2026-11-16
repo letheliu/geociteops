@@ -50,6 +50,7 @@ GeoCiteOps 是一套端到端的**生成式引擎优化（Generative Engine Opti
 | 让内容更容易被引用 | 将长内容拆成可独立引用的原子单元，逐段评分，改写薄弱段落，并生成 FAQ 风格答案。 |
 | 发布机器可读的品牌上下文 | 生成 Schema.org JSON-LD、`llms.txt` 与知识图谱导出，服务 AI 爬虫和下游系统。 |
 | 知道 AI 爬虫能不能用这个站 | 跑一次 Agent 就绪审计：按爬虫解析 robots.txt、检查 `llms.txt`、站点地图、页面信号、Markdown，以及机器人 User-Agent 是否被拦截。 |
+| 第一天就看到全貌 | 做一次 GEO 体检：就绪、一轮引用快照、关键页可引用性、Schema.org / llms.txt，外加一份短的行动清单。见 [docs/geo-health.md](./docs/geo-health.md)。 |
 
 ## 核心能力
 
@@ -59,6 +60,7 @@ GeoCiteOps 是一套端到端的**生成式引擎优化（Generative Engine Opti
 | 内容优化 | 内容原子化、AI 友好度评分、自动改写、FAQ 生成与 E-E-A-T 校验。 |
 | 结构化信号 | 生成 `SoftwareApplication`、`Organization`、`FAQPage` 等 Schema.org JSON-LD，并输出 `llms.txt`。 |
 | Agent 就绪 | 给一个 URL 打分，说明它对 AI 爬虫和回答引擎准备得怎么样，并按影响度列出修复项。见 [docs/agent-readiness.md](./docs/agent-readiness.md)。 |
+| GEO 体检 | 一张表单、一份报告：就绪、引用、可引用性和结构化信号，加上最优先的行动。见 [docs/geo-health.md](./docs/geo-health.md)。 |
 | 知识图谱 | 抽取实体与关系，支持 JSON / RDF 导出。 |
 | 多租户运行时 | 工作区隔离、工作区级平台凭证、API Key 与类型化 SDK 访问。 |
 
@@ -67,18 +69,19 @@ GeoCiteOps 是一套端到端的**生成式引擎优化（Generative Engine Opti
 ```text
 ┌──────────────────────────────────────────────────────┐
 │ Web 控制台（Vue 3 + Naive UI + Vite）                │
-│ 仪表盘 · 查询库 · 引用报告 · 内容优化 · 知识图谱       │
-│ Agent 就绪                                           │
+│ 仪表盘 · GEO 体检 · 查询库 · 引用报告 · 内容优化     │
+│ 知识图谱 · Agent 就绪                                │
 ├──────────────────────────────────────────────────────┤
 │ API 网关（Fastify + tRPC）                           │
 │ workspace · citation · content · tasks · schema · kg │
-│ agentReadiness                                       │
+│ agentReadiness · geoHealth                           │
 ├──────────────────────────────────────────────────────┤
 │ 核心服务                                             │
 │ 引用监测器 + 平台适配器                              │
 │ 内容优化器（原子化 → 评分 → 改写）                   │
 │ Schema 生成器（JSON-LD + llms.txt）                  │
 │ Agent 就绪（爬虫审计 + 评分报告）                    │
+│ GEO 体检（一次跑完的上手报告）                       │
 │ 知识图谱（实体 / 关系抽取）                          │
 │ LLM Provider · 向量库（Zvec）· 任务队列（pg-boss）   │
 ├──────────────────────────────────────────────────────┤
@@ -363,8 +366,9 @@ src/
 │   ├── content-optimizer/# 原子化、评分、改写、FAQ、E-E-A-T、编排器
 │   ├── schema-generator/ # JSON-LD 构建器、llms.txt 构建器、校验器、注册表
 │   ├── agent-readiness/  # 爬虫审计、防 SSRF 抓取、评分报告
+│   ├── geo-health/       # 一键体检、评分、行动清单
 │   └── knowledge-graph/  # 抽取器、仓储、导出器
-├── workers/              # 引用调度器、Agent 就绪审计（pg-boss）
+├── workers/              # 引用调度器、就绪审计、体检（pg-boss）
 └── router.ts             # 根 tRPC 路由
 sdk/                      # 类型化 tRPC 客户端（@geociteops/sdk）
 web/                      # Vue 3 管理控制台（geo-web）
@@ -384,6 +388,7 @@ pnpm test:watch
 - [x] 内容原子化、评分与改写
 - [x] JSON-LD 与 `llms.txt` 生成
 - [x] Agent 就绪审计（robots、llms.txt、站点地图、页面信号、Markdown、爬虫可访问性）
+- [x] 一键 GEO 体检（就绪 + 引用 + 可引用性 + 结构化信号）
 - [x] 知识图谱抽取与导出
 - [x] 容器化一键部署（Docker Compose 四服务）
 - [ ] 闭环自动化：监测 → 优化建议 → 发布

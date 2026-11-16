@@ -7,6 +7,7 @@ import { schemaRouter } from './modules/schema-generator/router.js'
 import { kgRouter } from './modules/knowledge-graph/router.js'
 import { diagnosticRouter } from './modules/diagnostic/router.js'
 import { agentReadinessRouter } from './modules/agent-readiness/router.js'
+import { geoHealthRouter } from './modules/geo-health/router.js'
 import { authRouter, adminUserRouter } from './platform/identity/router.js'
 import { auditRouter } from './platform/audit/router.js'
 import { adminWorkspaceRouter } from './platform/tenancy/workspace-router.js'
@@ -49,6 +50,7 @@ export const appRouter = router({
   kg: kgRouter,
   diagnostic: diagnosticRouter,
   agentReadiness: agentReadinessRouter,
+  geoHealth: geoHealthRouter,
 })
 
 export type AppRouter = typeof appRouter

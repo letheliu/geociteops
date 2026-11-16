@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **GEO health check** — one form (brand, official URL, optional industry, competitors, and questions)
+  produces a single report: the embedded Agent Readiness audit, a one-shot citation snapshot on
+  whichever engines the workspace has configured, citability scores for the homepage and a few
+  sitemap pages, and Schema.org / llms.txt status plus downloadable generator output. Overall
+  score is a documented weighted blend; a failed pillar does not fail the report. pg-boss queues
+  `geo-health-dispatch`, `geo-health-pillar`, `geo-health-finalize`. Console page:
+  `/console/w/:workspaceId/geo-health`. See [docs/geo-health.md](./docs/geo-health.md).
 - **Agent Readiness audit** — given a public URL, score how ready the site is for AI crawlers
   and answer engines. Checks robots.txt (per crawler, catalog in one file), `llms.txt` /
   `llms-full.txt`, sitemap discovery, page signals (JSON-LD, meta, canonical, lang, Open Graph,

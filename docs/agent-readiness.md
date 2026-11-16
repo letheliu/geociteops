@@ -48,14 +48,7 @@ Applicable checks only. `pass` earns the full weight, `warn` earns half, `fail` 
 
 ## Report shape
 
-`report.version` is `1`. A later GEO health check should embed the object rather than copy fields:
-
-```ts
-interface GeoHealthCheck {
-  agentReadiness: AgentReadinessReport | null
-  // citation monitoring joins here in step 2
-}
-```
+`report.version` is `1`. The GEO health check embeds this object as `pillars.agentReadiness.report` instead of copying fields. See [GEO 体检](./geo-health.md).
 
 `AgentReadinessReport` lives in `src/modules/agent-readiness/types.ts`.
 
@@ -78,4 +71,4 @@ Agent 就绪审计回答一个问题：如果 AI 爬虫或回答引擎今天来�
 
 评分只统计 `applicable` 的检查：通过拿满权重，警告拿一半，未通过拿 0，再归一化到 0–100。`fixes` 按影响度从高到低排列。
 
-后续的「GEO 健康检查」应整包嵌入 `AgentReadinessReport`（`version: 1`），不要把字段拆开重做。
+「GEO 体检」整包嵌入 `AgentReadinessReport`（`version: 1`），不把字段拆开重做。见 [GEO 体检](./geo-health.md)。

@@ -41,6 +41,7 @@ model Workspace {
   diagnosticFindings DiagnosticFinding[]
   diagnosticActions  DiagnosticAction[]
   agentReadinessAudits AgentReadinessAudit[]
+  geoHealthChecks      GeoHealthCheck[]
 
   orderItems        OrderItem[]
   serviceDeliveries ServiceDelivery[]
@@ -543,6 +544,46 @@ enum AgentReadinessStatus {
   RUNNING
   SUCCEEDED
   FAILED
+}
+
+enum GeoHealthStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+}
+
+/// 一次一键 GEO 体检。report 为版本化 GeoHealthReport（version 1）。
+/// agentReadiness 整包嵌入 AgentReadinessReport，不另拆一套字段。
+model GeoHealthCheck {
+  id            String          @id @default(cuid())
+  workspaceId   String
+  brandName     String
+  siteUrl       String
+  industry      String?
+  competitors   Json            @default("[]")
+  /// 用户手填的问题。空数组表示跑的时候再生成起步问题。
+  userQueries   Json            @default("[]")
+  /// zh | en | auto
+  language      String          @default("auto")
+  status        GeoHealthStatus @default(QUEUED)
+  /// 0–100，SUCCEEDED / PARTIAL 时有值（全部支柱都没有分数时为 0）
+  score         Float?
+  /// A / B / C / D / F，刻度与 Agent 就绪相同
+  grade         String?
+  progress      Json
+  /// 各支柱的中间结果。收尾时汇成 report。
+  pillarResults Json?
+  report        Json?
+  error         String?
+  createdAt     DateTime        @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  updatedAt     DateTime        @updatedAt
+  workspace     Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
 }
 
 model PublicationRecord {
