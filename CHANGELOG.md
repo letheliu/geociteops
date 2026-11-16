@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Agent Readiness audit** — given a public URL, score how ready the site is for AI crawlers
+  and answer engines. Checks robots.txt (per crawler, catalog in one file), `llms.txt` /
+  `llms-full.txt`, sitemap discovery, page signals (JSON-LD, meta, canonical, lang, Open Graph,
+  server-rendered text, noindex), markdown availability, and whether an AI bot user-agent is
+  blocked. The report (`version: 1`) is stored per workspace and is meant to be embedded by a
+  later GEO health check. Runs as a pg-boss job (`agent-readiness-audit`). Console page:
+  `/console/w/:workspaceId/agent-readiness`. See [docs/agent-readiness.md](./docs/agent-readiness.md).
 - **Closed-loop automation (M2 §3.3)** — "monitoring finds a weak point → one-click rewrite suggestion
   → human review + publish (suggestion written back to the page) → next run back-fills → Δ on a loop
   board". The loop anchor lives on `OptimizationTask` (10 columns + `AWAITING_VERIFICATION`/`VERIFIED`

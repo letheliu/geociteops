@@ -1,0 +1,12 @@
+# Example
+
+> Example publishes product docs and a pricing page for answer engines.
+
+## Docs
+
+- [Overview](https://example.com/docs): What the product does
+- [Pricing](/pricing): Plans and limits
+
+## Optional
+
+- [About](https://example.com/about): Company background

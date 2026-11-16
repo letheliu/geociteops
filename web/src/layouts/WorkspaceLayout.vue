@@ -100,6 +100,11 @@ const menuOptions: MenuOption[] = [
     ],
   },
   {
+    label: 'Agent 就绪',
+    key: 'agent-readiness',
+    icon: renderIcon('🤖'),
+  } as MenuOption,
+  {
     label: 'GEO 诊断',
     key: 'diagnostic-group',
     type: 'group',
