@@ -57,7 +57,7 @@ function enter(row: WorkspaceRow) {
 const orgName = computed(() => sessionStore.me?.organization?.name ?? '')
 const emptyDescription = computed(() =>
   sessionStore.isOrgOwner
-    ? '企业还没有 Workspace，创建一个开始 GEO 监测。'
+    ? '企业还没有 Workspace。创建一个之后，可以先做一次 GEO 体检，不必先配齐所有引擎。'
     : '暂无授权的工作区，请联系企业管理员开通。',
 )
 

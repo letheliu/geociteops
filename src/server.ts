@@ -52,7 +52,7 @@ import { startCitationScheduler } from './workers/citation-scheduler.js'
 import { startOrderActivateWorker } from './workers/order-activate.js'
 import { startBillingCrons } from './workers/billing-crons.js'
 import { loadMasterKey } from './core/crypto/envelope.js'
-import { createCredentialResolver } from './platform/tenancy/credential-resolver.js'
+import { REQUIRED_KEYS, createCredentialResolver } from './platform/tenancy/credential-resolver.js'
 import { getLlmProvider } from './core/llm/index.js'
 import { getVectorStore } from './core/vector/index.js'
 import { createProjectService } from './modules/diagnostic/project-service.js'
@@ -65,6 +65,12 @@ import { analyzeCitation } from './modules/citation-monitor/analyzer.js'
 import { startDiagnosticWorkers } from './workers/diagnostic-workers.js'
 import { createAgentReadinessService } from './modules/agent-readiness/service.js'
 import { startAgentReadinessWorker } from './workers/agent-readiness-worker.js'
+import { BROWSER_USER_AGENT } from './modules/agent-readiness/bots.js'
+import { runAgentReadinessAudit } from './modules/agent-readiness/runner.js'
+import { safeFetch } from './modules/agent-readiness/safe-fetch.js'
+import { tx } from './modules/agent-readiness/types.js'
+import { createGeoHealthService } from './modules/geo-health/service.js'
+import { startGeoHealthWorker } from './workers/geo-health-worker.js'
 import { createAtomizer } from './modules/content-optimizer/atomizer.js'
 import { createScoringEngine } from './modules/content-optimizer/scoring.js'
 import { createCitabilityEngine } from './modules/content-optimizer/citability.js'
@@ -304,6 +310,47 @@ async function main() {
       actionService,
     },
     agentReadiness: createAgentReadinessService({ prisma, boss }),
+    geoHealth: createGeoHealthService({
+      prisma,
+      boss,
+      queryLibrary,
+      pillarDeps: {
+        runReadiness: (url) => runAgentReadinessAudit(url),
+        completeChat: async (messages) => {
+          const res = await llm.chat(messages, { temperature: 0.4 })
+          return res.text
+        },
+        listEngines: async (workspaceId) => {
+          const active = await resolver.listActivePlatforms(workspaceId)
+          const registered = new Set(registry.list())
+          const skipped = Object.keys(REQUIRED_KEYS)
+            .filter((platform) => registered.has(platform) && !active.includes(platform))
+            .map((platform) => ({
+              platform,
+              reason: tx(
+                'No credentials configured for this engine.',
+                '这个引擎还没有配置凭证。',
+              ),
+            }))
+          return { active, skipped }
+        },
+        queryEngine: async (workspaceId, platform, text) => {
+          const adapter = registry.get(platform)
+          if (!adapter) throw new Error(`未注册的引擎：${platform}`)
+          const credentials = await resolver.getCredentials(workspaceId, platform)
+          return adapter.query(text, credentials)
+        },
+        fetchPage: (url) => safeFetch(url, {
+          timeoutMs: 8000,
+          maxBytes: 1_500_000,
+          headers: {
+            'user-agent': BROWSER_USER_AGENT,
+            accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          },
+        }),
+        atomize: (text) => atomizer.atomize(text),
+      },
+    }),
     // 任务 12：identity/session/audit/workspaceAdmin/loginRateLimiter/getWorkspaceSummary
     identity: identityService,
     registration: registrationService,
@@ -505,6 +552,12 @@ async function main() {
   await startAgentReadinessWorker({
     boss,
     execute: (auditId) => services.agentReadiness.execute(auditId),
+  })
+  await startGeoHealthWorker({
+    boss,
+    dispatch: (checkId) => services.geoHealth.dispatch(checkId),
+    runPillar: (checkId, pillar) => services.geoHealth.runPillarJob(checkId, pillar),
+    finalize: (checkId) => services.geoHealth.finalize(checkId),
   })
 
   await fastify.listen({ port, host: '0.0.0.0' })
