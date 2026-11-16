@@ -4,15 +4,15 @@
 
 # GeoCiteOps
 
-**AI citation intelligence and optimization platform for generative search.**
-
-Track how AI answer engines mention your brand, improve the content they can cite, and publish the structured signals they need to understand you.
+**Monitor and improve how AI answer engines cite your brand.**
 
 English · [简体中文](./README.zh-CN.md)
 
+[Five-minute score](#get-your-geo-score-in-5-minutes) · [Demo](#demo) · [How it works](#how-it-works) · [Compare](#compared-with-the-other-ways) · [FAQ](#faq)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![CI](https://github.com/letheliu/geociteops/actions/workflows/ci.yml/badge.svg)](https://github.com/letheliu/geociteops/actions/workflows/ci.yml)
-[![Node](https://img.shields.io/badge/node-%3E%3D22-green)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-%3E%3D22.5-green)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org/)
 [![SDK](https://img.shields.io/npm/v/@geociteops/sdk)](https://www.npmjs.com/package/@geociteops/sdk)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fletheliu%2Fgeociteops--api-blue)](https://github.com/letheliu/geociteops/pkgs/container/geociteops-api)
@@ -21,48 +21,83 @@ English · [简体中文](./README.zh-CN.md)
 
 ---
 
-GeoCiteOps is an end-to-end **Generative Engine Optimization (GEO)** platform. It helps teams understand whether AI search engines cite their brand, then closes the loop with content optimization, Schema.org output, `llms.txt`, and a brand knowledge graph.
-
-> GEO improves how likely your content is to be cited by AI answer engines, just as SEO improves visibility on search results pages.
+GeoCiteOps is a self-hosted **Generative Engine Optimization (GEO)** platform. GEO is the work of making your pages more likely to be quoted by AI answer engines, the way SEO is the work of being found on a results page.
 
 ## Demo
 
-<!--
-  Demo recording slot — asciinema SVG cast (preferred over GIF: does not bloat the repo).
+The walkthrough brand is **ZoomerAI**, a fictional AI image product on `zoomer.top`. Nothing in the seed is a live crawl or a live model answer. The scores use the same formulas as a real run (`buildReport`, `conclude`, and the weights in `src/modules/geo-health/weights.ts`). Load it with `pnpm demo:reset`.
 
-  How to record (with the stack running locally):
+<img src="./docs/assets/demo.gif" alt="GeoCiteOps demo: share of voice, a GEO health report, and an Agent Readiness audit for the fictional brand ZoomerAI" width="1100" />
 
-    asciinema rec -c "pnpm demo:reset && pnpm dev" demo.cast
-    svg-term --in=demo.cast --out=docs/assets/demo.svg --theme=monokai
+| Dashboard | GEO health report | Agent Readiness |
+| --- | --- | --- |
+| [![Share of voice trend for the fictional ZoomerAI workspace](./docs/assets/dashboard.webp)](./docs/assets/dashboard.webp) | [![GEO health report: score, four pillars, and share of voice](./docs/assets/geo-health.webp)](./docs/assets/geo-health.webp) | [![Agent Readiness audit: score, category cards, and prioritized fixes](./docs/assets/agent-readiness.webp)](./docs/assets/agent-readiness.webp) |
 
-  Save the artifact to docs/assets/demo.svg, then uncomment the line below:
+A read-only deployment of this project is at <https://geo.gsgroup.club>. Standing up your own is [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
 
-  <img src="./docs/assets/demo.svg" alt="GeoCiteOps demo: citation monitoring to SOV report" width="800" />
+## Get your GEO score in 5 minutes
 
-  Live read-only demo: https://geo.gsgroup.club
--->
+The short path is the one-click **GEO Health Check**: one form, one report, a score, and a short action list. You do not configure every engine first.
 
-## Why GeoCiteOps
+1. Start the stack. Docker Compose is below. For a local checkout: `pnpm install`, `pnpm db:generate`, then `pnpm dev` (API on port 4000) and `pnpm dev:web` (console on port 5170).
+2. Sign in. A fresh database needs a platform admin: `pnpm admin:bootstrap --username admin --password <your-password>`. The password must be at least 10 characters and must not contain the username.
+3. Open the workspace and choose **GEO 体检** (`/console/w/:workspaceId/geo-health`).
+4. Enter the brand and the official URL. Industry, competitors, and questions are optional. Choose **开始体检**.
 
-| Need | What GeoCiteOps provides |
+Readiness, citability, and structured signals run from the public URL. The citation snapshot only calls engines that already have workspace credentials. The others are skipped and named on the report. Weights, letter grades, and the action sort are written up in [docs/geo-health.md](./docs/geo-health.md).
+
+To open the fictional dataset instead of auditing a real site:
+
+```bash
+pnpm demo:reset
+```
+
+Sign in as `demo-viewer` (override with `DEMO_USERNAME`). Set `DEMO_ACCOUNT_PASSWORD` before the first reset if you want to choose the password. If it is unset, the script prints one once and does not store it in plaintext. Setting it later does not change an account that already exists. The console lands on the workspace: overview for share of voice, **GEO 体检** for the health report, **Agent 就绪** for the crawler audit.
+
+## How it works
+
+```mermaid
+flowchart LR
+  form["Brand and official URL"] --> health["GEO Health Check"]
+  health --> ready["Agent Readiness"]
+  health --> cite["Citation snapshot"]
+  health --> pages["Page citability"]
+  health --> signals["Schema.org and llms.txt"]
+  ready --> report["Score and action list"]
+  cite --> report
+  pages --> report
+  signals --> report
+  report --> library["Save questions to the query library"]
+  library --> runs["Scheduled citation runs"]
+  runs --> sov["Share of voice and weak points"]
+```
+
+A health check is the onboarding pass. Saving its questions turns them into the query library, and the citation monitor keeps sampling on the schedule you set. Content optimization, JSON-LD, `llms.txt`, and the knowledge graph are the follow-up tools on the same workspace. The closed loop (publish a rewrite, then read the next run's delta) is on the loop board.
+
+## Compared with the other ways
+
+Illustrative only. This is how the work is shaped, not a benchmark and not a price survey.
+
+| | By hand | An agency | A closed GEO product | GeoCiteOps |
+| --- | --- | --- | --- | --- |
+| First look | Paste the same question into each chat and copy the answers into a sheet | A project, then a deck | A dashboard after accounts are connected | One health check on a machine you run |
+| The next month | You remember to repeat it | Whatever the retainer includes | Their monitoring, on their definition of share of voice | Scheduled runs. The formulas are in the repo. See [docs/METRICS.md](./docs/METRICS.md) |
+| Where the rows live | Your files | Their workspace | Their cloud | Your Postgres |
+| What you pay for | Your time | A project fee or a retainer | A subscription | The MIT license. Engine APIs you already use, and the machine this runs on |
+| Can you read the score | Yes, if you wrote the sheet | Usually not | Usually not | Yes. Weights and checks are source files |
+| Crawler readiness | Read `robots.txt` yourself | Depends on the engagement | Sometimes a separate product | An Agent Readiness audit on the same report |
+
+## What it covers
+
+| Area | What you can do |
 | --- | --- |
-| Know where your brand appears | Run the same query across major AI engines and compare mentions, citations, URLs, rank position, and Share of Voice (SOV). |
-| Make content easier to cite | Break long-form pages into citable atoms, score them, rewrite weak segments, and generate FAQ-style answers. |
-| Publish machine-readable context | Generate Schema.org JSON-LD, `llms.txt`, and knowledge graph exports for AI crawlers and downstream systems. |
-| Know if AI crawlers can use the site | Run an Agent Readiness audit: robots.txt per crawler, `llms.txt`, sitemap, page signals, markdown, and whether a bot user-agent is blocked. |
-| See the whole picture on day one | Run a GEO health check: readiness, a one-shot citation snapshot, citability of key pages, and Schema.org / llms.txt, with a short action list. See [docs/geo-health.md](./docs/geo-health.md). |
-
-## Core Capabilities
-
-| Area | Highlights |
-| --- | --- |
-| Citation monitoring | DeepSeek, Doubao, Qwen, ERNIE, ChatGPT Search, Perplexity, Gemini, and Anthropic/Claude adapters. |
-| Content optimization | Atomization, AI-friendliness scoring, rewriting, FAQ generation, and E-E-A-T checks. |
-| Structured signals | Schema.org builders for `SoftwareApplication`, `Organization`, `FAQPage`, and more, plus `llms.txt` generation. |
-| Agent Readiness | Score a URL for AI crawlers and answer engines, with prioritized fixes. See [docs/agent-readiness.md](./docs/agent-readiness.md). |
-| GEO health check | One form, one report: readiness, citations, citability, and structured signals, plus the top actions. See [docs/geo-health.md](./docs/geo-health.md). |
-| Knowledge graph | Entity and relation extraction with JSON / RDF export. |
-| Multi-tenant runtime | Workspace isolation, per-workspace platform credentials, API keys, and typed SDK access. |
+| GEO health check | One form. Four pillars: Agent Readiness, a one-shot citation snapshot, citability of the homepage and a few sitemap pages, and Schema.org / `llms.txt`, plus at most ten actions. See [docs/geo-health.md](./docs/geo-health.md). |
+| Agent Readiness | Score one public URL for AI crawlers and answer engines: robots.txt per crawler, `llms.txt`, sitemap, page signals, markdown, and whether a bot user-agent is blocked. See [docs/agent-readiness.md](./docs/agent-readiness.md). |
+| Citation monitoring | The adapters mounted in `src/server.ts`: DeepSeek, Doubao, Qwen, ERNIE, Perplexity, ChatGPT Search, and Gemini. Share of voice, mention rate, citation rate, rank, and a trend of runs. |
+| Content optimization | Atomize a page, score how citable it is, rewrite weak passages, generate FAQ-style answers, and check E-E-A-T. |
+| Structured signals | Schema.org JSON-LD (`SoftwareApplication`, `Organization`, `FAQPage`, and others) and `llms.txt`. |
+| Knowledge graph | Extract entities and relations. Export JSON or RDF. |
+| Tenancy | Organizations, workspaces, envelope-encrypted platform credentials, API keys, and a typed SDK. |
 
 ## Architecture
 
@@ -157,7 +192,7 @@ The session cookie is named `__Host-geo_sid` by default (`src/platform/identity/
 
 ### Option B — Local development with pnpm
 
-**Prerequisites:** Node.js 20+, pnpm 11+, and a PostgreSQL with pgvector reachable by you.
+**Prerequisites:** Node.js 22.5+ (pnpm 11 uses `node:sqlite`), pnpm 11+, and a PostgreSQL with pgvector you can reach. `package.json` allows Node `>=22`; a 22.0–22.4 install fails at `pnpm install`.
 
 ```bash
 git clone https://github.com/letheliu/geociteops.git
@@ -372,7 +407,7 @@ src/
 ├── workers/              # citation scheduler, readiness audit, health check (pg-boss)
 └── router.ts             # root tRPC router
 sdk/                      # typed tRPC client (@geociteops/sdk)
-web/                      # Vue 3 admin console (geo-web)
+web/                      # Vue 3 console (package name geociteops-web)
 prisma/                   # schema.prisma
 ```
 
@@ -383,21 +418,51 @@ pnpm test
 pnpm test:watch
 ```
 
+## FAQ
+
+<details>
+<summary>What is GEO?</summary>
+
+Generative Engine Optimization. The goal is to be mentioned and cited inside an AI answer, not only to rank as a blue link. GeoCiteOps treats that as an operations loop: measure what the engines say, see whether crawlers can fetch the site, and make the pages easier to quote.
+
+</details>
+
+<details>
+<summary>Which engines does it call?</summary>
+
+The process in `src/server.ts` registers seven adapters: DeepSeek, Doubao (Volcengine), Qwen, ERNIE, Perplexity, ChatGPT Search, and Gemini. A run only calls the ones whose workspace credentials are set. The health check lists the rest as skipped, with the reason “No credentials configured for this engine.” An Anthropic adapter file exists and is not registered.
+
+</details>
+
+<details>
+<summary>Where does the data go? Can I self-host?</summary>
+
+Yes. Docker Compose is the primary install: Postgres, migrations, the API, and the console, on a machine you control. Citation rows, health reports, and credentials stay in that database. Platform credentials are envelope-encrypted with `CREDENTIAL_MASTER_KEY` (AES-256-GCM). Calling an engine sends that engine the question and uses the key you stored. There is no GeoCiteOps cloud account in the open-source build.
+
+</details>
+
+<details>
+<summary>What does it cost?</summary>
+
+The repo is MIT. You pay for the computer it runs on and for any engine or LLM API you connect. The health check's readiness, citability, and structured-signal pillars do not need those keys. The citation snapshot and scheduled monitoring do, for each engine you want in the score. Billing inside the app (plans, orders, mock payments) is for people who run GeoCiteOps as a multi-tenant service. It is off unless `BILLING_ENFORCEMENT=on`.
+
+</details>
+
 ## Roadmap
 
-- [x] Citation monitoring across 8 AI engines
+- [x] Citation monitoring on the seven registered engines (DeepSeek, Doubao, Qwen, ERNIE, Perplexity, ChatGPT Search, Gemini)
 - [x] Content atomization, scoring, and rewriting
 - [x] JSON-LD and `llms.txt` generation
 - [x] Agent Readiness audit (robots, llms.txt, sitemap, page signals, markdown, bot access)
 - [x] One-click GEO health check (readiness + citations + citability + structured signals)
 - [x] Knowledge graph extraction and export
 - [x] Containerized one-command deployment (Docker Compose, four services)
-- [ ] Closed-loop automation: monitoring → optimization suggestion → publish
-- [ ] More platforms and richer SOV analytics
+- [x] Closed loop: a weak query → a rewrite suggestion → a human publish → the next run fills in the delta
+- [ ] Register the adapters that are not mounted yet, and richer share-of-voice views
 
 ## Contributing
 
-Issues and pull requests are welcome. Please open an issue first to discuss large changes — see [CONTRIBUTING.md](./CONTRIBUTING.md) for branch naming, commit style, and the test requirements for new code. By contributing, you agree that your contributions are licensed under the MIT License.
+Issues and pull requests are welcome. Please open an issue first to discuss large changes. Branch names, commit style, and the test bar are in [CONTRIBUTING.md](./CONTRIBUTING.md). Starter tasks that are not filed as issues yet are listed in [docs/good-first-issues.md](./docs/good-first-issues.md). By contributing, you agree that your contributions are licensed under the MIT License.
 
 ## License
 

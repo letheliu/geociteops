@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Good first issues
+    url: https://github.com/letheliu/geociteops/blob/main/docs/good-first-issues.md
+    about: Starter tasks listed in the repo. They are not filed issues yet. Open one before you start.

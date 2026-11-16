@@ -84,4 +84,4 @@ quick start.
 
 ## License
 
-[MIT](./LICENSE) © 2026 letheliu
+[MIT](../LICENSE) © 2026 letheliu

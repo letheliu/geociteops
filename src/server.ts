@@ -368,7 +368,10 @@ async function main() {
   }
 
   // requestId 用 UUID：审计日志（requestId 来源）可跨日志关联
-  const fastify = Fastify({ logger: true, genReqId: () => randomUUID() })
+  // tRPC httpBatchLink 把多个 procedure 用逗号拼进同一个 path。
+  // Fastify 默认 maxParamLength=100，概览页那一批（workspace.get + trend + …）
+  // 会超过 100 而被当成 404，控制台数字和趋势图就一直是空的。
+  const fastify = Fastify({ logger: true, genReqId: () => randomUUID(), maxParamLength: 1000 })
   await fastify.register(cookie)
   // 安全响应头（默认配置）
   await fastify.register(helmet)
