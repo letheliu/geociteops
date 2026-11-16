@@ -39,6 +39,10 @@ const report = await geo.citation.runMonitor.mutate({ queryId: '...' })
 
 // Optimize a content page
 const task = await geo.content.optimize.mutate({ pageId: '...' })
+
+// Queue an Agent Readiness audit, then read the stored report
+const audit = await geo.agentReadiness.start.mutate({ url: 'https://example.com/' })
+const report = await geo.agentReadiness.get.query({ id: audit.id })
 ```
 
 ## Authentication

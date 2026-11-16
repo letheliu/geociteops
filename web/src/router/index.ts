@@ -260,6 +260,11 @@ export const router = createRouter({
               component: () => import('../views/kg/Graph.vue'),
             },
             {
+              path: 'agent-readiness',
+              name: 'agent-readiness',
+              component: () => import('../views/agent-readiness/Audit.vue'),
+            },
+            {
               path: 'diagnostic/projects',
               name: 'diagnostic-projects',
               component: () => import('../views/diagnostic/Projects.vue'),
@@ -395,6 +400,7 @@ const TITLE_MAP: Record<string, string> = {
   'kg-relations': '关系管理',
   'kg-graph': '图谱可视化',
   settings: '设置',
+  'agent-readiness': 'Agent 就绪',
   'diagnostic-projects': '诊断项目',
   'diagnostic-project-create': '新建项目',
   'diagnostic-project-detail': '项目详情',

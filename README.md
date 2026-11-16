@@ -49,6 +49,7 @@ GeoCiteOps is an end-to-end **Generative Engine Optimization (GEO)** platform. I
 | Know where your brand appears | Run the same query across major AI engines and compare mentions, citations, URLs, rank position, and Share of Voice (SOV). |
 | Make content easier to cite | Break long-form pages into citable atoms, score them, rewrite weak segments, and generate FAQ-style answers. |
 | Publish machine-readable context | Generate Schema.org JSON-LD, `llms.txt`, and knowledge graph exports for AI crawlers and downstream systems. |
+| Know if AI crawlers can use the site | Run an Agent Readiness audit: robots.txt per crawler, `llms.txt`, sitemap, page signals, markdown, and whether a bot user-agent is blocked. |
 
 ## Core Capabilities
 
@@ -57,6 +58,7 @@ GeoCiteOps is an end-to-end **Generative Engine Optimization (GEO)** platform. I
 | Citation monitoring | DeepSeek, Doubao, Qwen, ERNIE, ChatGPT Search, Perplexity, Gemini, and Anthropic/Claude adapters. |
 | Content optimization | Atomization, AI-friendliness scoring, rewriting, FAQ generation, and E-E-A-T checks. |
 | Structured signals | Schema.org builders for `SoftwareApplication`, `Organization`, `FAQPage`, and more, plus `llms.txt` generation. |
+| Agent Readiness | Score a URL for AI crawlers and answer engines, with prioritized fixes. See [docs/agent-readiness.md](./docs/agent-readiness.md). |
 | Knowledge graph | Entity and relation extraction with JSON / RDF export. |
 | Multi-tenant runtime | Workspace isolation, per-workspace platform credentials, API keys, and typed SDK access. |
 
@@ -66,14 +68,17 @@ GeoCiteOps is an end-to-end **Generative Engine Optimization (GEO)** platform. I
 ┌──────────────────────────────────────────────────────┐
 │ Web Console (Vue 3 + Naive UI + Vite)                │
 │ Dashboard · Query Library · Reports · Content · KG   │
+│ Agent Readiness                                      │
 ├──────────────────────────────────────────────────────┤
 │ API Gateway (Fastify + tRPC)                         │
 │ workspace · citation · content · tasks · schema · kg │
+│ agentReadiness                                       │
 ├──────────────────────────────────────────────────────┤
 │ Core Services                                        │
 │ Citation Monitor + Platform Adapters                 │
 │ Content Optimizer (atomize → score → rewrite)        │
 │ Schema Generator (JSON-LD + llms.txt)                │
+│ Agent Readiness (crawler audit + scored report)      │
 │ Knowledge Graph (entity / relation extraction)       │
 │ LLM Provider · Vector Store (Zvec) · Queue (pg-boss) │
 ├──────────────────────────────────────────────────────┤
@@ -358,8 +363,9 @@ src/
 │   ├── citation-monitor/ # platform adapters, analyzer, SOV metrics, query library
 │   ├── content-optimizer/# atomizer, scoring, rewriter, FAQ, E-E-A-T, orchestrator
 │   ├── schema-generator/ # JSON-LD builder, llms.txt builder, validator, registry
+│   ├── agent-readiness/  # crawler audit, SSRF-safe fetch, scored report
 │   └── knowledge-graph/  # extractor, repository, exporter
-├── workers/              # citation scheduler (pg-boss)
+├── workers/              # citation scheduler, agent-readiness audit (pg-boss)
 └── router.ts             # root tRPC router
 sdk/                      # typed tRPC client (@geociteops/sdk)
 web/                      # Vue 3 admin console (geo-web)
@@ -378,6 +384,7 @@ pnpm test:watch
 - [x] Citation monitoring across 8 AI engines
 - [x] Content atomization, scoring, and rewriting
 - [x] JSON-LD and `llms.txt` generation
+- [x] Agent Readiness audit (robots, llms.txt, sitemap, page signals, markdown, bot access)
 - [x] Knowledge graph extraction and export
 - [x] Containerized one-command deployment (Docker Compose, four services)
 - [ ] Closed-loop automation: monitoring → optimization suggestion → publish

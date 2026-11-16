@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="A page that asks crawlers not to index it, even though the body has plenty of server-rendered text for a human reader who already has the URL.">
+  <link rel="canonical" href="https://example.com/secret">
+  <meta property="og:title" content="Secret">
+  <meta property="og:description" content="Hidden page.">
+</head>
+<body>
+  <p>This page has enough server-rendered text to pass the visible-text heuristic. It still must fail the indexability check because meta robots says noindex. Answer engines should not cite a URL the site told them to skip, so the audit treats noindex as a failure rather than a warning. The extra sentences exist only to push the raw text past four hundred characters, which is the threshold the server-rendered-text check uses before it calls a page substantial. Without them the fixture would warn for thin content and the test could not isolate the noindex failure from the text-length warning.</p>
+</body>
+</html>

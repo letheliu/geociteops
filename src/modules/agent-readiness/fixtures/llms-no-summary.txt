@@ -1,0 +1,5 @@
+# Example
+
+## Docs
+
+- [Overview](https://example.com/docs): What the product does

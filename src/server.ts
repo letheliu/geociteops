@@ -63,6 +63,8 @@ import { createReportService } from './modules/diagnostic/report-service.js'
 import { createActionService } from './modules/diagnostic/action-service.js'
 import { analyzeCitation } from './modules/citation-monitor/analyzer.js'
 import { startDiagnosticWorkers } from './workers/diagnostic-workers.js'
+import { createAgentReadinessService } from './modules/agent-readiness/service.js'
+import { startAgentReadinessWorker } from './workers/agent-readiness-worker.js'
 import { createAtomizer } from './modules/content-optimizer/atomizer.js'
 import { createScoringEngine } from './modules/content-optimizer/scoring.js'
 import { createCitabilityEngine } from './modules/content-optimizer/citability.js'
@@ -301,6 +303,7 @@ async function main() {
       reportService,
       actionService,
     },
+    agentReadiness: createAgentReadinessService({ prisma, boss }),
     // 任务 12：identity/session/audit/workspaceAdmin/loginRateLimiter/getWorkspaceSummary
     identity: identityService,
     registration: registrationService,
@@ -499,6 +502,10 @@ async function main() {
     resolveActivePlatforms: resolver.listActivePlatforms,
   })
   await startDiagnosticWorkers({ boss, prisma, registry, analyzeCitation, getCredentials: resolver.getCredentials })
+  await startAgentReadinessWorker({
+    boss,
+    execute: (auditId) => services.agentReadiness.execute(auditId),
+  })
 
   await fastify.listen({ port, host: '0.0.0.0' })
   fastify.log.info(`geo-service listening on :${port}`)
