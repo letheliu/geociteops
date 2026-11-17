@@ -6,6 +6,7 @@ Thanks for your interest. This document covers the conventions that keep the cod
 
 - **Open an issue first for anything substantial.** A PR that changes authorization, billing, or the Prisma schema needs a design conversation before code. Small bug fixes can go straight to a PR.
 - **Search existing issues.** Duplicate reports slow everyone down.
+- **Looking for a starter task?** [docs/good-first-issues.md](./docs/good-first-issues.md) lists a few. They are not filed issues. Open one before you start, and mention which item it is.
 
 ## Branches
 

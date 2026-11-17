@@ -4,15 +4,15 @@
 
 # GeoCiteOps
 
-**面向生成式搜索的 AI 引用洞察与优化平台。**
-
-追踪 AI 回答引擎如何提及你的品牌，优化它们更容易引用的内容，并输出结构化信号帮助 AI 理解你。
+**监测并改进 AI 回答引擎如何引用你的品牌。**
 
 [English](./README.md) · 简体中文
 
+[五分钟拿到分数](#五分钟拿到-geo-分数) · [演示](#演示) · [它怎么工作](#它怎么工作) · [和其他做法比](#和其他做法比) · [常见问题](#常见问题)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![CI](https://github.com/letheliu/geociteops/actions/workflows/ci.yml/badge.svg)](https://github.com/letheliu/geociteops/actions/workflows/ci.yml)
-[![Node](https://img.shields.io/badge/node-%3E%3D22-green)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-%3E%3D22.5-green)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org/)
 [![SDK](https://img.shields.io/npm/v/@geociteops/sdk)](https://www.npmjs.com/package/@geociteops/sdk)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fletheliu%2Fgeociteops--api-blue)](https://github.com/letheliu/geociteops/pkgs/container/geociteops-api)
@@ -21,48 +21,83 @@
 
 ---
 
-GeoCiteOps 是一套端到端的**生成式引擎优化（Generative Engine Optimization，GEO）**平台。它帮助团队理解品牌是否被 AI 搜索引擎引用，并通过内容优化、Schema.org、`llms.txt` 与品牌知识图谱形成闭环。
-
-> GEO 优化的是内容被 AI 回答引擎引用的概率，正如 SEO 优化的是网页在搜索结果页中的可见性。
+GeoCiteOps 是一套可自托管的**生成式引擎优化（Generative Engine Optimization，GEO）**平台。GEO 做的是让页面更容易被 AI 回答引擎引用，就像 SEO 做的是让页面出现在搜索结果里。
 
 ## 演示
 
-<!--
-  演示录像位——asciinema SVG cast（优先于 GIF：不膨胀仓库体积）。
+演示品牌是 **ZoomerAI**，一个虚构的 AI 画图产品，站点写的是 `zoomer.top`。种子里没有真实抓取，也没有模型的真实回答。分数用的是正式运行的同一套公式（`buildReport`、`conclude`，以及 `src/modules/geo-health/weights.ts` 里的权重）。用 `pnpm demo:reset` 装进去。
 
-  录制方式（本地起好栈后执行）：
+<img src="./docs/assets/demo.gif" alt="GeoCiteOps 演示：虚构品牌 ZoomerAI 的声量份额、GEO 体检报告和 Agent 就绪审计" width="1100" />
 
-    asciinema rec -c "pnpm demo:reset && pnpm dev" demo.cast
-    svg-term --in=demo.cast --out=docs/assets/demo.svg --theme=monokai
+| 概览 | GEO 体检 | Agent 就绪 |
+| --- | --- | --- |
+| [![虚构工作区 ZoomerAI 的声量趋势](./docs/assets/dashboard.webp)](./docs/assets/dashboard.webp) | [![GEO 体检：总分、四根支柱和声量份额](./docs/assets/geo-health.webp)](./docs/assets/geo-health.webp) | [![Agent 就绪：分数、分类卡片和优先修复](./docs/assets/agent-readiness.webp)](./docs/assets/agent-readiness.webp) |
 
-  产物放到 docs/assets/demo.svg 后，取消下面这行的注释：
+本仓库有一个只读部署：<https://geo.gsgroup.club>。自己部署见 [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)。
 
-  <img src="./docs/assets/demo.svg" alt="GeoCiteOps 演示：引用监测到 SOV 报告" width="800" />
+## 五分钟拿到 GEO 分数
 
-  在线只读演示站：https://geo.gsgroup.club
--->
+最短的路径是一键 **GEO 体检**：一张表单、一份报告、一个分数、一份短的行动清单。不用先把每个引擎都配上。
 
-## 为什么需要 GeoCiteOps
+1. 把栈跑起来。Docker Compose 在下面。本地开发是：`pnpm install`、`pnpm db:generate`，然后 `pnpm dev`（API 在 4000）和 `pnpm dev:web`（控制台在 5170）。
+2. 登录。全新库要先建平台管理员：`pnpm admin:bootstrap --username admin --password <你的密码>`。密码至少 10 位，且不能包含用户名。
+3. 进入工作区，打开 **GEO 体检**（`/console/w/:workspaceId/geo-health`）。
+4. 填写品牌名和官网。行业、竞品、问题都可以空着。点 **开始体检**。
 
-| 需求 | GeoCiteOps 提供什么 |
+就绪、可引用性、结构化信号根据这个公开 URL 来跑。引用快照只调用工作区里已经配了凭证的引擎，其余的会跳过，并在报告里写出原因。权重、字母档和行动排序写在 [docs/geo-health.md](./docs/geo-health.md)。
+
+如果想先看虚构数据集，而不是去审计一个真实站点：
+
+```bash
+pnpm demo:reset
+```
+
+用 `demo-viewer` 登录（可用 `DEMO_USERNAME` 改名）。想自己定密码，就在第一次重置之前设 `DEMO_ACCOUNT_PASSWORD`。没设的话，脚本会把密码打印一次，库里不存明文。账号已经存在之后再设，不会改掉旧密码。进工作区之后：概览看声量，**GEO 体检**看报告，**Agent 就绪**看爬虫审计。
+
+## 它怎么工作
+
+```mermaid
+flowchart LR
+  form["品牌和官网"] --> health["GEO 体检"]
+  health --> ready["Agent 就绪"]
+  health --> cite["引用快照"]
+  health --> pages["页面可引用性"]
+  health --> signals["Schema.org 与 llms.txt"]
+  ready --> report["分数和行动清单"]
+  cite --> report
+  pages --> report
+  signals --> report
+  report --> library["把问题存进查询库"]
+  library --> runs["定时引用监测"]
+  runs --> sov["声量份额和薄弱点"]
+```
+
+体检是上手的那一次。把这次的问题存进查询库之后，引用监测按你设的节奏继续采样。内容优化、JSON-LD、`llms.txt` 和知识图谱是同一个工作区里的后续工具。闭环（发布一版改写，再读下一次运行的 Δ）在闭环看板上。
+
+## 和其他做法比
+
+下面只说明工作方式，不是评测，也不是报价。
+
+| | 自己做 | 找代理 | 封闭的 GEO 产品 | GeoCiteOps |
+| --- | --- | --- | --- | --- |
+| 第一次看到结果 | 把同一个问题贴进每个对话框，再抄到表格里 | 做一个项目，然后是一叠幻灯片 | 账号接上之后的一块仪表盘 | 在你自己的机器上做一次体检 |
+| 下个月 | 你得记得再做一遍 | 看合同里包不包括 | 他们的监测，声量按他们的定义 | 定时运行。公式在仓库里。见 [docs/METRICS.md](./docs/METRICS.md) |
+| 数据放在哪 | 你的文件 | 他们的工作区 | 他们的云 | 你的 Postgres |
+| 钱花在哪 | 你的时间 | 项目费或月费 | 订阅 | MIT 许可。你已经在用的引擎 API，以及跑这套程序的机器 |
+| 能不能看懂分数 | 表格是你写的就能 | 通常不能 | 通常不能 | 能。权重和检查项都是源码 |
+| 爬虫是否进得来 | 自己读 `robots.txt` | 看这次合作包不包括 | 有时是另一个产品 | 同一份报告里的 Agent 就绪审计 |
+
+## 它覆盖什么
+
+| 模块 | 你能做什么 |
 | --- | --- |
-| 看清品牌出现在哪里 | 将同一个问题发送到多个主流 AI 引擎，对比品牌提及、引用 URL、排名位置与 SOV（声音份额）。 |
-| 让内容更容易被引用 | 将长内容拆成可独立引用的原子单元，逐段评分，改写薄弱段落，并生成 FAQ 风格答案。 |
-| 发布机器可读的品牌上下文 | 生成 Schema.org JSON-LD、`llms.txt` 与知识图谱导出，服务 AI 爬虫和下游系统。 |
-| 知道 AI 爬虫能不能用这个站 | 跑一次 Agent 就绪审计：按爬虫解析 robots.txt、检查 `llms.txt`、站点地图、页面信号、Markdown，以及机器人 User-Agent 是否被拦截。 |
-| 第一天就看到全貌 | 做一次 GEO 体检：就绪、一轮引用快照、关键页可引用性、Schema.org / llms.txt，外加一份短的行动清单。见 [docs/geo-health.md](./docs/geo-health.md)。 |
-
-## 核心能力
-
-| 模块 | 亮点 |
-| --- | --- |
-| 引用监测 | 适配 DeepSeek、豆包、通义千问、文心一言、ChatGPT Search、Perplexity、Gemini 与 Anthropic/Claude。 |
-| 内容优化 | 内容原子化、AI 友好度评分、自动改写、FAQ 生成与 E-E-A-T 校验。 |
-| 结构化信号 | 生成 `SoftwareApplication`、`Organization`、`FAQPage` 等 Schema.org JSON-LD，并输出 `llms.txt`。 |
-| Agent 就绪 | 给一个 URL 打分，说明它对 AI 爬虫和回答引擎准备得怎么样，并按影响度列出修复项。见 [docs/agent-readiness.md](./docs/agent-readiness.md)。 |
-| GEO 体检 | 一张表单、一份报告：就绪、引用、可引用性和结构化信号，加上最优先的行动。见 [docs/geo-health.md](./docs/geo-health.md)。 |
-| 知识图谱 | 抽取实体与关系，支持 JSON / RDF 导出。 |
-| 多租户运行时 | 工作区隔离、工作区级平台凭证、API Key 与类型化 SDK 访问。 |
+| GEO 体检 | 一张表单。四根支柱：Agent 就绪、一轮引用快照、首页和少量站点地图页面的可引用性、Schema.org / `llms.txt`，外加最多十条行动。见 [docs/geo-health.md](./docs/geo-health.md)。 |
+| Agent 就绪 | 给一个公开 URL 打分：按爬虫看 robots.txt、`llms.txt`、站点地图、页面信号、Markdown，以及机器人 User-Agent 是否被拦。见 [docs/agent-readiness.md](./docs/agent-readiness.md)。 |
+| 引用监测 | `src/server.ts` 里挂上的适配器：DeepSeek、豆包、通义千问、文心一言、Perplexity、ChatGPT Search、Gemini。声量份额、提及率、引用率、排名，以及按运行画出的趋势。 |
+| 内容优化 | 把页面拆成原子、给可引用性打分、改写薄弱段落、生成 FAQ 风格答案，并做 E-E-A-T 检查。 |
+| 结构化信号 | Schema.org JSON-LD（`SoftwareApplication`、`Organization`、`FAQPage` 等）和 `llms.txt`。 |
+| 知识图谱 | 抽取实体和关系。导出 JSON 或 RDF。 |
+| 多租户 | 企业、工作区、信封加密的平台凭证、API Key，以及类型化 SDK。 |
 
 ## 系统架构
 
@@ -157,7 +192,7 @@ docker compose exec app tsx scripts/reset-demo.mjs
 
 ### 方式 B：本机 pnpm 开发
 
-**前置要求：** Node.js 20+、pnpm 11+，以及你自己可访问的带 pgvector 的 PostgreSQL。
+**前置要求：** Node.js 22.5+（pnpm 11 会用到 `node:sqlite`）、pnpm 11+，以及你自己可访问的带 pgvector 的 PostgreSQL。`package.json` 写的是 `>=22`；22.0 到 22.4 会在 `pnpm install` 失败。
 
 ```bash
 git clone https://github.com/letheliu/geociteops.git
@@ -371,7 +406,7 @@ src/
 ├── workers/              # 引用调度器、就绪审计、体检（pg-boss）
 └── router.ts             # 根 tRPC 路由
 sdk/                      # 类型化 tRPC 客户端（@geociteops/sdk）
-web/                      # Vue 3 管理控制台（geo-web）
+web/                      # Vue 3 控制台（包名 geociteops-web）
 prisma/                   # schema.prisma
 ```
 
@@ -382,21 +417,51 @@ pnpm test
 pnpm test:watch
 ```
 
+## 常见问题
+
+<details>
+<summary>GEO 是什么？</summary>
+
+生成式引擎优化。目标是在 AI 的回答里被提到、被引用，而不只是排成一条蓝色链接。GeoCiteOps 把它做成一条运营回路：看引擎怎么说，看爬虫能不能抓到站，再把页面改得更容易被引用。
+
+</details>
+
+<details>
+<summary>它会调用哪些引擎？</summary>
+
+`src/server.ts` 里注册了七个适配器：DeepSeek、豆包（火山引擎）、通义千问、文心一言、Perplexity、ChatGPT Search、Gemini。一次运行只调用工作区里已经配了凭证的那些。体检会把其余的标成跳过，原因是「这个引擎还没有配置凭证」。仓库里有 Anthropic 适配器文件，但没有注册进进程。
+
+</details>
+
+<details>
+<summary>数据放在哪？能不能自己托管？</summary>
+
+能。Docker Compose 是主要安装方式：Postgres、迁移、API 和控制台，都在你自己的机器上。引用记录、体检报告和凭证留在这个库里。平台凭证用 `CREDENTIAL_MASTER_KEY` 做信封加密（AES-256-GCM）。调用某个引擎时，问题会发给那个引擎，用的是你存进去的 Key。开源版本里没有 GeoCiteOps 的云账号。
+
+</details>
+
+<details>
+<summary>要花多少钱？</summary>
+
+仓库是 MIT。你付的是跑它的机器，以及你接上的引擎或 LLM API。体检里的就绪、可引用性、结构化信号不需要这些 Key。引用快照和定时监测需要，而且是你想计入分数的每一个引擎各一份。应用内部的计费（套餐、订单、mock 支付）是给把 GeoCiteOps 当成多租户服务来运营的人用的。`BILLING_ENFORCEMENT` 不是 `on` 就不会生效。
+
+</details>
+
 ## 路线图
 
-- [x] 8 个 AI 引擎的引用监测
+- [x] 七个已注册引擎的引用监测（DeepSeek、豆包、通义千问、文心一言、Perplexity、ChatGPT Search、Gemini）
 - [x] 内容原子化、评分与改写
 - [x] JSON-LD 与 `llms.txt` 生成
 - [x] Agent 就绪审计（robots、llms.txt、站点地图、页面信号、Markdown、爬虫可访问性）
 - [x] 一键 GEO 体检（就绪 + 引用 + 可引用性 + 结构化信号）
 - [x] 知识图谱抽取与导出
 - [x] 容器化一键部署（Docker Compose 四服务）
-- [ ] 闭环自动化：监测 → 优化建议 → 发布
-- [ ] 更多平台与更丰富的 SOV 分析
+- [x] 闭环：监测发现薄弱点 → 改写建议 → 人工发布 → 下一次运行回填 Δ
+- [ ] 把尚未注册的适配器接上，以及更细的声量分析
 
 ## 参与贡献
 
-欢迎提交 Issue 和 Pull Request。较大的改动请先开 Issue 讨论——分支命名、commit 风格、新代码的测试要求见 [CONTRIBUTING.md](./CONTRIBUTING.md)。提交贡献即表示你同意以 MIT 协议授权。
+欢迎提交 Issue 和 Pull Request。较大的改动请先开 Issue 讨论。分支命名、commit 风格、新代码的测试要求见 [CONTRIBUTING.md](./CONTRIBUTING.md)。还没建成 GitHub issue 的起步任务列在 [docs/good-first-issues.md](./docs/good-first-issues.md)。提交贡献即表示你同意以 MIT 协议授权。
 
 ## 许可证
 

@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Demo snapshot for Agent Readiness and the GEO health check.** `pnpm demo:reset` now stores one fictional ZoomerAI audit and one fictional health report beside the existing citation seed. The numbers are not hand-written: checks go through `buildReport`, the overall score and the action list go through `conclude`. The report text says the samples are fictional.
+- **README tour.** English and Simplified Chinese READMEs lead with the one-click health check, a short flow, a qualitative comparison, and an FAQ. Screenshots and a short GIF of the fictional workspace live in `docs/assets/`.
+- **Starter task list** in [docs/good-first-issues.md](./docs/good-first-issues.md). These are suggestions, not GitHub issues.
+
+### Fixed
+
+- `pnpm dev:web` filtered the package `geo-web`, which matches nothing after the console was renamed to `geociteops-web`. It now filters `./web`, the same path CI typechecks.
+- Batched tRPC queries on the overview (the procedure list is longer than Fastify's default 100-character param limit) returned 404, so the dashboard stayed empty. The server allows a longer param.
+
+### Added
+
 - **GEO health check** — one form (brand, official URL, optional industry, competitors, and questions)
   produces a single report: the embedded Agent Readiness audit, a one-shot citation snapshot on
   whichever engines the workspace has configured, citability scores for the homepage and a few

@@ -42,6 +42,8 @@ const prisma = new PrismaClient()
 async function truncateDemoData(workspaceId) {
   await prisma.optimizationTask.deleteMany({ where: { workspaceId } })
   await prisma.schemaRecord.deleteMany({ where: { workspaceId } })
+  await prisma.geoHealthCheck.deleteMany({ where: { workspaceId } })
+  await prisma.agentReadinessAudit.deleteMany({ where: { workspaceId } })
   await prisma.citationEvent.deleteMany({ where: { workspaceId } })
   // 监测运行（M2 §3.1）：Run 删除 Cascade 掉其采样行；显式删除保证重置后不留孤儿 Run
   await prisma.citationRun.deleteMany({ where: { workspaceId } })
@@ -81,7 +83,7 @@ async function main() {
     loadMasterKey()
   } catch (e) {
     console.error('❌ CREDENTIAL_MASTER_KEY 未配置或格式非法：', e.message)
-    console.error('   生成命令：node -e "console.log(require(require(\'crypto\').randomBytes(32).toString(\'hex\'))"')
+    console.error('   生成命令：node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"')
     process.exitCode = 1
     return
   }

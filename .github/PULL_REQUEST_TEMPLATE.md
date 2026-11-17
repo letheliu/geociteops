@@ -14,7 +14,7 @@
 - [ ] `pnpm test` 本地跑过，结果：**___ 通过 / ___ 失败**
       （失败项若为已知环境性问题——无本地 Postgres、zvec Windows 文件锁——请注明）
 - [ ] `pnpm exec tsc --noEmit` 通过（后端）
-- [ ] `pnpm --filter geo-web exec vue-tsc -b` 通过（前端）
+- [ ] `pnpm --filter ./web exec vue-tsc -b` 通过（前端）
 - [ ] `pnpm exec prisma generate` 已执行（**tsc 前必须**，否则 Prisma 类型全红）
 
 ```

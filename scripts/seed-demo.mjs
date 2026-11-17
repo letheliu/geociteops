@@ -47,6 +47,9 @@ await prisma.$transaction([
   prisma.citationRun.deleteMany({ where: { workspaceId: WS_ID } }),
   prisma.citationQuery.deleteMany({ where: { workspaceId: WS_ID } }),
   prisma.contentPage.deleteMany({ where: { workspaceId: WS_ID } }),
+  // 体检和就绪审计不挂在上面那些表上，重置时单独清，避免历史列表越积越长
+  prisma.geoHealthCheck.deleteMany({ where: { workspaceId: WS_ID } }),
+  prisma.agentReadinessAudit.deleteMany({ where: { workspaceId: WS_ID } }),
 ])
 // KgEntity/KgRelation 通过 entity 间接归属，先删关系再删实体
 const oldEntities = await prisma.kgEntity.findMany({ where: { workspaceId: WS_ID }, select: { id: true } })
@@ -700,6 +703,63 @@ for (const r of RELATIONS) {
 }
 console.log(`✅ KgRelation 已填充: ${RELATIONS.length} 条关系`)
 
+// === 9. Agent 就绪 + GEO 体检（虚构样本，分数走产品公式）===
+const { buildDemoReports } = await import('./lib/demo-reports.ts')
+const demoReports = buildDemoReports({ generatedAt: new Date(NOW - 2 * 3600000) })
+const auditFinished = new Date(NOW - 2 * 3600000)
+const auditStarted = new Date(auditFinished.getTime() - 4000)
+await prisma.agentReadinessAudit.create({
+  data: {
+    workspaceId: WS_ID,
+    targetUrl: demoReports.readiness.url,
+    status: 'SUCCEEDED',
+    score: demoReports.readiness.score,
+    grade: demoReports.readiness.grade,
+    report: demoReports.readiness,
+    startedAt: auditStarted,
+    finishedAt: auditFinished,
+    createdAt: auditStarted,
+  },
+})
+const healthFinished = new Date(NOW - 2 * 3600000 + 60_000)
+const healthStarted = new Date(healthFinished.getTime() - 20_000)
+const pillarStamp = {
+  status: 'SUCCEEDED',
+  error: null,
+  startedAt: healthStarted.toISOString(),
+  finishedAt: healthFinished.toISOString(),
+}
+await prisma.geoHealthCheck.create({
+  data: {
+    workspaceId: WS_ID,
+    brandName: demoReports.health.brandName,
+    siteUrl: demoReports.health.siteUrl,
+    industry: demoReports.health.industry,
+    competitors: demoReports.competitors,
+    userQueries: demoReports.userQueries,
+    language: 'zh',
+    status: demoReports.healthStatus,
+    score: demoReports.health.score,
+    grade: demoReports.health.grade,
+    progress: {
+      percent: 100,
+      pillars: {
+        agentReadiness: pillarStamp,
+        citations: pillarStamp,
+        citability: pillarStamp,
+        structuredSignals: pillarStamp,
+      },
+    },
+    pillarResults: demoReports.health.pillars,
+    report: demoReports.health,
+    startedAt: healthStarted,
+    finishedAt: healthFinished,
+    createdAt: healthStarted,
+  },
+})
+console.log(`✅ Agent 就绪演示审计: ${demoReports.readiness.score} ${demoReports.readiness.grade}（虚构样本）`)
+console.log(`✅ GEO 体检演示报告: ${demoReports.health.score} ${demoReports.health.grade}（虚构样本，${demoReports.healthStatus}）`)
+
 // === 汇总 ===
 // 注意：KgRelation 没有直接的 workspaceId 字段，通过实体间接归属
 const entityIds = Object.values(createdEntities).map(e => e.id)
@@ -738,6 +798,8 @@ console.log(`\n📊 SOV 趋势（呼应「优化后效果提升」叙事）:`)
 console.log(`  近 7 天 SOV:  ${sovRecent.toFixed(1)}%`)
 console.log(`  前 7 天 SOV:  ${sovPrev.toFixed(1)}%`)
 console.log(`  变化:         ${(sovRecent - sovPrev >= 0 ? '+' : '')}${(sovRecent - sovPrev).toFixed(1)}%`)
-console.log(`\n🔑 登录 Key: geo_12b0a4dfa067e0835ff47312fb125be828d308d2593cfedf`)
+console.log(`  Agent 就绪:   ${demoReports.readiness.score} ${demoReports.readiness.grade}`)
+console.log(`  GEO 体检:     ${demoReports.health.score} ${demoReports.health.grade}`)
+console.log('\n控制台登录用 pnpm demo:reset 打印的演示账号（默认用户名 demo-viewer）。上面不再打印已失效的 API Key。')
 
 await prisma.$disconnect()
