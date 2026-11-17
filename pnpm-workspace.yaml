@@ -1,6 +1,13 @@
 packages:
   - "sdk"
   - "web"
+  - "mcp"
+# pnpm 11 rejects versions published within the last day. The MCP SDK's
+# latest @hono/node-server and express's router were inside that window.
+# These are the newest releases that still satisfy the declared ranges.
+overrides:
+  '@hono/node-server': 2.1.8
+  router: 2.2.0
 allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true
