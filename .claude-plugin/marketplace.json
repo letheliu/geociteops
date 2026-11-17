@@ -1,0 +1,14 @@
+{
+  "name": "geociteops",
+  "description": "GeoCiteOps plugins for Claude Code.",
+  "owner": {
+    "name": "letheliu"
+  },
+  "plugins": [
+    {
+      "name": "geociteops",
+      "source": "./integrations/claude-code",
+      "description": "GEO audits, health checks, citation checks, and structured signals inside Claude Code."
+    }
+  ]
+}

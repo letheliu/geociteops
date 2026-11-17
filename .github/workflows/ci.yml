@@ -74,6 +74,12 @@ jobs:
         working-directory: sdk
         run: npm publish --dry-run
 
+      # MCP 包要编出可执行的 dist（npx 入口）。dry-run 会跑 prepublishOnly：
+      # 类型检查 + esbuild。不需要 registry 凭据，也不会真的发布。
+      - name: MCP publish dry-run
+        working-directory: mcp
+        run: npm publish --dry-run
+
   # ------------------------------------------------------------------
   # 测试：需要真实 Postgres（pgvector）
   #

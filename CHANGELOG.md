@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **MCP server (`@geociteops/mcp`)** — stdio MCP server (optional localhost Streamable HTTP) so Claude Code, Cursor, and Claude Desktop can run GEO health checks, agent readiness audits, citation checks, share of voice, content optimization, JSON-LD, `llms.txt`, and knowledge-graph extraction. Agent readiness, `llms.txt`, and JSON-LD also run in-process with no API key. Claude Code skills live in `integrations/claude-code/`. See [docs/mcp.md](./docs/mcp.md).
 - **Demo snapshot for Agent Readiness and the GEO health check.** `pnpm demo:reset` now stores one fictional ZoomerAI audit and one fictional health report beside the existing citation seed. The numbers are not hand-written: checks go through `buildReport`, the overall score and the action list go through `conclude`. The report text says the samples are fictional.
 - **README tour.** English and Simplified Chinese READMEs lead with the one-click health check, a short flow, a qualitative comparison, and an FAQ. Screenshots and a short GIF of the fictional workspace live in `docs/assets/`.
 - **Starter task list** in [docs/good-first-issues.md](./docs/good-first-issues.md). These are suggestions, not GitHub issues.

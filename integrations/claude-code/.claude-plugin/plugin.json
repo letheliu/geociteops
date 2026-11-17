@@ -1,0 +1,28 @@
+{
+  "name": "geociteops",
+  "description": "GEO health checks, agent readiness, citations, and structured signals inside Claude Code.",
+  "version": "0.1.0",
+  "author": {
+    "name": "letheliu",
+    "url": "https://github.com/letheliu/geociteops"
+  },
+  "userConfig": {
+    "api_url": {
+      "type": "string",
+      "title": "GeoCiteOps API URL",
+      "description": "Base URL of your GeoCiteOps API.",
+      "default": "http://localhost:4000"
+    },
+    "api_key": {
+      "type": "string",
+      "title": "Workspace API key",
+      "description": "Leave empty to use local agent readiness, llms.txt, and JSON-LD only.",
+      "sensitive": true
+    },
+    "workspace_id": {
+      "type": "string",
+      "title": "Workspace id",
+      "description": "Optional. A workspace API key already selects its workspace. Sent as x-workspace-id."
+    }
+  }
+}
