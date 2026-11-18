@@ -106,7 +106,7 @@ describe('query library service', () => {
             queryText: 'AI 设计工具哪个好',
             intentType: 'comparison',
             cluster: 'ai-design-tools',
-            mappedPageUrl: 'https://zoomer.top/features',
+            mappedPageUrl: 'https://acmedraw.example/features',
             priority: 1,
           },
         ]),
@@ -129,7 +129,7 @@ describe('query library service', () => {
         status: 'ACTIVE',
         intentType: 'comparison',
         cluster: 'ai-design-tools',
-        mappedPageUrl: 'https://zoomer.top/features',
+        mappedPageUrl: 'https://acmedraw.example/features',
         priority: 1,
       }),
     })
@@ -168,7 +168,7 @@ describe('query library service', () => {
       source: 'MANUAL',
       intentType: 'comparison',
       cluster: 'ai-design',
-      mappedPageUrl: 'https://zoomer.top',
+      mappedPageUrl: 'https://acmedraw.example',
       priority: 1,
     })
 
@@ -176,7 +176,7 @@ describe('query library service', () => {
       data: expect.objectContaining({
         intentType: 'comparison',
         cluster: 'ai-design',
-        mappedPageUrl: 'https://zoomer.top',
+        mappedPageUrl: 'https://acmedraw.example',
         priority: 1,
       }),
     })

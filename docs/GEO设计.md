@@ -1,4 +1,6 @@
-# 给程序员的 GEO 开发指南（基于 zoomer.top）
+# 给程序员的 GEO 开发指南（示例站点 acmedraw.example）
+
+示例品牌是虚构的 **Acme Draw**。站点 `https://acmedraw.example` 用的是保留顶级域 `.example`，不可能属于任何真实产品。下面的竞品（Northstar）同样是虚构的。
 
 既然你是程序员、有自己的产品域名、想自己开发 GEO 工具，那我给你一套**真正可落地的**技术路线，而不是营销话术。
 
@@ -19,7 +21,7 @@
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Frontend (Vue 3 / Nuxt)  → zoomer.top 后台      │
+│  Frontend (Vue 3 / Nuxt)  → acmedraw.example 后台      │
 ├─────────────────────────────────────────────────┤
 │  API Gateway (FastAPI / Hono)                    │
 ├─────────────────────────────────────────────────┤
@@ -166,20 +168,20 @@ CREATE INDEX ON citation_events USING ivfflat (embedding vector_cosine_ops);
 **llms.txt 是 2024 年 Answer.AI 提出的 AI 爬虫协议**，类似于 robots.txt 但专门给 LLM 用的：
 
 ```markdown
-# zoomer.top
-> AI 时代的内容协作平台，专注团队知识沉淀与语义检索
+# Acme Draw
+> 虚构的 AI 图像生成产品。站点 https://acmedraw.example 使用保留域名。
 
 ## 核心产品
-- [功能 1](https://zoomer.top/features/x): 一句话定义
-- [功能 2](https://zoomer.top/features/y): 一句话定义
+- [画布编辑](https://acmedraw.example/features/canvas): 可视化图层编辑
+- [中文提示词](https://acmedraw.example/features/prompts): 直接用中文描述出图
 
 ## 权威资源
-- [白皮书](https://zoomer.top/whitepaper.pdf): 完整技术方案
-- [技术博客](https://zoomer.top/blog): 工程实践
+- [说明](https://acmedraw.example/whitepaper.pdf): 产品说明（示例）
+- [博客](https://acmedraw.example/blog): 工程实践（示例）
 
 ## 常见问答
-- Q: zoomer.top 解决什么问题？A: ...
-- Q: 跟 Notion 的差异？A: ...
+- Q: Acme Draw 解决什么问题？A: ...
+- Q: 跟 Northstar 的差异？A: ...
 
 ## 更新频率
 - 文档：每周
@@ -193,7 +195,7 @@ import { generateStructuredData } from './llm-extractor';
 
 const schema = await generateStructuredData({
   type: 'SoftwareApplication',
-  url: 'https://zoomer.top',
+  url: 'https://acmedraw.example',
   fields: {
     name: '...',
     description: '...',
@@ -207,9 +209,9 @@ const schema = await generateStructuredData({
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "zoomer.top",
+  "name": "Acme Draw",
   "description": "...",
-  "url": "https://zoomer.top",
+  "url": "https://acmedraw.example",
   "applicationCategory": "ProductivityApplication",
   "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
   "aggregateRating": {"@type": "AggregateRating", "ratingValue": "4.8", "ratingCount": "126"}
@@ -221,24 +223,24 @@ const schema = await generateStructuredData({
 
 ### 模块 4：Knowledge Graph Builder（知识图谱）
 
-**目标**：让 zoomer.top 的"实体"在 Wikidata/Schema.org 知识图谱中可被识别。
+**目标**：让 acmedraw.example 的"实体"在 Wikidata/Schema.org 知识图谱中可被识别。
 
 ```python
 from rdflib import Graph, Literal, URIRef, Namespace
 
-EX = Namespace("https://zoomer.top/entity/")
+EX = Namespace("https://acmedraw.example/entity/")
 
 def build_kg():
     g = Graph()
 
-    # 把 zoomer.top 建模为一个 SoftwareProduct 节点
-    g.add((EX.zoomer_top, RDF.type, SCHEMA.SoftwareApplication))
-    g.add((EX.zoomer_top, SCHEMA.name, Literal("zoomer.top")))
-    g.add((EX.zoomer_top, SCHEMA.featureList, EX.feature_knowledge_graph))
+    # 把 acmedraw.example 建模为一个 SoftwareProduct 节点
+    g.add((EX.acme_draw, RDF.type, SCHEMA.SoftwareApplication))
+    g.add((EX.acme_draw, SCHEMA.name, Literal("Acme Draw")))
+    g.add((EX.acme_draw, SCHEMA.featureList, EX.feature_knowledge_graph))
 
-    # 与竞品/上下游建立关系
-    g.add((EX.zoomer_top, SCHEMA competitor, EX.notion))
-    g.add((EX.zoomer_top, SCHEMA.audience, EX.startup_founder))
+    # 与虚构竞品建立关系（northstar.example，不是真实公司）
+    g.add((EX.acme_draw, SCHEMA competitor, EX.northstar))
+    g.add((EX.acme_draw, SCHEMA.audience, EX.startup_founder))
 
 
     # 同步到 Wikidata（如果值得提交）
@@ -260,13 +262,13 @@ def build_kg():
 ```python
 # 实验：在 5 个 AI 平台问 50 个 query，记录引用情况
 queries = [
-    "best AI content tool for teams",
-    "alternative to Notion for developers",
-    "what is semantic search",
+    "AI image tools with a canvas editor",
+    "alternative to Northstar",
+    "what is Acme Draw",
     # ... 50 个
 ]
 
-# 跑一遍，手工记录 zoomer.top 是否被引用
+# 跑一遍，手工记录 acmedraw.example 是否被引用
 # 这个 baseline 是你后面所有优化的对照
 ```
 
@@ -317,13 +319,13 @@ LLM 生成改写方案
 
 ---
 
-## 五、给 zoomer.top 的具体起点建议
+## 五、给 acmedraw.example 的具体起点建议
 
 我建议**这周就做**：
-1. **部署 llms.txt** —— 在 zoomer.top 根目录放一份完整 llms.txt（10 分钟）
+1. **部署 llms.txt** —— 在 acmedraw.example 根目录放一份完整 llms.txt（10 分钟）
 2. **添加关键页面 JSON-LD** —— SoftwareApplication、Organization、Product、FAQPage（1 天）
-3. **建 50 个核心 query 库** —— 围绕"AI 协作、知识管理、团队 wiki"等你的核心场景（半天）
-4. **跑一次 baseline** —— 5 个平台 × 50 个 query = 250 次调用，记录 zoomer.top 当前被引用情况（半天）
+3. **建 50 个核心 query 库** —— 围绕「AI 图像生成、中文提示词、画布编辑」等核心场景（半天）
+4. **跑一次 baseline** —— 5 个平台 × 50 个 query = 250 次调用，记录 acmedraw.example 当前被引用情况（半天）
 5. **改写 10 篇核心内容** —— 按"AI 友好切片"标准重写（2 天）
 
 做完这 5 步，**2 周内你就有真实的 baseline + 第一批可对比的优化样本**。这时候再决定要不要做工具。

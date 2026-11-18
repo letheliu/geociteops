@@ -8,7 +8,7 @@ describe('SchemaTypeAdapter', () => {
 
   it('rawType 含"工具"/"app" → SoftwareApplication', () => {
     const result = adapter.adapt([
-      { name: 'zoomer AI', rawType: 'AI 设计工具', properties: { name: 'zoomer AI' } },
+      { name: 'Acme Draw', rawType: 'AI 设计工具', properties: { name: 'Acme Draw' } },
       { name: 'X', rawType: 'mobile app', properties: { name: 'X' } },
     ])
     expect(result).toHaveLength(2)
@@ -54,22 +54,22 @@ describe('SchemaTypeAdapter', () => {
   it('未匹配的 rawType 被跳过（不抛错）', () => {
     const result = adapter.adapt([
       { name: 'unknown', rawType: '杂七杂八的东西', properties: {} },
-      { name: 'zoomer', rawType: 'AI 工具', properties: { name: 'zoomer' } },
+      { name: 'acme', rawType: 'AI 工具', properties: { name: 'acme' } },
     ])
     expect(result).toHaveLength(1)
-    expect((result[0].fields as any).name).toBe('zoomer')
+    expect((result[0].fields as any).name).toBe('acme')
   })
 
   it('过滤掉不在白名单的 properties 字段', () => {
     const result = adapter.adapt([
       {
-        name: 'zoomer',
+        name: 'acme',
         rawType: 'AI 工具',
-        properties: { name: 'zoomer', applicationCategory: 'DesignApp', extra: 'drop me' },
+        properties: { name: 'acme', applicationCategory: 'DesignApp', extra: 'drop me' },
       },
     ])
     expect((result[0].fields as any).extra).toBeUndefined()
-    expect((result[0].fields as any).name).toBe('zoomer')
+    expect((result[0].fields as any).name).toBe('acme')
     expect((result[0].fields as any).applicationCategory).toBe('DesignApp')
   })
 

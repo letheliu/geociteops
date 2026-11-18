@@ -111,7 +111,7 @@ async function handleSave() {
         <NCard title="编辑">
           <NForm label-placement="top">
             <NFormItem label="品牌名">
-              <NInput v-model:value="brandName" placeholder="zoomer.top" />
+              <NInput v-model:value="brandName" placeholder="acmedraw.example" />
             </NFormItem>
             <NFormItem label="标语">
               <NInput v-model:value="tagline" placeholder="AI 时代的内容协作平台" />

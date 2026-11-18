@@ -8,7 +8,7 @@ describe('DeepSeekAdapter', () => {
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
-            choices: [{ message: { content: 'zoomer AI。https://zoomer.top' } }],
+            choices: [{ message: { content: 'Acme Draw。https://acmedraw.example' } }],
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         ),
@@ -20,8 +20,8 @@ describe('DeepSeekAdapter', () => {
   it('返回答案并提取 URL', async () => {
     const adapter = new DeepSeekAdapter()
     const result = await adapter.query('AI工具', { DEEPSEEK_API_KEY: 'ds-test' })
-    expect(result.answer).toContain('zoomer AI')
-    expect(result.sourceCitations[0].url).toBe('https://zoomer.top')
+    expect(result.answer).toContain('Acme Draw')
+    expect(result.sourceCitations[0].url).toBe('https://acmedraw.example')
   })
 
   it('使用 DeepSeek base url', async () => {

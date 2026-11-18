@@ -37,7 +37,7 @@ describe('AutoSections', () => {
   it('从 KG 实体（SoftwareApplication/Product）收集核心产品 section', async () => {
     const prisma = mockPrisma({
       entities: [
-        { name: 'zoomer AI', type: 'SoftwareApplication', properties: { url: 'https://x.com/zoomer' } },
+        { name: 'Acme Draw', type: 'SoftwareApplication', properties: { url: 'https://x.com/acme' } },
         { name: 'Pro Plan', type: 'Product', properties: { url: 'https://x.com/pro' } },
         { name: 'Acme Co', type: 'Organization', properties: {} },
       ],
@@ -47,7 +47,7 @@ describe('AutoSections', () => {
     const productSection = result.sections.find((s) => s.title === '核心产品')
     expect(productSection).toBeDefined()
     expect(productSection!.items).toHaveLength(2)
-    expect(productSection!.items.map((i) => i.label)).toContain('zoomer AI')
+    expect(productSection!.items.map((i) => i.label)).toContain('Acme Draw')
   })
 
   it('从 ContentPage（blog/docs）收集权威资源 section', async () => {
@@ -68,7 +68,7 @@ describe('AutoSections', () => {
   it('从 ContentPage.optimizedContent 解析 FaqPair 收集常见问答 section', async () => {
     const faqResult = {
       faqs: [
-        { question: '什么是 zoomer AI?', answer: '是 AI 设计工具' },
+        { question: '什么是 Acme Draw?', answer: '是 AI 设计工具' },
         { question: '价格如何?', answer: '免费' },
       ],
     }

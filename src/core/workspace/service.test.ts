@@ -26,7 +26,7 @@ describe('workspace service', () => {
   it('create 抛错占位（任务 9/11 重写：Organization + ApiCredential 签发）', async () => {
     const svc = createWorkspaceService(prisma)
     await expect(
-      svc.create({ name: 'zoomer', defaultBrandName: 'zoomer AI' }),
+      svc.create({ name: 'acme', defaultBrandName: 'Acme Draw' }),
     ).rejects.toThrow(API_KEY_CHANNEL_ERROR)
     expect(prisma.workspace.create).not.toHaveBeenCalled()
   })
@@ -38,7 +38,7 @@ describe('workspace service', () => {
   })
 
   it('getById 按 id 查找', async () => {
-    prisma.workspace.findUnique.mockResolvedValue({ id: 'ws-1', name: 'zoomer' })
+    prisma.workspace.findUnique.mockResolvedValue({ id: 'ws-1', name: 'acme' })
     const svc = createWorkspaceService(prisma)
     const found = await svc.getById('ws-1')
     expect(found?.id).toBe('ws-1')

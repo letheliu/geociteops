@@ -8,7 +8,7 @@ describe('diagnostic normalization', () => {
   })
 
   it('rejects brand alias that conflicts with competitor name', () => {
-    expect(() => validateBrandCompetitors('Zoomer', ['Zoomer AI'], [{ name: 'zoomer ai' }]))
+    expect(() => validateBrandCompetitors('Acme', ['Acme Draw'], [{ name: 'acme draw' }]))
       .toThrow('BRAND_COMPETITOR_CONFLICT')
   })
 
@@ -35,7 +35,7 @@ describe('diagnostic normalization', () => {
   })
 
   it('accepts same brand name in competitor conflict check', () => {
-    expect(() => validateBrandCompetitors('Zoomer', ['Zoomer'], []))
+    expect(() => validateBrandCompetitors('Acme Draw', ['Acme Draw'], []))
       .not.toThrow()
   })
 })

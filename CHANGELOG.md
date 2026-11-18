@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Demo snapshot for Agent Readiness and the GEO health check.** `pnpm demo:reset` now stores one fictional ZoomerAI audit and one fictional health report beside the existing citation seed. The numbers are not hand-written: checks go through `buildReport`, the overall score and the action list go through `conclude`. The report text says the samples are fictional.
+- **Demo snapshot for Agent Readiness and the GEO health check.** `pnpm demo:reset` stores one fictional Acme Draw audit and one fictional health report beside the citation seed. The numbers are not hand-written: checks go through `buildReport`, the overall score and the action list go through `conclude`. The report text says the samples are fictional. The brand is Acme Draw at `https://acmedraw.example` (the reserved `.example` TLD). Competitors in the seed are fictional names on `.example` domains.
 - **README tour.** English and Simplified Chinese READMEs lead with the one-click health check, a short flow, a qualitative comparison, and an FAQ. Screenshots and a short GIF of the fictional workspace live in `docs/assets/`.
 - **Starter task list** in [docs/good-first-issues.md](./docs/good-first-issues.md). These are suggestions, not GitHub issues.
 

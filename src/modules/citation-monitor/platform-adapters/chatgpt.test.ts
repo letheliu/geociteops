@@ -10,9 +10,9 @@ describe('ChatGptSearchAdapter', () => {
           JSON.stringify({
             choices: [{
               message: {
-                content: 'zoomer AI 是设计工具。详见 https://zoomer.top',
+                content: 'Acme Draw 是设计工具。详见 https://acmedraw.example',
                 annotations: [
-                  { type: 'url_citation', url_citation: { url: 'https://zoomer.top', title: 'Zoomer AI' } },
+                  { type: 'url_citation', url_citation: { url: 'https://acmedraw.example', title: 'Acme Draw' } },
                 ],
               },
             }],
@@ -27,10 +27,10 @@ describe('ChatGptSearchAdapter', () => {
   it('返回答案并从 annotations 提取引用', async () => {
     const adapter = new ChatGptSearchAdapter()
     const result = await adapter.query('AI工具', { OPENAI_API_KEY: 'sk-test' })
-    expect(result.answer).toContain('zoomer AI')
+    expect(result.answer).toContain('Acme Draw')
     expect(result.sourceCitations).toHaveLength(1)
-    expect(result.sourceCitations[0].url).toBe('https://zoomer.top')
-    expect(result.sourceCitations[0].title).toBe('Zoomer AI')
+    expect(result.sourceCitations[0].url).toBe('https://acmedraw.example')
+    expect(result.sourceCitations[0].title).toBe('Acme Draw')
   })
 
   it('无 annotations 时降级正则提 URL', async () => {

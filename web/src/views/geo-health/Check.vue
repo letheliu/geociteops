@@ -290,7 +290,7 @@ onUnmounted(stopPolling)
         </NGridItem>
         <NGridItem span="2 m:1">
           <NText depth="3" style="font-size: 12px">竞品（可选，每行一个或用逗号分隔，最多 8 个）</NText>
-          <NInput v-model:value="competitorsText" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="Notion" :disabled="starting" />
+          <NInput v-model:value="competitorsText" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="Northstar" :disabled="starting" />
         </NGridItem>
         <NGridItem span="2 m:1">
           <NText depth="3" style="font-size: 12px">目标问题（可选。留空则自动生成 5–8 个起步问题）</NText>

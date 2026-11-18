@@ -4,8 +4,8 @@ import type { PrismaClient } from '@prisma/client'
 
 function mockPrisma() {
   const entities = new Map<string, any>([
-    ['w1::zoomer AI', { id: 'e1', workspaceId: 'w1', name: 'zoomer AI', type: 'SoftwareApplication', properties: {} }],
-    ['w2::zoomer AI', { id: 'e2', workspaceId: 'w2', name: 'zoomer AI', type: 'SoftwareApplication', properties: {} }],
+    ['w1::Acme Draw', { id: 'e1', workspaceId: 'w1', name: 'Acme Draw', type: 'SoftwareApplication', properties: {} }],
+    ['w2::Acme Draw', { id: 'e2', workspaceId: 'w2', name: 'Acme Draw', type: 'SoftwareApplication', properties: {} }],
   ])
   return {
     kgEntity: {
@@ -57,13 +57,13 @@ describe('KgRepository', () => {
   it('addEntity 重复 name 时抛 DuplicateEntityError', async () => {
     const repo = createKgRepository(mockPrisma())
     await expect(
-      repo.addEntity({ workspaceId: 'w1', name: 'zoomer AI', type: 'X', properties: {} }),
+      repo.addEntity({ workspaceId: 'w1', name: 'Acme Draw', type: 'X', properties: {} }),
     ).rejects.toThrow(DuplicateEntityError)
   })
 
   it('findEntityByName 返回已知实体', async () => {
     const repo = createKgRepository(mockPrisma())
-    const entity = await repo.findEntityByName('w1', 'zoomer AI')
+    const entity = await repo.findEntityByName('w1', 'Acme Draw')
     expect(entity?.id).toBe('e1')
   })
 
@@ -96,9 +96,9 @@ describe('KgRepository', () => {
 
   it('addRelation 不会跨 workspace 串到同名实体', async () => {
     const repo = createKgRepository(mockPrisma())
-    // w1 中没有 zoomer AI 之外的实体，但 w2 有
+    // w1 中没有 Acme Draw 之外的实体，但 w2 有
     await expect(
-      repo.addRelation({ workspaceId: 'w2', fromName: 'zoomer AI', toName: 'missingInW2', relationType: 'competitor' }),
+      repo.addRelation({ workspaceId: 'w2', fromName: 'Acme Draw', toName: 'missingInW2', relationType: 'competitor' }),
     ).rejects.toThrow(EntityNotFoundError)
   })
 

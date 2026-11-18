@@ -299,7 +299,7 @@ async function handleSaveCompetitors() {  savingCompetitors.value = true
             tag
             clearable
             :disabled="!canWrite"
-            placeholder="输入竞品名后回车添加，如 Midjourney"
+            placeholder="输入竞品名后回车添加，如 Northstar"
             :options="competitors.map((c) => ({ label: c, value: c }))"
             style="max-width: 560px"
           />

@@ -14,7 +14,7 @@ function mockLlm(responseText: string): LlmProvider {
 function makeScoredAtom(overrides: Partial<ScoredAtom> = {}): ScoredAtom {
   return {
     text: '原始文本',
-    subject: 'zoomer AI',
+    subject: 'Acme Draw',
     predicate: '是',
     object: '工具',
     anchors: [],
@@ -32,12 +32,12 @@ function makeScoredAtom(overrides: Partial<ScoredAtom> = {}): ScoredAtom {
 describe('LlmRewriter', () => {
   it('rewriteBatch 只重写不达标的 atom（score < threshold）', async () => {
     const rewrittenJson = JSON.stringify({
-      text: 'zoomer AI 在 2024 年服务了 50 万设计师',
-      subject: 'zoomer AI',
+      text: 'Acme Draw 在 2024 年服务了 50 万设计师',
+      subject: 'Acme Draw',
       predicate: '服务了',
       object: '50 万设计师',
-      anchors: ['2024年', '50万', 'zoomer AI'],
-      definition: 'zoomer AI 是一款 AI 设计工具',
+      anchors: ['2024年', '50万', 'Acme Draw'],
+      definition: 'Acme Draw 是一款 AI 设计工具',
     })
     const llm = mockLlm(rewrittenJson)
     const rewriter = createRewriter(llm)
@@ -97,11 +97,11 @@ describe('LlmRewriter', () => {
   it('rewrite 单个 atom', async () => {
     const rewrittenJson = JSON.stringify({
       text: '改写后内容 2024',
-      subject: 'zoomer AI',
+      subject: 'Acme Draw',
       predicate: '是',
       object: '工具',
-      anchors: ['2024', 'zoomer AI'],
-      definition: 'zoomer AI 是工具',
+      anchors: ['2024', 'Acme Draw'],
+      definition: 'Acme Draw 是工具',
     })
     const llm = mockLlm(rewrittenJson)
     const rewriter = createRewriter(llm)
@@ -132,13 +132,13 @@ describe('rewriteForQuery（M2 §3.3 整页改写）', () => {
     const llm = mockLlm('这是改写后的整页正文')
     const rewriter = createRewriter(llm)
 
-    const out = await rewriter.rewriteForQuery('原始整页内容', 'AI 设计工具哪个好', 'zoomer AI')
+    const out = await rewriter.rewriteForQuery('原始整页内容', 'AI 设计工具哪个好', 'Acme Draw')
     expect(out).toBe('这是改写后的整页正文')
 
     const messages = (llm.chat as any).mock.calls[0][0]
     const prompt = messages.map((m: any) => m.content).join('\n')
     expect(prompt).toContain('AI 设计工具哪个好')
-    expect(prompt).toContain('zoomer AI')
+    expect(prompt).toContain('Acme Draw')
     expect(prompt).toContain('原始整页内容')
   })
 

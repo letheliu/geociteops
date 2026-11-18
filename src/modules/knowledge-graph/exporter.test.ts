@@ -27,7 +27,7 @@ describe('GraphExporter', () => {
     const exporter = createGraphExporter(
       mockPrisma(
         [
-          { id: 'e1', workspaceId: 'w1', name: 'zoomer AI', type: 'SoftwareApplication', properties: { url: 'https://x.com' } },
+          { id: 'e1', workspaceId: 'w1', name: 'Acme Draw', type: 'SoftwareApplication', properties: { url: 'https://x.com' } },
         ],
         [],
       ),
@@ -37,14 +37,14 @@ describe('GraphExporter', () => {
     expect(parsed['@context']).toBeDefined()
     expect(parsed['@graph']).toHaveLength(1)
     expect(parsed['@graph'][0]['@type']).toBe('SoftwareApplication')
-    expect(parsed['@graph'][0]['@id']).toContain('zoomer-ai')
+    expect(parsed['@graph'][0]['@id']).toContain('acme-draw')
   })
 
   it('export turtle 输出 @prefix + 主语谓语宾语句子', async () => {
     const exporter = createGraphExporter(
       mockPrisma(
         [
-          { id: 'e1', workspaceId: 'w1', name: 'zoomer AI', type: 'SoftwareApplication', properties: { name: 'zoomer AI', url: 'https://x.com' } },
+          { id: 'e1', workspaceId: 'w1', name: 'Acme Draw', type: 'SoftwareApplication', properties: { name: 'Acme Draw', url: 'https://x.com' } },
         ],
         [],
       ),
@@ -52,7 +52,7 @@ describe('GraphExporter', () => {
     const out = await exporter.export({ workspaceId: 'w1', format: 'turtle' })
     expect(out).toMatch(/^@prefix/)
     expect(out).toContain('a schema:SoftwareApplication')
-    expect(out).toMatch(/schema:name\s+"zoomer AI"/)
+    expect(out).toMatch(/schema:name\s+"Acme Draw"/)
   })
 
   it('空 workspace 时 jsonld 输出空 @graph', async () => {

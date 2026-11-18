@@ -27,7 +27,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
-    # 不向宿主机发布 5432：避免与宿主机上已有 Postgres 撞端口（演示站与 zoomer 共存时尤其重要）
+    # 不向宿主机发布 5432：避免与宿主机上已有 Postgres 撞端口。
     mem_limit: 512m
 
   # ---------- migrate：一次性迁移 ----------

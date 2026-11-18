@@ -12,7 +12,7 @@ import { loadTrendPoints } from './trend-query.js'
 import { dayKey } from './aggregate.js'
 
 const OK_RESULT: PlatformResult = {
-  answer: '推荐 zoomer AI，详见 https://zoomer.top',
+  answer: '推荐 Acme Draw，详见 https://acmedraw.example',
   sourceCitations: [],
   groundingSources: [],
   answerMentions: [],
@@ -44,8 +44,8 @@ function makePrisma(opts: {
   const workspace = {
     id: 'w1',
     name: '测试工作区',
-    defaultBrandName: 'zoomer AI',
-    domain: 'zoomer.top',
+    defaultBrandName: 'Acme Draw',
+    domain: 'acmedraw.example',
     platformConfig: { openai: { OPENAI_API_KEY: 'sk-test' }, anthropic: { ANTHROPIC_API_KEY: 'an-test' } },
     monitorSampleCount: 5,
     ...opts.workspace,
@@ -628,8 +628,8 @@ describe('monitor — Run 编排', () => {
     registry = registryOf({
       openai: okAdapter({
         query: vi.fn().mockResolvedValue({
-          answer: 'zoomer AI 与 Figma 都可选',
-          sourceCitations: [{ url: 'https://zoomer.top/x', position: 1, sourceType: 'api_citation' }],
+          answer: 'Acme Draw 与 Figma 都可选',
+          sourceCitations: [{ url: 'https://acmedraw.example/x', position: 1, sourceType: 'api_citation' }],
           groundingSources: [],
           answerMentions: [],
         } as PlatformResult),

@@ -1,6 +1,6 @@
 // 演示用的 Agent 就绪审计 + GEO 体检报告。
 //
-// 品牌 ZoomerAI / zoomer.top 是虚构的。分数不手写：检查项交给 Agent 就绪的
+// 品牌 Acme Draw / acmedraw.example 是虚构的。分数不手写：检查项交给 Agent 就绪的
 // buildReport，结构化信号交给 runStructuredSignals，总分和行动清单交给 conclude。
 // 引用快照与页面分数是写死的虚构样本，但提及率、排名分、页面综合分走产品里的同一套公式。
 
@@ -13,12 +13,12 @@ import { QUERY_FALLBACK_NOTE, querySourceOf } from '../../src/modules/geo-health
 import { citationPillarScore, pageComposite } from '../../src/modules/geo-health/score.js'
 import { runStructuredSignals } from '../../src/modules/geo-health/signals.js'
 
-export const DEMO_BRAND = 'ZoomerAI'
-export const DEMO_SITE = 'https://zoomer.top'
+export const DEMO_BRAND = 'Acme Draw'
+export const DEMO_SITE = 'https://acmedraw.example'
 export const DEMO_INDUSTRY = 'AI 图像生成'
 
-const FICTIONAL_EN = 'Fictional demo data for the ZoomerAI walkthrough, not a live fetch or a live engine response.'
-const FICTIONAL_ZH = '这是 ZoomerAI 演示用的虚构数据，不是一次真实抓取，也不是引擎的真实返回。'
+const FICTIONAL_EN = 'Fictional demo data for the Acme Draw walkthrough, not a live fetch or a live engine response.'
+const FICTIONAL_ZH = '这是 Acme Draw 演示用的虚构数据，不是一次真实抓取，也不是引擎的真实返回。'
 
 /** 训练爬虫拒绝不计分；360Spider 单独 Disallow，用来照亮「只挡一家中文引擎」的警告。 */
 const ROBOTS_DENIED = new Set([
@@ -33,13 +33,13 @@ const ROBOTS_DENIED = new Set([
 ])
 
 const QUERIES = [
-  { text: 'ZoomerAI 是什么', kind: 'brand' },
+  { text: 'Acme Draw 是什么', kind: 'brand' },
   { text: '国内好用的 AI 画图工具有哪些', kind: 'category' },
-  { text: 'Midjourney 有没有好用的中文替代', kind: 'comparison' },
+  { text: 'Northstar 有没有好用的中文替代', kind: 'comparison' },
   { text: '免费的 AI 绘画软件推荐', kind: 'category' },
 ]
 
-const COMPETITORS = ['Midjourney', '即梦', '文心一格', 'LiblibAI']
+const COMPETITORS = ['Northstar', 'Inkloom', 'Bristle', 'Huebench']
 
 /**
  * 每个样本是「一个引擎、一个问题、一次回答」。
@@ -47,14 +47,14 @@ const COMPETITORS = ['Midjourney', '即梦', '文心一格', 'LiblibAI']
  * share 是该答案里这个名字的精确份额，品牌自己的份额在 sov 字段。
  */
 const SAMPLES = [
-  row('deepseek', 0, { mentioned: true, cited: true, rank: 2, sov: 0.22, urls: ['https://zoomer.top', 'https://www.midjourney.com'], comps: { Midjourney: [1, 0.45], 即梦: [3, 0.18] } }),
-  row('doubao', 0, { mentioned: true, cited: false, rank: 4, sov: 0.18, urls: ['https://www.midjourney.com'], comps: { Midjourney: [1, 0.5], 即梦: [2, 0.32] } }),
-  row('deepseek', 1, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://jimeng.jianying.com'], comps: { Midjourney: [1, 0.4], 即梦: [2, 0.35], 文心一格: [3, 0.25] } }),
-  row('doubao', 1, { mentioned: true, cited: false, rank: 5, sov: 0.12, urls: ['https://www.midjourney.com'], comps: { Midjourney: [1, 0.48], 文心一格: [2, 0.22], LiblibAI: [4, 0.18] } }),
-  row('deepseek', 2, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://www.midjourney.com'], comps: { Midjourney: [1, 0.7], 即梦: [2, 0.3] } }),
-  row('doubao', 2, { mentioned: false, cited: false, rank: null, sov: 0, urls: [], comps: { Midjourney: [1, 0.55], 即梦: [2, 0.25], LiblibAI: [3, 0.2] } }),
-  row('deepseek', 3, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://www.liblib.art'], comps: { 即梦: [1, 0.4], LiblibAI: [2, 0.35], 文心一格: [3, 0.25] } }),
-  row('doubao', 3, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://www.liblib.art'], comps: { LiblibAI: [1, 0.42], 即梦: [2, 0.33], 文心一格: [3, 0.25] } }),
+  row('deepseek', 0, { mentioned: true, cited: true, rank: 2, sov: 0.22, urls: ['https://acmedraw.example', 'https://northstar.example'], comps: { Northstar: [1, 0.45], Inkloom: [3, 0.18] } }),
+  row('doubao', 0, { mentioned: true, cited: false, rank: 4, sov: 0.18, urls: ['https://northstar.example'], comps: { Northstar: [1, 0.5], Inkloom: [2, 0.32] } }),
+  row('deepseek', 1, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://inkloom.example'], comps: { Northstar: [1, 0.4], Inkloom: [2, 0.35], Bristle: [3, 0.25] } }),
+  row('doubao', 1, { mentioned: true, cited: false, rank: 5, sov: 0.12, urls: ['https://northstar.example'], comps: { Northstar: [1, 0.48], Bristle: [2, 0.22], Huebench: [4, 0.18] } }),
+  row('deepseek', 2, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://northstar.example'], comps: { Northstar: [1, 0.7], Inkloom: [2, 0.3] } }),
+  row('doubao', 2, { mentioned: false, cited: false, rank: null, sov: 0, urls: [], comps: { Northstar: [1, 0.55], Inkloom: [2, 0.25], Huebench: [3, 0.2] } }),
+  row('deepseek', 3, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://huebench.example'], comps: { Inkloom: [1, 0.4], Huebench: [2, 0.35], Bristle: [3, 0.25] } }),
+  row('doubao', 3, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://huebench.example'], comps: { Huebench: [1, 0.42], Inkloom: [2, 0.33], Bristle: [3, 0.25] } }),
 ]
 
 function row(platform, queryIndex, spec) {
@@ -96,11 +96,11 @@ function readinessChecks() {
     check(
       'access.http', 'access', 'pass',
       'Page responds to a browser', '页面对浏览器可访问',
-      'https://zoomer.top returned HTTP 200 in 180ms, with one redirect.',
-      'https://zoomer.top 在 180ms 内返回 HTTP 200，中间有一次跳转。',
+      'https://acmedraw.example returned HTTP 200 in 180ms, with one redirect.',
+      'https://acmedraw.example 在 180ms 内返回 HTTP 200，中间有一次跳转。',
       'No change required.', '无需修改。',
-      'curl -sI https://zoomer.top ends on HTTP 200. Re-run the audit.',
-      'curl -sI https://zoomer.top 最终是 HTTP 200。然后重新审计。',
+      'curl -sI https://acmedraw.example ends on HTTP 200. Re-run the audit.',
+      'curl -sI https://acmedraw.example 最终是 HTTP 200。然后重新审计。',
       { status: 200, durationMs: 180, redirects: 1 },
     ),
     check(
@@ -110,8 +110,8 @@ function readinessChecks() {
       'GPTBot 得到 HTTP 403，而浏览器 User-Agent 得到 HTTP 200。WAF 或机器人规则正在把 AI 爬虫挡在外面。ClaudeBot 得到 HTTP 200。',
       'Allow the GPTBot user-agent through the WAF. Keep a separate robots.txt policy if you only want to opt out of training.',
       '在 WAF 上放行 GPTBot。如果只想拒绝训练，用 robots.txt 单独表达，不要在 WAF 上直接 403。',
-      'curl -sI -A "GPTBot" https://zoomer.top returns the same status as a browser curl. Re-run the audit.',
-      'curl -sI -A "GPTBot" https://zoomer.top 的状态码应与浏览器 curl 相同。然后重新审计。',
+      'curl -sI -A "GPTBot" https://acmedraw.example returns the same status as a browser curl. Re-run the audit.',
+      'curl -sI -A "GPTBot" https://acmedraw.example 的状态码应与浏览器 curl 相同。然后重新审计。',
       {
         browserStatus: 200,
         browserDurationMs: 180,
@@ -127,8 +127,8 @@ function readinessChecks() {
       '/robots.txt returned HTTP 200 and plain text.',
       '/robots.txt 返回 HTTP 200，内容是纯文本。',
       'No change required.', '无需修改。',
-      'Open https://zoomer.top/robots.txt and confirm it is text, not an HTML error page.',
-      '打开 https://zoomer.top/robots.txt，确认是文本而不是 HTML 错误页。',
+      'Open https://acmedraw.example/robots.txt and confirm it is text, not an HTML error page.',
+      '打开 https://acmedraw.example/robots.txt，确认是文本而不是 HTML 错误页。',
       { status: 200, contentType: 'text/plain' },
     ),
     check(
@@ -156,24 +156,24 @@ function readinessChecks() {
     check(
       'llms.txt', 'llms', 'warn',
       'llms.txt is present and valid', 'llms.txt 存在且格式有效',
-      'https://zoomer.top/llms.txt returned HTTP 404. A missing file warns: major answer engines have not confirmed they consume it.',
-      'https://zoomer.top/llms.txt 返回 HTTP 404。文件缺失记为警告：主流回答引擎还没有确认会读取它。',
+      'https://acmedraw.example/llms.txt returned HTTP 404. A missing file warns: major answer engines have not confirmed they consume it.',
+      'https://acmedraw.example/llms.txt 返回 HTTP 404。文件缺失记为警告：主流回答引擎还没有确认会读取它。',
       'Publish an llms.txt with an H1, a blockquote summary, and one H2 section of markdown links. The health report can generate a starter file.',
       '发布一份 llms.txt：一级标题、一段引言摘要，外加一节带 Markdown 链接的二级标题。体检报告可以生成一份起步稿。',
       'Open /llms.txt and confirm the H1, the summary, and one list of links. Re-run the audit.',
       '打开 /llms.txt，确认有一级标题、摘要和一组链接。然后重新审计。',
-      { status: 404, url: 'https://zoomer.top/llms.txt' },
+      { status: 404, url: 'https://acmedraw.example/llms.txt' },
     ),
     check(
       'llms-full.txt', 'llms', 'warn',
       'llms-full.txt is available', 'llms-full.txt 可获取',
-      'https://zoomer.top/llms-full.txt returned HTTP 404. The companion file is optional, so a miss warns and does not fail the audit.',
-      'https://zoomer.top/llms-full.txt 返回 HTTP 404。这个伴随文件是可选的，缺失只警告，不让整次审计失败。',
+      'https://acmedraw.example/llms-full.txt returned HTTP 404. The companion file is optional, so a miss warns and does not fail the audit.',
+      'https://acmedraw.example/llms-full.txt 返回 HTTP 404。这个伴随文件是可选的，缺失只警告，不让整次审计失败。',
       'Optional. Publish llms-full.txt only if you want a single concatenated copy of the linked pages.',
       '可选。只有在你想提供一份拼好的长文时才发布 llms-full.txt。',
       'Open /llms-full.txt. Re-run the audit.',
       '打开 /llms-full.txt。然后重新审计。',
-      { status: 404, url: 'https://zoomer.top/llms-full.txt' },
+      { status: 404, url: 'https://acmedraw.example/llms-full.txt' },
     ),
     check(
       'llms.links', 'llms', 'warn',
@@ -190,18 +190,18 @@ function readinessChecks() {
     check(
       'sitemap', 'sitemap', 'pass',
       'XML sitemap is discoverable', 'XML 站点地图可被发现',
-      'Found https://zoomer.top/sitemap.xml from the Sitemap: directive in robots.txt. It parsed, with a homepage, a features page, and a pricing page.',
-      '从 robots.txt 的 Sitemap: 指令找到 https://zoomer.top/sitemap.xml。解析成功，里面有首页、功能页和定价页。',
+      'Found https://acmedraw.example/sitemap.xml from the Sitemap: directive in robots.txt. It parsed, with a homepage, a features page, and a pricing page.',
+      '从 robots.txt 的 Sitemap: 指令找到 https://acmedraw.example/sitemap.xml。解析成功，里面有首页、功能页和定价页。',
       'No change required.', '无需修改。',
       'Open /sitemap.xml and confirm the URLs you want cited are listed. Re-run the audit.',
       '打开 /sitemap.xml，确认你希望被引用的 URL 都在里面。然后重新审计。',
-      { url: 'https://zoomer.top/sitemap.xml', urlCount: 4 },
+      { url: 'https://acmedraw.example/sitemap.xml', urlCount: 4 },
     ),
     check(
       'page.jsonld', 'page', 'fail',
       'Schema.org JSON-LD is present', '存在 Schema.org JSON-LD',
-      'The raw HTML of https://zoomer.top has no script type="application/ld+json".',
-      'https://zoomer.top 的网页源代码里没有 script type="application/ld+json"。',
+      'The raw HTML of https://acmedraw.example has no script type="application/ld+json".',
+      'https://acmedraw.example 的网页源代码里没有 script type="application/ld+json"。',
       'Add Organization and WebSite JSON-LD to the homepage. View source, not the DOM inspector. The health report can generate a starter file.',
       '在首页加上 Organization 和 WebSite 的 JSON-LD。看网页源代码，不要看 DOM 检查器。体检报告可以生成一份起步稿。',
       'View source and confirm a script type="application/ld+json" is in the HTML. Re-run the audit.',
@@ -217,17 +217,17 @@ function readinessChecks() {
       '把描述改到这个长度，并在句子里保留品牌名。',
       'curl -s the page and grep name="description". Re-run the audit.',
       'curl -s 页面并 grep name="description"。然后重新审计。',
-      { length: 18, present: true, sample: 'ZoomerAI 是一款 AI 画图产品。' },
+      { length: 18, present: true, sample: 'Acme Draw 是一款 AI 画图产品。' },
     ),
     check(
       'page.canonical', 'page', 'pass',
       'Canonical URL is set', '已设置 canonical',
-      'One rel=canonical points at https://zoomer.top/.',
-      '有一条 rel=canonical，指向 https://zoomer.top/。',
+      'One rel=canonical points at https://acmedraw.example/.',
+      '有一条 rel=canonical，指向 https://acmedraw.example/。',
       'No change required.', '无需修改。',
       'View source and confirm a single rel=canonical. Re-run the audit.',
       '查看源代码，确认只有一条 rel=canonical。然后重新审计。',
-      { href: 'https://zoomer.top/' },
+      { href: 'https://acmedraw.example/' },
     ),
     check(
       'page.lang', 'page', 'pass',
@@ -248,7 +248,7 @@ function readinessChecks() {
       '补上 og:title 和 og:description，两边都带上品牌名。',
       'View source and confirm both meta properties. Re-run the audit.',
       '查看源代码，确认这两个 meta。然后重新审计。',
-      { title: 'ZoomerAI', description: null },
+      { title: 'Acme Draw', description: null },
     ),
     check(
       'page.ssr-text', 'page', 'pass',
@@ -274,12 +274,12 @@ function readinessChecks() {
     check(
       'markdown', 'markdown', 'warn',
       'Markdown is available to agents', '可为 Agent 提供 Markdown',
-      'Accept: text/markdown and https://zoomer.top/index.md both missed. Agents can still read the HTML.',
-      'Accept: text/markdown 和 https://zoomer.top/index.md 都没有命中。Agent 仍然可以读 HTML。',
+      'Accept: text/markdown and https://acmedraw.example/index.md both missed. Agents can still read the HTML.',
+      'Accept: text/markdown 和 https://acmedraw.example/index.md 都没有命中。Agent 仍然可以读 HTML。',
       'Optional. Serve markdown for the same URL, or publish a sibling .md file.',
       '可选。同一 URL 上提供 markdown，或者放一个同名的 .md 文件。',
-      'curl -sH "Accept: text/markdown" https://zoomer.top returns markdown, or /index.md does. Re-run the audit.',
-      'curl -sH "Accept: text/markdown" https://zoomer.top 返回 markdown，或者 /index.md 可以打开。然后重新审计。',
+      'curl -sH "Accept: text/markdown" https://acmedraw.example returns markdown, or /index.md does. Re-run the audit.',
+      'curl -sH "Accept: text/markdown" https://acmedraw.example 返回 markdown，或者 /index.md 可以打开。然后重新审计。',
       { contentNegotiation: 406, siblingStatus: 404 },
     ),
   ]
@@ -386,7 +386,7 @@ function citationPillar(queries) {
     meanRank,
     shareOfVoice,
     citedUrls: [...new Set(samples.flatMap((sample) => sample.citedUrls))],
-    brandCitedUrls: ['https://zoomer.top'],
+    brandCitedUrls: ['https://acmedraw.example'],
     competitorSov: competitorSov(samples),
     samples,
     note: tx(
@@ -411,15 +411,15 @@ function page(url, title, atomScore, citabilityScore, atoms) {
 
 function citabilityPillar() {
   const pages = [
-    page('https://zoomer.top/', 'ZoomerAI 首页', 42, 38, [
+    page('https://acmedraw.example/', 'Acme Draw 首页', 42, 38, [
       { text: '我们的产品很好用，欢迎体验。', score: 22, missing: ['definition', 'numeric', 'entity'] },
       { text: '我们提供 AI 画图功能，可以帮助用户快速生成图片。', score: 35, missing: ['numeric', 'selfContained'] },
     ]),
-    page('https://zoomer.top/features', '功能', 48, 44, [
+    page('https://acmedraw.example/features', '功能', 48, 44, [
       { text: '画布编辑器：可以拖拽编辑。', score: 28, missing: ['selfContained', 'definition'] },
       { text: 'AI 生成：支持文生图。', score: 31, missing: ['entity', 'numeric'] },
     ]),
-    page('https://zoomer.top/pricing', '定价', 61, 55, [
+    page('https://acmedraw.example/pricing', '定价', 61, 55, [
       { text: '团队版：联系销售。', score: 30, missing: ['numeric'] },
     ]),
   ]

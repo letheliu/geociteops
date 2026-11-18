@@ -158,7 +158,7 @@ const columns: DataTableColumns<any> = [
     <NModal v-model:show="showModal" preset="card" title="添加实体" style="width: 480px">
       <NForm>
         <NFormItem label="名称">
-          <NInput v-model:value="formData.name" placeholder="zoomer.top" />
+          <NInput v-model:value="formData.name" placeholder="acmedraw.example" />
         </NFormItem>
         <NFormItem label="类型">
           <NInput v-model:value="formData.type" placeholder="SoftwareApplication" />

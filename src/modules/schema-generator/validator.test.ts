@@ -10,7 +10,7 @@ describe('SchemaValidator', () => {
     const result = validator.validate({
       '@context': 'https://schema.org',
       '@type': 'SoftwareApplication',
-      name: 'zoomer AI',
+      name: 'Acme Draw',
       applicationCategory: 'DesignApplication',
     })
     expect(result.valid).toBe(true)

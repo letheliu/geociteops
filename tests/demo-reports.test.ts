@@ -10,7 +10,7 @@ describe('demo health snapshot', () => {
   it('scores the fictional readiness audit with the product formula', () => {
     const { readiness } = built
     expect(readiness.version).toBe(1)
-    expect(readiness.url).toBe('https://zoomer.top')
+    expect(readiness.url).toBe('https://acmedraw.example')
     expect(readiness.score).toBe(scoreChecks(readiness.checks))
     expect(readiness.grade).toBe(gradeFor(readiness.score))
     expect(readiness.summary.zh).toContain('虚构')
@@ -27,7 +27,7 @@ describe('demo health snapshot', () => {
     const { health, healthStatus } = built
     expect(healthStatus).toBe('SUCCEEDED')
     expect(health.version).toBe(1)
-    expect(health.brandName).toBe('ZoomerAI')
+    expect(health.brandName).toBe('Acme Draw')
     expect(health.summary.zh).toMatch(/GEO 体检得分/)
     const weighted = applyWeights({
       agentReadiness: health.pillars.agentReadiness.score,
@@ -47,7 +47,7 @@ describe('demo health snapshot', () => {
     const brandShare = health.pillars.citations.shareOfVoice ?? 0
     const leader = Math.max(...health.pillars.citations.competitorSov.map((row) => row.shareOfVoice))
     expect(leader).toBeGreaterThan(brandShare)
-    expect(health.pillars.structuredSignals.generatedLlmsTxt).toContain('# ZoomerAI')
+    expect(health.pillars.structuredSignals.generatedLlmsTxt).toContain('# Acme Draw')
     expect(health.pillars.structuredSignals.generatedJsonLd).toContain('Organization')
     expect(health.actions.length).toBeGreaterThan(0)
     expect(health.actions.length).toBeLessThanOrEqual(10)

@@ -7,12 +7,12 @@ describe('KgTypeAdapter', () => {
 
   it('保留所有 RawEntity 直接转换为 KgEntityDraft', () => {
     const result = adapter.adapt([
-      { name: 'zoomer AI', rawType: 'AI 设计工具', properties: { url: 'https://x.com' } },
+      { name: 'Acme Draw', rawType: 'AI 设计工具', properties: { url: 'https://x.com' } },
       { name: 'Notion', rawType: '笔记软件', properties: { founded: 2016 } },
     ])
     expect(result).toHaveLength(2)
     expect(result[0]).toEqual({
-      name: 'zoomer AI',
+      name: 'Acme Draw',
       type: 'AI 设计工具',
       properties: { url: 'https://x.com' },
     })

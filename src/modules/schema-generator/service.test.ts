@@ -27,7 +27,7 @@ function mockPrisma() {
         id: 'page-1',
         workspaceId: 'w1',
         url: 'https://x.com/landing',
-        currentContent: 'zoomer AI 是 AI 设计工具',
+        currentContent: 'Acme Draw 是 AI 设计工具',
       }),
     },
   } as unknown as PrismaClient
@@ -37,27 +37,27 @@ function mockDeps(prisma = mockPrisma()) {
   const extractor: EntityExtractorService = {
     extract: vi.fn().mockResolvedValue({
       entities: [
-        { name: 'zoomer AI', rawType: 'AI 设计工具', properties: { name: 'zoomer AI', applicationCategory: 'DesignApplication' } },
+        { name: 'Acme Draw', rawType: 'AI 设计工具', properties: { name: 'Acme Draw', applicationCategory: 'DesignApplication' } },
       ],
       relations: [],
     }),
   }
   const schemaAdapter: SchemaAdapterService = {
     adapt: vi.fn().mockReturnValue([
-      { type: 'SoftwareApplication', fields: { name: 'zoomer AI', applicationCategory: 'DesignApplication' } },
+      { type: 'SoftwareApplication', fields: { name: 'Acme Draw', applicationCategory: 'DesignApplication' } },
     ]),
   }
   const jsonLdBuilder: JsonLdBuilderService = {
     build: vi.fn().mockReturnValue({
       '@context': 'https://schema.org',
       '@type': 'SoftwareApplication',
-      name: 'zoomer AI',
+      name: 'Acme Draw',
       applicationCategory: 'DesignApplication',
     }),
   }
   const llmsTxtBuilder: LlmsTxtBuilderService = {
-    build: vi.fn().mockReturnValue({ content: '# zoomer AI\n> tagline\n', warnings: ['No major AI search system'] }),
-    buildRaw: vi.fn().mockReturnValue('# zoomer AI\n> tagline\n'),
+    build: vi.fn().mockReturnValue({ content: '# Acme Draw\n> tagline\n', warnings: ['No major AI search system'] }),
+    buildRaw: vi.fn().mockReturnValue('# Acme Draw\n> tagline\n'),
     parseMarkdown: vi.fn(),
   }
   const validator: SchemaValidatorService = {
@@ -81,7 +81,7 @@ describe('SchemaService', () => {
     const result = await svc.generateJsonLd({
       workspaceId: 'w1', pageUrl: 'https://x.com/landing',
       schemaType: 'SoftwareApplication',
-      fields: { name: 'zoomer AI', applicationCategory: 'DesignApp' },
+      fields: { name: 'Acme Draw', applicationCategory: 'DesignApp' },
     })
     expect(result.jsonld['@type']).toBe('SoftwareApplication')
     expect(result.record.id).toBeDefined()
@@ -113,10 +113,10 @@ describe('SchemaService', () => {
     const deps = mockDeps()
     const svc = createSchemaService(deps)
     const result = await svc.generateLlmsTxt({
-      workspaceId: 'w1', brandName: 'zoomer', tagline: 'AI',
+      workspaceId: 'w1', brandName: 'acme', tagline: 'AI',
       sections: [{ title: '核心产品', items: [] }],
     })
-    expect(result.markdown).toContain('# zoomer')
+    expect(result.markdown).toContain('# Acme Draw')
     expect(result.record.schemaType).toBe('LlmsTxt')
     expect(result.warnings).toHaveLength(1)
     expect(result.warnings[0]).toContain('No major AI search system')

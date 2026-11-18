@@ -14,8 +14,8 @@ class FakeAdapter implements PlatformAdapter {
   name = 'openai'
   async query(): Promise<PlatformResult> {
     return {
-      answer: '推荐 zoomer AI，它是一款设计工具。参考 https://zoomer.top',
-      sourceCitations: [{ url: 'https://zoomer.top', position: 1, sourceType: 'api_citation' }],
+      answer: '推荐 Acme Draw，它是一款设计工具。参考 https://acmedraw.example',
+      sourceCitations: [{ url: 'https://acmedraw.example', position: 1, sourceType: 'api_citation' }],
       groundingSources: [],
       answerMentions: [],
     }
@@ -39,7 +39,7 @@ describe('e2e: citation flow', () => {
     const workspace = await prisma.workspace.create({
       data: {
         name: 'test',
-        defaultBrandName: 'zoomer AI',
+        defaultBrandName: 'Acme Draw',
         organizationId: org.id,
         // M2 §3.1：N=2 让采样级链路在 e2e 里真实成立（Run 行 + 2 行采样）
         monitorSampleCount: 2,

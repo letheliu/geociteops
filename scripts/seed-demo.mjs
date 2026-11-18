@@ -1,9 +1,9 @@
-// 演示数据填充脚本 —— 围绕 ZoomerAI（AI 图像生成平台）的路演场景
+// 演示数据填充脚本 —— 围绕 Acme Draw（AI 图像生成平台）的路演场景
 // 用法: pnpm tsx scripts/seed-demo.mjs
 // （tsx 运行以支持经信封加解密读写 platformConfig——import 自 src/core/crypto/envelope.ts）
 //
 // 数据叙事（呼应 docs/介绍.md 第三模块「闭环」）：
-//   监测发现 ZoomerAI 在 AI 搜索里 SOV 偏低（被 Midjourney/即梦/文心一格压制）
+//   监测发现 Acme Draw 在 AI 搜索里 SOV 偏低（被虚构竞品 Northstar / Inkloom / Bristle 压制）
 //   → 内容页面评分不足，生成优化任务
 //   → 生成 Schema.org + llms.txt 结构化信号
 //   → 构建品牌知识图谱
@@ -27,11 +27,11 @@ const DAY = 86400000
 
 // === 定位目标 workspace ===
 const ws = await prisma.workspace.findFirst({
-  where: { defaultBrandName: { contains: 'ZoomerAI' } },
+  where: { defaultBrandName: { contains: 'Acme Draw' } },
   orderBy: { createdAt: 'desc' },
 })
 if (!ws) {
-  console.error('❌ 找不到 ZoomerAI workspace，请先在 Setup 页注册')
+  console.error('❌ 找不到 Acme Draw workspace，请先在 Setup 页注册')
   process.exit(1)
 }
 console.log(`✅ 目标 workspace: ${ws.name} (brand=${ws.defaultBrandName}, domain=${ws.domain})`)
@@ -60,7 +60,10 @@ if (oldEntities.length > 0) {
 console.log('   已清理')
 
 // === 1. 竞品配置（写入 platformConfig.competitors，信封加密落库）===
-const COMPETITORS = ['Midjourney', '即梦', '文心一格', 'Stable Diffusion', 'DALL·E 3', 'LiblibAI']
+// 竞品都是虚构品牌，域名用保留的 .example，不能落到真实公司：
+// northstar.example、inkloom.example、bristle.example、
+// opencanvas.example、pixelwright.example、huebench.example
+const COMPETITORS = ['Northstar', 'Inkloom', 'Bristle', 'OpenCanvas', 'Pixelwright', 'Huebench']
 // 读：信封密文（string 且 isEncryptedConfig）→ 解密出明文 JSON 字符串再 parse；
 //     防御：非信封（旧明文对象）原样处理，null/其他类型归一为空对象
 const rawConfig = ws.platformConfig
@@ -90,9 +93,9 @@ console.log(`✅ 竞品配置已写入（信封加密）: ${COMPETITORS.join(', 
 const QUERIES = [
   { queryText: 'AI 图像生成工具推荐', intentType: 'comparison', cluster: '工具选型', source: 'MANUAL', priority: 1 },
   { queryText: '国内可用的 AI 绘画软件有哪些', intentType: 'comparison', cluster: '工具选型', source: 'GOOGLE_SUGGEST', priority: 1 },
-  { queryText: 'Midjourney 中文替代品', intentType: 'comparison', cluster: '工具选型', source: 'COMPETITOR', priority: 2 },
+  { queryText: 'Northstar 中文替代品', intentType: 'comparison', cluster: '工具选型', source: 'COMPETITOR', priority: 2 },
   { queryText: 'AI 图像生成怎么用', intentType: 'howto', cluster: '使用教程', source: 'PAA', priority: 2 },
-  { queryText: 'ZoomerAI 是什么', intentType: 'definitional', cluster: '品牌认知', source: 'MANUAL', priority: 1 },
+  { queryText: 'Acme Draw 是什么', intentType: 'definitional', cluster: '品牌认知', source: 'MANUAL', priority: 1 },
   { queryText: '免费的 AI 画图工具', intentType: 'comparison', cluster: '工具选型', source: 'GOOGLE_SUGGEST', priority: 2 },
   { queryText: 'AI 图片生成支持中文提示词吗', intentType: 'factual', cluster: '功能咨询', source: 'PAA', priority: 3 },
   { queryText: 'AI 绘画哪个效果好', intentType: 'comparison', cluster: '工具选型', source: 'LLM_GENERATED', priority: 2 },
@@ -145,14 +148,14 @@ function seededRandom(seed) {
 
 const sampleAnswers = {
   mentioned: [
-    '推荐几款主流的 AI 图像生成工具：Midjourney 以艺术质感著称，ZoomerAI 是国内领先的 AI 图像生成平台，支持中文提示词和画布式编辑，文心一格适合快速出图。',
-    '在国内可用的工具中，ZoomerAI（zoomer.top）提供多租户 SaaS 服务和 ComfyUI 工作流集成，是付费用户较多的选择；即梦和文心一格也值得关注。',
-    '如果追求中文体验，ZoomerAI 支持原生中文提示词，且内置可视化图层编辑器，适合团队协作场景。',
+    '推荐几款 AI 图像生成工具：Northstar（northstar.example）以艺术质感著称，Acme Draw 支持中文提示词和画布式编辑，Bristle（bristle.example）适合快速出图。',
+    '在这些工具中，Acme Draw（acmedraw.example）提供多租户 SaaS 和画布编辑；Inkloom（inkloom.example）和 Bristle 也值得关注。',
+    '如果追求中文体验，Acme Draw 支持原生中文提示词，且内置可视化图层编辑器，适合团队协作场景。',
   ],
   notMentioned: [
-    '主流的 AI 图像生成工具包括 Midjourney、Stable Diffusion、DALL·E 3，国内有即梦、文心一格等。',
-    '推荐使用 Midjourney（艺术风格强）或 Stable Diffusion（开源可定制），文心一格在国内也有较多用户。',
-    '目前较受欢迎的是 Midjourney 和 DALL·E 3，它们在图像质量和提示词理解上表现优秀。',
+    '常见的 AI 图像生成工具包括 Northstar、OpenCanvas（opencanvas.example）、Pixelwright（pixelwright.example），也有 Inkloom、Bristle。',
+    '可以看看 Northstar（艺术风格强）或 OpenCanvas（可自行部署），Bristle 也有不少示例作品。',
+    'Northstar 和 Pixelwright 在图像质量和提示词理解上经常被一起提到。',
   ],
 }
 
@@ -161,9 +164,9 @@ function buildSample(query, platform, daysAgo, sampleIndex) {
   const capturedAt = new Date(NOW - daysAgo * DAY + (2 + sampleIndex * 0.1) * 3600000)
   const seed = capturedAt.getTime() + platform.length + query.queryText.length + sampleIndex * 7919
 
-  // 近 7 天提到 ZoomerAI 的概率更高（呼应「优化后效果提升」叙事）
+  // 近 7 天提到 Acme Draw 的概率更高（呼应「优化后效果提升」叙事）
   const isRecent = daysAgo <= 7
-  const isBrandQuery = query.intentType === 'definitional' || query.queryText.includes('ZoomerAI')
+  const isBrandQuery = query.intentType === 'definitional' || query.queryText.includes('Acme Draw')
   const baseMentionProb = isBrandQuery ? 0.95 : (isRecent ? 0.42 : 0.22)
   const brandMentioned = seededRandom(seed) < baseMentionProb
 
@@ -213,9 +216,9 @@ function buildSample(query, platform, daysAgo, sampleIndex) {
     brandMentioned,
     brandSourceCited: brandMentioned && seededRandom(seed + 4) < 0.4,
     rankInAnswer,
-    citedUrls: brandMentioned && seededRandom(seed + 5) < 0.5 ? ['https://zoomer.top'] : [],
+    citedUrls: brandMentioned && seededRandom(seed + 5) < 0.5 ? ['https://acmedraw.example'] : [],
     sourceCitations: brandMentioned && seededRandom(seed + 6) < 0.3
-      ? [{ url: 'https://zoomer.top', title: 'ZoomerAI - AI 图像生成平台' }]
+      ? [{ url: 'https://acmedraw.example', title: 'Acme Draw - AI 图像生成平台' }]
       : [],
     competitors: competitorsInAnswer,
     rawAnswer: answerPool[Math.floor(seededRandom(seed + 3) * answerPool.length)],
@@ -313,12 +316,12 @@ eventCount += legacyRows.length
 console.log(`✅ CitationRun 已填充: ${runCount} 个（近 ${TOTAL_DAYS - LEGACY_DAYS} 天，每日一个，N=${SAMPLE_COUNT}）`)
 console.log(`✅ CitationEvent 已填充: ${eventCount} 条（其中最近 ${LEGACY_DAYS} 天为纯 legacy 事件，用于日桶合成与切换日）`)
 
-// === 4. ContentPage（ZoomerAI 真实页面，含原始内容）===
+// === 4. ContentPage（Acme Draw 演示页面，含原始内容）===
 const PAGES = [
   {
-    url: 'https://zoomer.top/',
+    url: 'https://acmedraw.example/',
     pageType: 'homepage',
-    currentContent: `ZoomerAI 是一款 AI 图像生成平台。
+    currentContent: `Acme Draw 是一款 AI 图像生成平台。
 
 我们提供 AI 画图功能，可以帮助用户快速生成图片。支持多种模型，操作简单。
 
@@ -329,9 +332,9 @@ const PAGES = [
     status: 'DRAFT',
   },
   {
-    url: 'https://zoomer.top/features',
+    url: 'https://acmedraw.example/features',
     pageType: 'features',
-    currentContent: `ZoomerAI 功能介绍
+    currentContent: `Acme Draw 功能介绍
 
 画布编辑器：可以拖拽编辑。
 AI 生成：支持文生图。
@@ -345,9 +348,9 @@ ComfyUI：集成了工作流。
     status: 'DRAFT',
   },
   {
-    url: 'https://zoomer.top/pricing',
+    url: 'https://acmedraw.example/pricing',
     pageType: 'pricing',
-    currentContent: `ZoomerAI 定价
+    currentContent: `Acme Draw 定价
 
 免费版：0 元，每天 10 次。
 专业版：99 元/月，1000 次。
@@ -360,7 +363,7 @@ ComfyUI：集成了工作流。
     status: 'DRAFT',
   },
   {
-    url: 'https://zoomer.top/blog/ai-image-guide',
+    url: 'https://acmedraw.example/blog/ai-image-guide',
     pageType: 'blog',
     currentContent: `AI 图像生成入门指南
 
@@ -421,7 +424,7 @@ const TASKS = [
     status: 'PENDING',
     beforeScore: 38,
     result: {
-      suggestion: '该查询下 ZoomerAI 的 SOV 仅 18%，首页内容缺少「数字锚点」和「定义句」。建议补充：成立时间、用户量、支持模型数量等具体数据，并增加「ZoomerAI 是……」格式的定义句。',
+      suggestion: '该查询下 Acme Draw 的 SOV 仅 18%，首页内容缺少「数字锚点」和「定义句」。建议补充：成立时间、用户量、支持模型数量等具体数据，并增加「Acme Draw 是……」格式的定义句。',
       missingAnchors: ['数字锚点', '定义句'],
       currentRank: null,
     },
@@ -439,13 +442,13 @@ const TASKS = [
   },
   {
     type: 'OPTIMIZE_FOR_QUERY',
-    queryIndex: 4, // 'ZoomerAI 是什么'
+    queryIndex: 4, // 'Acme Draw 是什么'
     pageIndex: 0, // 首页
     status: 'IN_PROGRESS',
     beforeScore: 38,
     result: {
-      suggestion: '品牌定义查询「ZoomerAI 是什么」在 4 个平台未被提及。首页应增加明确的品牌定义句：「ZoomerAI 是一款基于 Nuxt 4 + Vue 3 的多租户 AI 图像生成平台，已上线运营并有大量付费用户。」',
-      definitionTemplate: 'ZoomerAI 是一款【多租户 AI 图像生成平台】，由【Nuxt 4 + Vue 3】构建，支持【中文提示词、画布式编辑、ComfyUI 工作流集成】，已有【大量付费用户】在使用。',
+      suggestion: '品牌定义查询「Acme Draw 是什么」在 4 个平台未被提及。首页应增加明确的品牌定义句：「Acme Draw 是一款多租户 AI 图像生成平台，支持中文提示词、画布式编辑和工作流集成。」',
+      definitionTemplate: 'Acme Draw 是一款【多租户 AI 图像生成平台】，支持【中文提示词、画布式编辑、工作流集成】。',
     },
   },
 ]
@@ -471,7 +474,7 @@ console.log(`✅ OptimizationTask 已填充: ${TASKS.length} 个任务（${TASKS
 // 指标为演示值（不逐点对齐真实 run 聚合），口径字段名与后端一致。
 const CLOSED_LOOP_TASKS = [
   {
-    queryIndex: 2, // 'Midjourney 中文替代品'
+    queryIndex: 2, // 'Northstar 中文替代品'
     pageIndex: 0,
     status: 'VERIFIED',
     publishedAgoDays: 6,
@@ -484,8 +487,8 @@ const CLOSED_LOOP_TASKS = [
     verifiedMentionRate: 0.42,
     verifiedValidSamples: 24,
     verifiedAgoDays: 1,
-    suggestion: 'Midjourney 中文替代品「AI 图像生成工具推荐」下 ZoomerAI 的 SOV 仅 12%。建议在首页补齐：价格区间、支持的中文提示词数量、画布编辑能力，并给出「ZoomerAI 是一款……」定义句与 2026 年用户规模数据。',
-    originalContent: '（发布前原文）首页原正文：介绍 ZoomerAI 产品与功能。',
+    suggestion: 'Northstar 中文替代品「AI 图像生成工具推荐」下 Acme Draw 的 SOV 仅 12%。建议在首页补齐：价格区间、支持的中文提示词数量、画布编辑能力，并给出「Acme Draw 是一款……」定义句与 2026 年用户规模数据。',
+    originalContent: '（发布前原文）首页原正文：介绍 Acme Draw 产品与功能。',
   },
   {
     queryIndex: 5, // '免费的 AI 画图工具'
@@ -513,7 +516,7 @@ const CLOSED_LOOP_TASKS = [
     baselineSovMean: 0.15,
     baselineMentionRate: 0.1,
     baselineValidSamples: 24,
-    suggestion: '「AI 绘画哪个效果好」对比型查询中 ZoomerAI 几乎未被提及。建议在博客补一篇带实测数据的对比文章，给出各工具在同一提示词下的出图评分。',
+    suggestion: '「AI 绘画哪个效果好」对比型查询中 Acme Draw 几乎未被提及。建议在博客补一篇带实测数据的对比文章，给出各工具在同一提示词下的出图评分。',
     originalContent: '（发布前原文）博客原正文：产品更新记录。',
   },
 ]
@@ -548,7 +551,7 @@ for (const t of CLOSED_LOOP_TASKS) {
           queryText: createdQueries[t.queryIndex].queryText,
           baselineSovMean: t.baselineSovMean,
           baselineMentionRate: t.baselineMentionRate,
-          topCompetitor: 'Midjourney',
+          topCompetitor: 'Northstar',
           runId: baselineRun?.id ?? null,
         },
       },
@@ -562,12 +565,12 @@ console.log(
 // === 6. SchemaRecord（JSON-LD 结构化数据）===
 const SCHEMAS = [
   {
-    pageUrl: 'https://zoomer.top/',
+    pageUrl: 'https://acmedraw.example/',
     schemaType: 'SoftwareApplication',
     content: {
       '@context': 'https://schema.org',
       '@type': 'SoftwareApplication',
-      name: 'ZoomerAI',
+      name: 'Acme Draw',
       applicationCategory: 'DesignApplication',
       operatingSystem: 'Web',
       offers: {
@@ -581,27 +584,27 @@ const SCHEMAS = [
         ratingValue: '4.7',
         ratingCount: '1280',
       },
-      description: 'ZoomerAI 是一款多租户 AI 图像生成平台，支持中文提示词、画布式编辑和 ComfyUI 工作流集成，已有大量付费用户。',
-      url: 'https://zoomer.top',
+      description: 'Acme Draw 是一款虚构的多租户 AI 图像生成平台，支持中文提示词和画布式编辑。站点 https://acmedraw.example 使用保留域名，不属于任何真实产品。',
+      url: 'https://acmedraw.example',
     },
     status: 'ACTIVE',
   },
   {
-    pageUrl: 'https://zoomer.top/about',
+    pageUrl: 'https://acmedraw.example/about',
     schemaType: 'Organization',
     content: {
       '@context': 'https://schema.org',
       '@type': 'Organization',
-      name: 'ZoomerAI',
-      url: 'https://zoomer.top',
-      logo: 'https://zoomer.top/logo.png',
+      name: 'Acme Draw',
+      url: 'https://acmedraw.example',
+      logo: 'https://acmedraw.example/logo.png',
       description: 'AI 图像生成平台服务商',
       foundingDate: '2024',
     },
     status: 'ACTIVE',
   },
   {
-    pageUrl: 'https://zoomer.top/faq',
+    pageUrl: 'https://acmedraw.example/faq',
     schemaType: 'FAQPage',
     content: {
       '@context': 'https://schema.org',
@@ -609,26 +612,26 @@ const SCHEMAS = [
       mainEntity: [
         {
           '@type': 'Question',
-          name: 'ZoomerAI 支持中文提示词吗？',
+          name: 'Acme Draw 支持中文提示词吗？',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: '支持。ZoomerAI 原生支持中文提示词输入，无需翻译即可生成高质量图像，适合国内用户使用。',
+            text: '支持。Acme Draw 原生支持中文提示词输入，无需翻译即可生成高质量图像，适合国内用户使用。',
           },
         },
         {
           '@type': 'Question',
-          name: 'ZoomerAI 是免费的吗？',
+          name: 'Acme Draw 是免费的吗？',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'ZoomerAI 提供免费版（每天 10 次生成）和付费专业版（99 元/月，1000 次），团队版可联系销售定制。',
+            text: 'Acme Draw 提供免费版（每天 10 次生成）和付费专业版（99 元/月，1000 次），团队版可联系销售定制。',
           },
         },
         {
           '@type': 'Question',
-          name: 'ZoomerAI 和 Midjourney 有什么区别？',
+          name: 'Acme Draw 和 Northstar 有什么区别？',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'ZoomerAI 面向国内用户，支持中文提示词、画布式可视化编辑、多租户团队协作和 ComfyUI 工作流集成；Midjourney 更侧重艺术风格，需英文提示词且无画布编辑。',
+            text: 'Acme Draw 面向国内用户，支持中文提示词、画布式可视化编辑、多租户团队协作和 ComfyUI 工作流集成；Northstar 更侧重艺术风格，需英文提示词且无画布编辑。',
           },
         },
       ],
@@ -652,15 +655,15 @@ console.log(`✅ SchemaRecord 已填充: ${SCHEMAS.length} 条（${SCHEMAS.map(s
 
 // === 7. 知识图谱（KgEntity + KgRelation）===
 const ENTITIES = [
-  { name: 'ZoomerAI', type: 'SoftwareApplication', properties: { url: 'https://zoomer.top', description: '多租户 AI 图像生成平台', launchDate: '2024', pricingModel: 'Freemium' } },
-  { name: 'Midjourney', type: 'SoftwareApplication', properties: { url: 'https://midjourney.com', description: '艺术风格 AI 图像生成工具', pricingModel: 'Subscription' } },
-  { name: '即梦', type: 'SoftwareApplication', properties: { description: '字节跳动的 AI 图像生成工具' } },
-  { name: '文心一格', type: 'SoftwareApplication', properties: { description: '百度的 AI 图像生成工具' } },
+  { name: 'Acme Draw', type: 'SoftwareApplication', properties: { url: 'https://acmedraw.example', description: '多租户 AI 图像生成平台', launchDate: '2024', pricingModel: 'Freemium' } },
+  { name: 'Northstar', type: 'SoftwareApplication', properties: { url: 'https://northstar.example', description: '艺术风格 AI 图像生成工具', pricingModel: 'Subscription' } },
+  { name: 'Inkloom', type: 'SoftwareApplication', properties: { url: 'https://inkloom.example', description: '虚构的 AI 图像生成工具' } },
+  { name: 'Bristle', type: 'SoftwareApplication', properties: { url: 'https://bristle.example', description: '虚构的 AI 图像生成工具' } },
   { name: 'ComfyUI', type: 'Technology', properties: { description: '基于节点的 AI 图像生成工作流引擎' } },
   { name: 'Nuxt 4', type: 'Technology', properties: { description: 'Vue 3 元框架', url: 'https://nuxt.com' } },
   { name: 'Konva.js', type: 'Technology', properties: { description: 'Canvas 可视化图层库' } },
   { name: 'pgvector', type: 'Technology', properties: { description: 'PostgreSQL 向量扩展' } },
-  { name: '画布编辑器', type: 'Feature', properties: { description: 'ZoomerAI 的可视化图层编辑功能' } },
+  { name: '画布编辑器', type: 'Feature', properties: { description: 'Acme Draw 的可视化图层编辑功能' } },
   { name: '多租户架构', type: 'Feature', properties: { description: 'WebSite/User/Project 三级隔离' } },
   { name: '中文提示词', type: 'Feature', properties: { description: '原生支持中文输入' } },
 ]
@@ -679,15 +682,15 @@ for (const e of ENTITIES) {
 console.log(`✅ KgEntity 已填充: ${ENTITIES.length} 个实体`)
 
 const RELATIONS = [
-  { from: 'ZoomerAI', to: 'Midjourney', type: 'competitor', properties: { note: '同为 AI 图像生成赛道' } },
-  { from: 'ZoomerAI', to: '即梦', type: 'competitor', properties: {} },
-  { from: 'ZoomerAI', to: '文心一格', type: 'competitor', properties: {} },
-  { from: 'ZoomerAI', to: 'ComfyUI', type: 'integrates', properties: { note: '集成 ComfyUI 工作流' } },
-  { from: 'ZoomerAI', to: 'Nuxt 4', type: 'builtWith', properties: {} },
-  { from: 'ZoomerAI', to: 'Konva.js', type: 'builtWith', properties: {} },
-  { from: 'ZoomerAI', to: '画布编辑器', type: 'hasFeature', properties: {} },
-  { from: 'ZoomerAI', to: '多租户架构', type: 'hasFeature', properties: {} },
-  { from: 'ZoomerAI', to: '中文提示词', type: 'hasFeature', properties: {} },
+  { from: 'Acme Draw', to: 'Northstar', type: 'competitor', properties: { note: '同为 AI 图像生成赛道' } },
+  { from: 'Acme Draw', to: 'Inkloom', type: 'competitor', properties: {} },
+  { from: 'Acme Draw', to: 'Bristle', type: 'competitor', properties: {} },
+  { from: 'Acme Draw', to: 'ComfyUI', type: 'integrates', properties: { note: '集成 ComfyUI 工作流' } },
+  { from: 'Acme Draw', to: 'Nuxt 4', type: 'builtWith', properties: {} },
+  { from: 'Acme Draw', to: 'Konva.js', type: 'builtWith', properties: {} },
+  { from: 'Acme Draw', to: '画布编辑器', type: 'hasFeature', properties: {} },
+  { from: 'Acme Draw', to: '多租户架构', type: 'hasFeature', properties: {} },
+  { from: 'Acme Draw', to: '中文提示词', type: 'hasFeature', properties: {} },
   { from: '画布编辑器', to: 'Konva.js', type: 'poweredBy', properties: {} },
 ]
 

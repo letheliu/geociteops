@@ -101,13 +101,13 @@ const columns: DataTableColumns<any> = [
     <NModal v-model:show="showModal" preset="card" title="添加关系" style="width: 480px">
       <NForm>
         <NFormItem label="起始实体">
-          <NInput v-model:value="formData.fromName" placeholder="zoomer.top" />
+          <NInput v-model:value="formData.fromName" placeholder="acmedraw.example" />
         </NFormItem>
         <NFormItem label="关系类型">
           <NInput v-model:value="formData.relationType" placeholder="competitor" />
         </NFormItem>
         <NFormItem label="目标实体">
-          <NInput v-model:value="formData.toName" placeholder="Notion" />
+          <NInput v-model:value="formData.toName" placeholder="Northstar" />
         </NFormItem>
         <NFormItem label="属性 (JSON)">
           <NInput v-model:value="formData.properties" type="textarea" :rows="3" placeholder="{}" />
