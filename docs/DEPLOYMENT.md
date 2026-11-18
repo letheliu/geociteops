@@ -241,26 +241,34 @@ Set after the repository is public (Settings → General / About):
 
 ---
 
-## 6. npm publish — `@geociteops/sdk@0.1.0`
+## 6. npm publish — `@geociteops/sdk` and `@geociteops/mcp`
 
-Publishing requires npm account access and is deliberately **not** automated.
+Publishing requires npm account access and is deliberately **not** automated. CI runs `npm publish --dry-run` for both packages.
 
 Prerequisites:
 
 - [ ] npm org `geociteops` exists and you can publish to it
 - [ ] `npm whoami` confirms the right account
 
-Then, from `sdk/`:
+From `sdk/`:
 
 ```bash
 npm publish --dry-run   # must pass — CI runs this too
 npm publish             # actual publish
-npm view @geociteops/sdk version   # expect 0.1.0
+npm view @geociteops/sdk version
 ```
 
-- [ ] dry-run passes
-- [ ] `npm view @geociteops/sdk` returns `0.1.0` (M1 spec §5.4)
-- [ ] The README badge resolves on npmjs.com
+From `mcp/` (build runs in `prepublishOnly`; the published entry is `dist/cli.js`):
+
+```bash
+npm publish --dry-run
+npm publish
+npm view @geociteops/mcp version
+```
+
+- [ ] both dry-runs pass
+- [ ] `npm view @geociteops/sdk` and `npm view @geociteops/mcp` return the version you published
+- [ ] `npx @geociteops/mcp --help` prints the CLI help
 
 ---
 

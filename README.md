@@ -23,6 +23,19 @@ English · [简体中文](./README.zh-CN.md)
 
 GeoCiteOps is a self-hosted **Generative Engine Optimization (GEO)** platform. GEO is the work of making your pages more likely to be quoted by AI answer engines, the way SEO is the work of being found on a results page.
 
+## Use in Claude Code / Cursor
+
+GeoCiteOps runs inside the editor. `@geociteops/mcp` is the MCP server Claude Code, Cursor, and Claude Desktop call. Agent readiness, `llms.txt`, and JSON-LD work with no API key. Health checks, citation runs, rewrites, and the knowledge graph use your workspace key.
+
+```bash
+claude mcp add --transport stdio geociteops \
+  --env GEOCITEOPS_API_URL=http://localhost:4000 \
+  --env GEOCITEOPS_API_KEY=<workspace-api-key> \
+  -- npx -y @geociteops/mcp
+```
+
+Copy [integrations/cursor/mcp.json](./integrations/cursor/mcp.json) into Cursor's `.cursor/mcp.json`. To install the Claude Code skill pack from this repo: `claude plugin marketplace add letheliu/geociteops`, then `claude plugin install geociteops@geociteops`. Tools, prompts, and the other client configs are in [docs/mcp.md](./docs/mcp.md).
+
 ## Demo
 
 The walkthrough brand is **ZoomerAI**, a fictional AI image product on `zoomer.top`. Nothing in the seed is a live crawl or a live model answer. The scores use the same formulas as a real run (`buildReport`, `conclude`, and the weights in `src/modules/geo-health/weights.ts`). Load it with `pnpm demo:reset`.
@@ -103,6 +116,9 @@ Illustrative only. This is how the work is shaped, not a benchmark and not a pri
 
 ```text
 ┌──────────────────────────────────────────────────────┐
+│ Editors (Claude Code, Cursor, Claude Desktop)        │
+│ @geociteops/mcp — stdio, optional local HTTP         │
+├──────────────────────────────────────────────────────┤
 │ Web Console (Vue 3 + Naive UI + Vite)                │
 │ Dashboard · GEO Health · Query Library · Reports     │
 │ Content · KG · Agent Readiness                       │
@@ -407,6 +423,8 @@ src/
 ├── workers/              # citation scheduler, readiness audit, health check (pg-boss)
 └── router.ts             # root tRPC router
 sdk/                      # typed tRPC client (@geociteops/sdk)
+mcp/                      # MCP server for coding agents (@geociteops/mcp)
+integrations/claude-code/ # Claude Code plugin and skills
 web/                      # Vue 3 console (package name geociteops-web)
 prisma/                   # schema.prisma
 ```
@@ -457,6 +475,7 @@ The repo is MIT. You pay for the computer it runs on and for any engine or LLM A
 - [x] One-click GEO health check (readiness + citations + citability + structured signals, PDF, schedule, score trend)
 - [x] Knowledge graph extraction and export
 - [x] Containerized one-command deployment (Docker Compose, four services)
+- [x] MCP server for Claude Code, Cursor, and other clients (`@geociteops/mcp`)
 - [x] Closed loop: a weak query → a rewrite suggestion → a human publish → the next run fills in the delta
 - [ ] Register the adapters that are not mounted yet, and richer share-of-voice views
 

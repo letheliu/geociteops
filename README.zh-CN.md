@@ -23,6 +23,19 @@
 
 GeoCiteOps 是一套可自托管的**生成式引擎优化（Generative Engine Optimization，GEO）**平台。GEO 做的是让页面更容易被 AI 回答引擎引用，就像 SEO 做的是让页面出现在搜索结果里。
 
+## 在 Claude Code / Cursor 里使用
+
+GeoCiteOps 可以直接跑在编辑器里。`@geociteops/mcp` 是 Claude Code、Cursor 和 Claude Desktop 调用的 MCP 服务。不配 API Key 时，Agent 就绪、`llms.txt` 和 JSON-LD 在本机运行。体检、引用监测、改写和知识图谱使用工作区 Key。
+
+```bash
+claude mcp add --transport stdio geociteops \
+  --env GEOCITEOPS_API_URL=http://localhost:4000 \
+  --env GEOCITEOPS_API_KEY=<工作区 API Key> \
+  -- npx -y @geociteops/mcp
+```
+
+把 [integrations/cursor/mcp.json](./integrations/cursor/mcp.json) 拷进 Cursor 的 `.cursor/mcp.json`。从本仓库安装 Claude Code 技能包：`claude plugin marketplace add letheliu/geociteops`，然后 `claude plugin install geociteops@geociteops`。工具、提示词和其他客户端配置见 [docs/mcp.md](./docs/mcp.md)。
+
 ## 演示
 
 演示品牌是 **ZoomerAI**，一个虚构的 AI 画图产品，站点写的是 `zoomer.top`。种子里没有真实抓取，也没有模型的真实回答。分数用的是正式运行的同一套公式（`buildReport`、`conclude`，以及 `src/modules/geo-health/weights.ts` 里的权重）。用 `pnpm demo:reset` 装进去。
@@ -103,6 +116,9 @@ flowchart LR
 
 ```text
 ┌──────────────────────────────────────────────────────┐
+│ 编辑器（Claude Code、Cursor、Claude Desktop）        │
+│ @geociteops/mcp — stdio，可选本地 HTTP               │
+├──────────────────────────────────────────────────────┤
 │ Web 控制台（Vue 3 + Naive UI + Vite）                │
 │ 仪表盘 · GEO 体检 · 查询库 · 引用报告 · 内容优化     │
 │ 知识图谱 · Agent 就绪                                │
@@ -406,6 +422,8 @@ src/
 ├── workers/              # 引用调度器、就绪审计、体检（pg-boss）
 └── router.ts             # 根 tRPC 路由
 sdk/                      # 类型化 tRPC 客户端（@geociteops/sdk）
+mcp/                      # 给编程助手用的 MCP 服务（@geociteops/mcp）
+integrations/claude-code/ # Claude Code 插件和技能
 web/                      # Vue 3 控制台（包名 geociteops-web）
 prisma/                   # schema.prisma
 ```
@@ -456,6 +474,7 @@ pnpm test:watch
 - [x] 一键 GEO 体检（就绪 + 引用 + 可引用性 + 结构化信号，PDF、定时复跑、分数趋势）
 - [x] 知识图谱抽取与导出
 - [x] 容器化一键部署（Docker Compose 四服务）
+- [x] 给 Claude Code、Cursor 和其他客户端用的 MCP 服务（`@geociteops/mcp`）
 - [x] 闭环：监测发现薄弱点 → 改写建议 → 人工发布 → 下一次运行回填 Δ
 - [ ] 把尚未注册的适配器接上，以及更细的声量分析
 
