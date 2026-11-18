@@ -8,6 +8,9 @@ import {
 import PageHeader from '../../components/common/PageHeader.vue'
 import ScoreBar from '../../components/common/ScoreBar.vue'
 import { trpc } from '../../composables/useTrpc'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 const route = useRoute()
 const router = useRouter()
@@ -75,7 +78,7 @@ async function loadPage() {
       optimizedResult.value = page.value.optimizedContent
     }
   } catch (e: any) {
-    message.error(e?.message || '加载失败')
+    message.error(e?.message || t("加载失败"))
   } finally {
     loading.value = false
   }
@@ -85,14 +88,14 @@ onMounted(loadPage)
 
 async function handleOptimize() {
   optimizing.value = true
-  message.loading('正在优化内容...')
+  message.loading(t("正在优化内容..."))
   try {
     const result = await trpc.content.optimize.mutate({ pageId: pageId.value })
     optimizedResult.value = result
-    message.success('优化完成')
+    message.success(t("优化完成"))
     await loadPage()
   } catch (e: any) {
-    message.error(e?.message || '优化失败')
+    message.error(e?.message || t("优化失败"))
   } finally {
     optimizing.value = false
   }
@@ -103,11 +106,11 @@ async function handleOptimize() {
   <div>
     <NSpace align="center" justify="space-between" style="margin-bottom: 20px">
       <div>
-        <NButton quaternary size="small" @click="router.push('/content/pages')" style="margin-right: 8px">← 返回</NButton>
+        <NButton quaternary size="small" @click="router.push('/content/pages')" style="margin-right: 8px">{{ t('← 返回') }}</NButton>
         <span style="font-size: 18px; font-weight: 600">{{ page?.url }}</span>
       </div>
       <NButton type="primary" :loading="optimizing" @click="handleOptimize">
-        {{ optimizing ? '优化中...' : '⚡ 优化此页面' }}
+        {{ optimizing ? t('优化中...') : t('⚡ 优化此页面') }}
       </NButton>
     </NSpace>
 
@@ -115,7 +118,7 @@ async function handleOptimize() {
       <NGrid :cols="2" :x-gap="16">
         <!-- 原始内容 -->
         <NGridItem>
-          <NCard title="原始内容">
+          <NCard :title="t('原始内容')">
             <div style="white-space: pre-wrap; font-size: 13px; max-height: 600px; overflow: auto; line-height: 1.8">
               {{ page?.currentContent }}
             </div>
@@ -127,20 +130,20 @@ async function handleOptimize() {
           <NCard>
             <template #header>
               <NSpace align="center">
-                <span>优化结果</span>
+                <span>{{ t('优化结果') }}</span>
                 <template v-if="beforeScore !== null && afterScore !== null">
-                  <NTag size="small" type="warning">前 {{ beforeScore }}</NTag>
+                  <NTag size="small" type="warning">{{ t('前') }} {{ beforeScore }}</NTag>
                   <span>→</span>
-                  <NTag size="small" type="success">后 {{ afterScore }}</NTag>
+                  <NTag size="small" type="success">{{ t('后') }} {{ afterScore }}</NTag>
                 </template>
               </NSpace>
             </template>
 
-            <NEmpty v-if="atoms.length === 0" description="尚未优化，点击右上角按钮开始" />
+            <NEmpty v-if="atoms.length === 0" :description="t('尚未优化，点击右上角按钮开始')" />
 
             <div v-else style="max-height: 600px; overflow: auto">
               <div style="margin-bottom: 16px">
-                <div style="font-weight: 600; margin-bottom: 8px">原子单元 ({{ atoms.length }})</div>
+                <div style="font-weight: 600; margin-bottom: 8px">{{ t('原子单元 (') }}{{ atoms.length }})</div>
                 <NSpace vertical :size="8">
                   <div
                     v-for="(atom, i) in atoms"
@@ -149,14 +152,14 @@ async function handleOptimize() {
                   >
                     <NSpace align="center" justify="space-between" style="margin-bottom: 4px">
                       <NTag size="small" :type="(atom.score?.total ?? 0) >= 70 ? 'success' : 'warning'">
-                        {{ (atom.score?.total ?? 0) >= 70 ? '✅' : '⚠️' }} Atom #{{ i + 1 }} · 分数 {{ atom.score?.total ?? '-' }}
+                        {{ (atom.score?.total ?? 0) >= 70 ? '✅' : '⚠️' }} Atom #{{ i + 1 }} {{ t('· 分数') }} {{ atom.score?.total ?? '-' }}
                       </NTag>
                     </NSpace>
                     <div style="font-size: 13px; line-height: 1.6">{{ atom.text }}</div>
                     <div v-if="atom.subject || atom.object" style="font-size: 11px; color: var(--text-color-3); margin-top: 4px">
-                      <span v-if="atom.subject">主语: {{ atom.subject }}</span>
-                      <span v-if="atom.predicate"> · 谓语: {{ atom.predicate }}</span>
-                      <span v-if="atom.object"> · 宾语: {{ atom.object }}</span>
+                      <span v-if="atom.subject">{{ t('主语:') }} {{ atom.subject }}</span>
+                      <span v-if="atom.predicate"> {{ t('· 谓语:') }} {{ atom.predicate }}</span>
+                      <span v-if="atom.object"> {{ t('· 宾语:') }} {{ atom.object }}</span>
                     </div>
                     <div v-if="atom.anchors?.length" style="margin-top: 4px">
                       <NTag v-for="(a, j) in atom.anchors" :key="j" size="tiny" style="margin-right: 4px">{{ a }}</NTag>

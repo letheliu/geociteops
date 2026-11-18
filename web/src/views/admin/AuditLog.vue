@@ -7,6 +7,9 @@ import {
 import type { DataTableColumns } from 'naive-ui'
 import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
+import { useI18n } from '@/i18n'
+const { t, locale: appLocale } = useI18n()
+
 
 const message = useMessage()
 
@@ -53,7 +56,7 @@ async function load() {
     items.value = result.items
     total.value = result.total
   } catch (e: any) {
-    message.error(e?.message || '加载失败')
+    message.error(e?.message || t("加载失败"))
   } finally {
     loading.value = false
   }
@@ -79,10 +82,10 @@ function handlePageSizeChange(ps: number) {
 
 const columns: DataTableColumns<AuditRow> = [
   {
-    title: '时间',
+    title: t("时间"),
     key: 'createdAt',
     width: 180,
-    render: (row) => new Date(row.createdAt).toLocaleString('zh-CN'),
+    render: (row) => new Date(row.createdAt).toLocaleString(appLocale.value),
   },
   {
     title: 'action',
@@ -100,7 +103,7 @@ const columns: DataTableColumns<AuditRow> = [
 
 <template>
   <div>
-    <PageHeader title="审计日志" subtitle="平台操作与认证事件流水（只读）" />
+    <PageHeader :title="t('审计日志')" :subtitle="t('平台操作与认证事件流水（只读）')" />
 
     <NSpace style="margin-bottom: 16px">
       <NSelect
@@ -109,7 +112,7 @@ const columns: DataTableColumns<AuditRow> = [
         filterable
         tag
         clearable
-        placeholder="action（可输入自定义值）"
+        :placeholder="t('action（可输入自定义值）')"
         style="width: 240px"
         @update:value="handleSearch"
       />
@@ -121,7 +124,7 @@ const columns: DataTableColumns<AuditRow> = [
         @keyup.enter="handleSearch"
         @clear="handleSearch"
       />
-      <NButton @click="handleSearch">查询</NButton>
+      <NButton @click="handleSearch">{{ t('搜索') }}</NButton>
     </NSpace>
 
     <NCard>

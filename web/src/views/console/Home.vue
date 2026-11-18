@@ -16,6 +16,9 @@ import { useRouter } from 'vue-router'
 import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
 import { useSessionStore } from '../../stores/session'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 const router = useRouter()
 const message = useMessage()
@@ -42,7 +45,7 @@ async function load() {
     const result = await trpc.org.workspaces.list.query({ page: 1, pageSize: 100 })
     items.value = result.items
   } catch (e: any) {
-    message.error(e?.message || '加载失败')
+    message.error(e?.message || t("加载失败"))
   } finally {
     loading.value = false
   }
@@ -57,8 +60,8 @@ function enter(row: WorkspaceRow) {
 const orgName = computed(() => sessionStore.me?.organization?.name ?? '')
 const emptyDescription = computed(() =>
   sessionStore.isOrgOwner
-    ? '企业还没有 Workspace。创建一个之后，可以先做一次 GEO 体检，不必先配齐所有引擎。'
-    : '暂无授权的工作区，请联系企业管理员开通。',
+    ? t("企业还没有 Workspace。创建一个之后，可以先做一次 GEO 体检，不必先配齐所有引擎。")
+    : t("暂无授权的工作区，请联系企业管理员开通。"),
 )
 
 // ===== 新建 Workspace（仅 ORG_OWNER） =====
@@ -77,7 +80,7 @@ function openCreate() {
 async function handleCreate() {
   const f = createForm.value
   if (!f.name.trim() || !f.defaultBrandName.trim()) {
-    message.warning('请填写名称与默认品牌名')
+    message.warning(t("请填写名称与默认品牌名"))
     return
   }
   creating.value = true
@@ -88,12 +91,12 @@ async function handleCreate() {
       ...(f.domain.trim() ? { domain: f.domain.trim() } : {}),
     })
     issuedKey.value = result.apiKey
-    message.success('Workspace 已创建')
+    message.success(t("Workspace 已创建"))
     await load()
     // 列表数据源是 org.workspaces.list 而非 me()；同步刷新会话让 Header 切换下拉含新工作区
     sessionStore.fetchMe()
   } catch (e: any) {
-    message.error(e?.message || '创建失败')
+    message.error(e?.message || t("创建失败"))
   } finally {
     creating.value = false
   }
@@ -110,9 +113,9 @@ function handleCloseCreate() {
 async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text)
-    message.success('已复制')
+    message.success(t("已复制"))
   } catch {
-    message.error('复制失败，请手动选择复制')
+    message.error(t("复制失败，请手动选择复制"))
   }
 }
 </script>
@@ -120,42 +123,32 @@ async function copyText(text: string) {
 <template>
   <div style="max-width: 1200px; margin: 0 auto; padding: 24px">
     <NSpace justify="space-between" align="center" style="margin-bottom: 16px">
-      <PageHeader title="我的 Workspace" :subtitle="orgName" />
-      <NButton v-if="sessionStore.isOrgOwner" type="primary" @click="openCreate">
-        + 新建 Workspace
-      </NButton>
+      <PageHeader :title="t('我的 Workspace')" :subtitle="orgName" />
+      <NButton v-if="sessionStore.isOrgOwner" type="primary" @click="openCreate"> {{ t('+ 新建 Workspace') }} </NButton>
     </NSpace>
 
     <!-- 企业设置入口（任务 9）：企业信息全员可见；成员管理/API 凭证仅 OWNER
          （VIEWER/MEMBER 无权，后端 org.manage / credential.write 也会拒） -->
     <NSpace :size="8" style="margin-bottom: 8px">
-      <NText depth="3" style="font-size: 13px; line-height: 28px">企业设置：</NText>
-      <NButton size="small" tertiary @click="router.push({ name: 'console-org-info' })">
-        企业信息
-      </NButton>
+      <NText depth="3" style="font-size: 13px; line-height: 28px">{{ t('企业设置：') }}</NText>
+      <NButton size="small" tertiary @click="router.push({ name: 'console-org-info' })"> {{ t('企业信息') }} </NButton>
       <NButton
         v-if="sessionStore.isOrgOwner"
         size="small"
         tertiary
         @click="router.push({ name: 'console-members' })"
-      >
-        成员管理
-      </NButton>
+      > {{ t('成员管理') }} </NButton>
       <NButton
         v-if="sessionStore.isOrgOwner"
         size="small"
         tertiary
         @click="router.push({ name: 'console-credentials' })"
-      >
-        API 凭证
-      </NButton>
+      > {{ t('API 凭证') }} </NButton>
     </NSpace>
 
     <NEmpty v-if="!loading && items.length === 0" :description="emptyDescription" style="margin-top: 96px">
       <template #extra>
-        <NButton v-if="sessionStore.isOrgOwner" type="primary" @click="openCreate">
-          创建第一个 Workspace
-        </NButton>
+        <NButton v-if="sessionStore.isOrgOwner" type="primary" @click="openCreate"> {{ t('创建第一个 Workspace') }} </NButton>
       </template>
     </NEmpty>
 
@@ -171,8 +164,8 @@ async function copyText(text: string) {
             </NTag>
           </template>
           <NSpace vertical :size="6">
-            <NText depth="3" style="font-size: 13px">域名：{{ row.domain || '—' }}</NText>
-            <NText depth="3" style="font-size: 13px">品牌名：{{ row.defaultBrandName }}</NText>
+            <NText depth="3" style="font-size: 13px">{{ t('域名：') }}{{ row.domain || '—' }}</NText>
+            <NText depth="3" style="font-size: 13px">{{ t('品牌名：') }}{{ row.defaultBrandName }}</NText>
           </NSpace>
           <template #footer>
             <NButton
@@ -180,9 +173,7 @@ async function copyText(text: string) {
               type="primary"
               :disabled="row.status !== 'ACTIVE'"
               @click="enter(row)"
-            >
-              进入
-            </NButton>
+            > {{ t('进入') }} </NButton>
           </template>
         </NCard>
       </NGridItem>
@@ -191,42 +182,40 @@ async function copyText(text: string) {
     <NModal
       :show="showModal"
       preset="card"
-      :title="issuedKey ? 'Workspace 已创建' : '新建 Workspace'"
+      :title="issuedKey ? t('Workspace 已创建') : t('新建 Workspace')"
       style="width: 520px"
       :mask-closable="false"
       @update:show="(v: boolean) => { if (!v) handleCloseCreate() }"
     >
       <!-- 成功态：一次性 API Key -->
       <NSpace v-if="issuedKey" vertical :size="12">
-        <NText type="warning" style="font-size: 13px">
-          初始 API Key 仅此一次展示，关闭后不可再查看，请立即复制并妥善保管。
-        </NText>
+        <NText type="warning" style="font-size: 13px"> {{ t('初始 API Key 仅此一次展示，关闭后不可再查看，请立即复制并妥善保管。') }} </NText>
         <NInputGroup>
           <NInput :value="issuedKey" readonly />
-          <NButton type="primary" @click="copyText(issuedKey)">复制</NButton>
+          <NButton type="primary" @click="copyText(issuedKey)">{{ t('复制') }}</NButton>
         </NInputGroup>
       </NSpace>
 
       <!-- 表单态 -->
       <NForm v-else label-placement="left" label-width="110">
-        <NFormItem label="名称">
-          <NInput v-model:value="createForm.name" placeholder="Workspace 名称" />
+        <NFormItem :label="t('名称')">
+          <NInput v-model:value="createForm.name" :placeholder="t('Workspace 名称')" />
         </NFormItem>
-        <NFormItem label="默认品牌名">
-          <NInput v-model:value="createForm.defaultBrandName" placeholder="引用归属展示用的品牌名" />
+        <NFormItem :label="t('默认品牌名')">
+          <NInput v-model:value="createForm.defaultBrandName" :placeholder="t('引用归属展示用的品牌名')" />
         </NFormItem>
-        <NFormItem label="域名（可选）">
+        <NFormItem :label="t('域名（可选）')">
           <NInput v-model:value="createForm.domain" placeholder="example.com" />
         </NFormItem>
       </NForm>
       <template #footer>
         <NSpace justify="end">
           <template v-if="issuedKey">
-            <NButton type="primary" @click="handleCloseCreate">我已保存，关闭</NButton>
+            <NButton type="primary" @click="handleCloseCreate">{{ t('我已保存，关闭') }}</NButton>
           </template>
           <template v-else>
-            <NButton @click="handleCloseCreate">取消</NButton>
-            <NButton type="primary" :loading="creating" @click="handleCreate">创建</NButton>
+            <NButton @click="handleCloseCreate">{{ t('取消') }}</NButton>
+            <NButton type="primary" :loading="creating" @click="handleCreate">{{ t('创建') }}</NButton>
           </template>
         </NSpace>
       </template>

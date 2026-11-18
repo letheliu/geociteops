@@ -4,6 +4,9 @@ import { useRoute } from 'vue-router'
 import { NTabs, NTab, NButton, NTable, NTag, NSpace, NEmpty, NSpin, useMessage } from 'naive-ui'
 import { trpc } from '../../api/client'
 import { DIAGNOSTIC_QUERY_TYPE_LABELS, queryCoverageHint } from '../../domain/diagnostic'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 const route = useRoute()
 const message = useMessage()
@@ -33,7 +36,7 @@ function updateFilter() {
 async function handleConfirm(id: string) {
   try {
     await (trpc as any).diagnostic.queries.bulkConfirm.mutate({ projectId, queryIds: [id] })
-    message.success('已确认')
+    message.success(t("已确认"))
     await loadQueries()
   } catch (err: any) {
     message.error(err.message)
@@ -43,7 +46,7 @@ async function handleConfirm(id: string) {
 async function handleDisable(id: string) {
   try {
     await (trpc as any).diagnostic.queries.disable.mutate({ projectId, queryId: id })
-    message.success('已禁用')
+    message.success(t("已禁用"))
     await loadQueries()
   } catch (err: any) {
     message.error(err.message)
@@ -55,7 +58,7 @@ onMounted(loadQueries)
 
 <template>
   <NSpace vertical :size="16">
-    <h2 style="margin: 0">问题规划</h2>
+    <h2 style="margin: 0">{{ t('问题规划') }}</h2>
 
     <NTabs v-model:value="activeTab" @update:value="updateFilter">
       <NTab v-for="type in queryTypes" :key="type" :name="type">
@@ -74,11 +77,11 @@ onMounted(loadQueries)
       <NTable v-if="filteredQueries.length">
         <thead>
           <tr>
-            <th>问题文本</th>
-            <th>优先级</th>
-            <th>来源</th>
-            <th>状态</th>
-            <th>操作</th>
+            <th>{{ t('问题文本') }}</th>
+            <th>{{ t('优先级') }}</th>
+            <th>{{ t('来源') }}</th>
+            <th>{{ t('状态') }}</th>
+            <th>{{ t('操作') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -93,14 +96,14 @@ onMounted(loadQueries)
             </td>
             <td>
               <NSpace>
-                <NButton v-if="q.status === 'DRAFT'" size="tiny" type="primary" @click="handleConfirm(q.id)">确认</NButton>
-                <NButton v-if="q.status !== 'DISABLED'" size="tiny" @click="handleDisable(q.id)">禁用</NButton>
+                <NButton v-if="q.status === 'DRAFT'" size="tiny" type="primary" @click="handleConfirm(q.id)">{{ t('确认') }}</NButton>
+                <NButton v-if="q.status !== 'DISABLED'" size="tiny" @click="handleDisable(q.id)">{{ t('禁用') }}</NButton>
               </NSpace>
             </td>
           </tr>
         </tbody>
       </NTable>
-      <NEmpty v-else description="暂无该类型的问题" />
+      <NEmpty v-else :description="t('暂无该类型的问题')" />
     </NSpin>
   </NSpace>
 </template>

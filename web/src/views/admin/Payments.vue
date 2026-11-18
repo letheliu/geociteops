@@ -16,6 +16,9 @@ import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
 import { formatCents } from '../../utils/money'
 import { paymentMethodLabel } from '../../utils/order'
+import { useI18n } from '@/i18n'
+const { t, locale: appLocale } = useI18n()
+
 
 const router = useRouter()
 const message = useMessage()
@@ -42,7 +45,7 @@ async function load() {
     items.value = result.items
     total.value = result.total
   } catch (e: any) {
-    message.error(e?.message || '收款列表加载失败')
+    message.error(e?.message || t("收款列表加载失败"))
   } finally {
     loading.value = false
   }
@@ -78,7 +81,7 @@ function dueInDays(row: PaymentRow): number | null {
 }
 
 function fmtDate(value: string | null): string {
-  return value ? new Date(value).toLocaleString('zh-CN') : '—'
+  return value ? new Date(value).toLocaleString(appLocale.value) : '—'
 }
 
 // ===== 确认收款 / 到账（VOUCHER 与 CREDIT 共用 confirm 端点） =====
@@ -88,10 +91,10 @@ async function handleConfirm(row: PaymentRow) {
   confirmingId.value = row.id
   try {
     await trpc.admin.payments.confirm.mutate({ paymentId: row.id })
-    message.success(view.value === 'CREDIT' ? '应收已确认到账' : '回单已确认收款，服务开通处理中')
+    message.success(view.value === 'CREDIT' ? t("应收已确认到账") : t("回单已确认收款，服务开通处理中"))
     await load()
   } catch (e: any) {
-    message.error(e?.message || '确认失败')
+    message.error(e?.message || t("确认失败"))
   } finally {
     confirmingId.value = null
   }
@@ -114,17 +117,17 @@ async function handleReject() {
   if (!row) return
   const reason = rejectReason.value.trim()
   if (!reason) {
-    message.warning('请填写驳回原因')
+    message.warning(t("请填写驳回原因"))
     return
   }
   rejecting.value = true
   try {
     await trpc.admin.payments.reject.mutate({ paymentId: row.id, reason })
-    message.success('回单已驳回，订单回退待支付')
+    message.success(t("回单已驳回，订单回退待支付"))
     showRejectModal.value = false
     await load()
   } catch (e: any) {
-    message.error(e?.message || '驳回失败')
+    message.error(e?.message || t("驳回失败"))
   } finally {
     rejecting.value = false
   }
@@ -132,7 +135,7 @@ async function handleReject() {
 
 const voucherColumns: DataTableColumns<PaymentRow> = [
   {
-    title: '订单号',
+    title: t("订单号"),
     key: 'orderNo',
     width: 190,
     render: (row) =>
@@ -141,14 +144,14 @@ const voucherColumns: DataTableColumns<PaymentRow> = [
       }),
   },
   {
-    title: '金额',
+    title: t("金额"),
     key: 'amountCents',
     width: 120,
     render: (row) => `¥${formatCents(row.amountCents)}`,
   },
-  { title: '通道', key: 'method', width: 100, render: (row) => paymentMethodLabel(row.method) },
+  { title: t("通道"), key: 'method', width: 100, render: (row) => paymentMethodLabel(row.method) },
   {
-    title: '回单',
+    title: t("回单"),
     key: 'voucherFileKey',
     width: 90,
     render: (row) =>
@@ -156,18 +159,18 @@ const voucherColumns: DataTableColumns<PaymentRow> = [
         ? h(
             NButton,
             { size: 'tiny', tertiary: true, tag: 'a', href: `/files/${row.voucherFileKey}`, target: '_blank' },
-            { default: () => '预览' },
+            { default: () => t("预览") },
           )
         : '—',
   },
   {
-    title: '提交时间',
+    title: t("提交时间"),
     key: 'createdAt',
     width: 170,
     render: (row) => fmtDate(row.createdAt),
   },
   {
-    title: '操作',
+    title: t("操作"),
     key: 'actions',
     width: 170,
     render: (row) =>
@@ -176,12 +179,12 @@ const voucherColumns: DataTableColumns<PaymentRow> = [
           h(NPopconfirm, { onPositiveClick: () => handleConfirm(row) }, {
             trigger: () =>
               h(NButton, { size: 'tiny', type: 'primary', loading: confirmingId.value === row.id }, {
-                default: () => '确认收款',
+                default: () => t("确认收款"),
               }),
-            default: () => `确认已收到 ¥${formatCents(row.amountCents)}？确认后订单进入服务开通。`,
+            default: () => `${t("确认已收到 ¥")}${formatCents(row.amountCents)}${t("？确认后订单进入服务开通。")}`,
           }),
           h(NButton, { size: 'tiny', type: 'warning', onClick: () => openReject(row) }, {
-            default: () => '驳回',
+            default: () => t("驳回"),
           }),
         ],
       }),
@@ -190,7 +193,7 @@ const voucherColumns: DataTableColumns<PaymentRow> = [
 
 const creditColumns: DataTableColumns<PaymentRow> = [
   {
-    title: '订单号',
+    title: t("订单号"),
     key: 'orderNo',
     width: 190,
     render: (row) =>
@@ -199,19 +202,19 @@ const creditColumns: DataTableColumns<PaymentRow> = [
       }),
   },
   {
-    title: '应收金额',
+    title: t("应收金额"),
     key: 'amountCents',
     width: 120,
     render: (row) => `¥${formatCents(row.amountCents)}`,
   },
   {
-    title: '开通时间',
+    title: t("开通时间"),
     key: 'createdAt',
     width: 170,
     render: (row) => fmtDate(row.createdAt),
   },
   {
-    title: '账期截止',
+    title: t("账期截止"),
     key: 'dueAt',
     width: 220,
     render: (row) => {
@@ -220,9 +223,9 @@ const creditColumns: DataTableColumns<PaymentRow> = [
       if (days === null) return dueAt
       const tag =
         days < 0
-          ? h(NTag, { size: 'small', type: 'error', bordered: false }, { default: () => `已逾期 ${-days} 天` })
+          ? h(NTag, { size: 'small', type: 'error', bordered: false }, { default: () => `${t("已逾期 ")}${-days}${t(" 天")}` })
           : h(NTag, { size: 'small', type: days <= 7 ? 'warning' : 'info', bordered: false }, {
-              default: () => `剩余 ${days} 天`,
+              default: () => `${t("剩余 ")}${days}${t(" 天")}`,
             })
       return h(NSpace, { size: 8, align: 'center', wrap: false }, {
         default: () => [h('span', dueAt), tag],
@@ -230,16 +233,16 @@ const creditColumns: DataTableColumns<PaymentRow> = [
     },
   },
   {
-    title: '操作',
+    title: t("操作"),
     key: 'actions',
     width: 130,
     render: (row) =>
       h(NPopconfirm, { onPositiveClick: () => handleConfirm(row) }, {
         trigger: () =>
           h(NButton, { size: 'tiny', type: 'primary', loading: confirmingId.value === row.id }, {
-            default: () => '确认到账',
+            default: () => t("确认到账"),
           }),
-        default: () => `确认已收到 ¥${formatCents(row.amountCents)}？确认后应收流水结清。`,
+        default: () => `${t("确认已收到 ¥")}${formatCents(row.amountCents)}${t("？确认后应收流水结清。")}`,
       }),
   },
 ]
@@ -249,7 +252,7 @@ const columns = computed(() => (view.value === 'CREDIT' ? creditColumns : vouche
 
 <template>
   <div>
-    <PageHeader title="收款确认" subtitle="对公转账回单审核与合同账期应收跟进" />
+    <PageHeader :title="t('收款确认')" :subtitle="t('对公转账回单审核与合同账期应收跟进')" />
 
     <NCard>
       <NTabs
@@ -257,7 +260,7 @@ const columns = computed(() => (view.value === 'CREDIT' ? creditColumns : vouche
         type="line"
         @update:value="(v: string | number) => { view = v as 'VOUCHER' | 'CREDIT'; handleTabChange() }"
       >
-        <NTabPane name="VOUCHER" tab="待确认回单">
+        <NTabPane name="VOUCHER" :tab="t('待确认回单')">
           <NDataTable
             :columns="columns"
             :data="items"
@@ -275,11 +278,9 @@ const columns = computed(() => (view.value === 'CREDIT' ? creditColumns : vouche
             }"
             remote
           />
-          <NText depth="3" style="font-size: 12px">
-            客户上传对公转账回单后在此审核；驳回需填原因（订单回退待支付，客户可重新上传）。
-          </NText>
+          <NText depth="3" style="font-size: 12px"> {{ t('客户上传对公转账回单后在此审核；驳回需填原因（订单回退待支付，客户可重新上传）。') }} </NText>
         </NTabPane>
-        <NTabPane name="CREDIT" tab="应收账期">
+        <NTabPane name="CREDIT" :tab="t('应收账期')">
           <NDataTable
             :columns="columns"
             :data="items"
@@ -297,9 +298,7 @@ const columns = computed(() => (view.value === 'CREDIT' ? creditColumns : vouche
             }"
             remote
           />
-          <NText depth="3" style="font-size: 12px">
-            运营开通的合同账期应收流水；确认到账不改变订单履行状态，仅结清应收。
-          </NText>
+          <NText depth="3" style="font-size: 12px"> {{ t('运营开通的合同账期应收流水；确认到账不改变订单履行状态，仅结清应收。') }} </NText>
         </NTabPane>
       </NTabs>
     </NCard>
@@ -308,31 +307,29 @@ const columns = computed(() => (view.value === 'CREDIT' ? creditColumns : vouche
     <NModal
       v-model:show="showRejectModal"
       preset="card"
-      title="驳回回单"
+      :title="t('驳回回单')"
       style="width: 480px"
       :mask-closable="false"
     >
       <NForm label-placement="left" label-width="90">
-        <NFormItem label="订单">
+        <NFormItem :label="t('订单')">
           <NText>{{ rejectRow?.order?.orderNo }}（¥{{ formatCents(rejectRow?.amountCents ?? null) }}）</NText>
         </NFormItem>
-        <NFormItem label="驳回原因" required>
+        <NFormItem :label="t('驳回原因')" required>
           <NInput
             v-model:value="rejectReason"
             type="textarea"
-            placeholder="将展示给客户（如金额不符 / 凭证模糊），200 字内"
+            :placeholder="t('将展示给客户（如金额不符 / 凭证模糊），200 字内')"
             :maxlength="200"
             show-count
           />
         </NFormItem>
       </NForm>
-      <div style="font-size: 12px; color: var(--text-color-3)">
-        驳回后订单回退待支付，客户可在订单详情重新上传回单或改用其他支付方式。
-      </div>
+      <div style="font-size: 12px; color: var(--text-color-3)"> {{ t('驳回后订单回退待支付，客户可在订单详情重新上传回单或改用其他支付方式。') }} </div>
       <template #footer>
         <NSpace justify="end">
-          <NButton @click="showRejectModal = false">取消</NButton>
-          <NButton type="warning" :loading="rejecting" @click="handleReject">确认驳回</NButton>
+          <NButton @click="showRejectModal = false">{{ t('取消') }}</NButton>
+          <NButton type="warning" :loading="rejecting" @click="handleReject">{{ t('确认驳回') }}</NButton>
         </NSpace>
       </template>
     </NModal>

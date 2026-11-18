@@ -10,6 +10,10 @@ import { useAppStore } from '../stores/app'
 import { useSessionStore } from '../stores/session'
 import { trpc } from '../composables/useTrpc'
 import headerLogo from '../assets/geociteops-header.svg'
+import { useI18n } from '@/i18n'
+import LanguageSwitcher from '@/components/common/LanguageSwitcher.vue'
+const { t } = useI18n()
+
 
 const appStore = useAppStore()
 const sessionStore = useSessionStore()
@@ -51,75 +55,75 @@ function renderIcon(emoji: string) {
 
 const menuOptions: MenuOption[] = [
   {
-    label: '概览',
+    label: t("概览"),
     key: 'dashboard',
     icon: renderIcon('📊'),
   } as MenuOption,
   {
-    label: 'GEO 体检',
+    label: t("GEO 体检"),
     key: 'geo-health',
     icon: renderIcon('🩺'),
   } as MenuOption,
   {
-    label: '引用监测',
+    label: t("引用监测"),
     key: 'citation-group',
     type: 'group',
     children: [
-      { label: '查询库', key: 'citation-queries', icon: renderIcon('🔍') } as MenuOption,
-      { label: '引用报告', key: 'citation-reports', icon: renderIcon('📋') } as MenuOption,
-      { label: 'SOV 分析', key: 'citation-sov', icon: renderIcon('📈') } as MenuOption,
+      { label: t("查询库"), key: 'citation-queries', icon: renderIcon('🔍') } as MenuOption,
+      { label: t("引用报告"), key: 'citation-reports', icon: renderIcon('📋') } as MenuOption,
+      { label: t("SOV 分析"), key: 'citation-sov', icon: renderIcon('📈') } as MenuOption,
       // 引用覆盖矩阵(PUBLISHED 页 × 平台,盲区/域级证据/意图落空)
-      { label: '引用覆盖', key: 'citation-coverage', icon: renderIcon('🧭') } as MenuOption,
-      { label: '效果对比', key: 'citation-effect', icon: renderIcon('⚖️') } as MenuOption,
+      { label: t("引用覆盖"), key: 'citation-coverage', icon: renderIcon('🧭') } as MenuOption,
+      { label: t("效果对比"), key: 'citation-effect', icon: renderIcon('⚖️') } as MenuOption,
       // M2 §3.3 闭环看板
-      { label: '闭环看板', key: 'citation-loop', icon: renderIcon('🔁') } as MenuOption,
+      { label: t("闭环看板"), key: 'citation-loop', icon: renderIcon('🔁') } as MenuOption,
     ],
   },
   {
-    label: '内容优化',
+    label: t("内容优化"),
     key: 'content-group',
     type: 'group',
     children: [
-      { label: '内容页面', key: 'content-pages', icon: renderIcon('📄') } as MenuOption,
-      { label: '优化任务', key: 'content-tasks', icon: renderIcon('✅') } as MenuOption,
+      { label: t("内容页面"), key: 'content-pages', icon: renderIcon('📄') } as MenuOption,
+      { label: t("优化任务"), key: 'content-tasks', icon: renderIcon('✅') } as MenuOption,
     ],
   },
   {
-    label: 'Schema 生成',
+    label: t("Schema 生成"),
     key: 'schema-group',
     type: 'group',
     children: [
-      { label: 'Schema 记录', key: 'schema-records', icon: renderIcon('📚') } as MenuOption,
-      { label: '生成 JSON-LD', key: 'schema-generate', icon: renderIcon('⚙️') } as MenuOption,
-      { label: 'llms.txt 编辑器', key: 'schema-llms-txt', icon: renderIcon('📝') } as MenuOption,
+      { label: t("Schema 记录"), key: 'schema-records', icon: renderIcon('📚') } as MenuOption,
+      { label: t("生成 JSON-LD"), key: 'schema-generate', icon: renderIcon('⚙️') } as MenuOption,
+      { label: t("llms.txt 编辑器"), key: 'schema-llms-txt', icon: renderIcon('📝') } as MenuOption,
     ],
   },
   {
-    label: '知识图谱',
+    label: t("知识图谱"),
     key: 'kg-group',
     type: 'group',
     children: [
-      { label: '实体管理', key: 'kg-entities', icon: renderIcon('🔷') } as MenuOption,
-      { label: '关系管理', key: 'kg-relations', icon: renderIcon('🔗') } as MenuOption,
-      { label: '图谱可视化', key: 'kg-graph', icon: renderIcon('🌐') } as MenuOption,
+      { label: t("实体管理"), key: 'kg-entities', icon: renderIcon('🔷') } as MenuOption,
+      { label: t("关系管理"), key: 'kg-relations', icon: renderIcon('🔗') } as MenuOption,
+      { label: t("图谱可视化"), key: 'kg-graph', icon: renderIcon('🌐') } as MenuOption,
     ],
   },
   {
-    label: 'Agent 就绪',
+    label: t("Agent 就绪"),
     key: 'agent-readiness',
     icon: renderIcon('🤖'),
   } as MenuOption,
   {
-    label: 'GEO 诊断',
+    label: t("GEO 诊断"),
     key: 'diagnostic-group',
     type: 'group',
     children: [
-      { label: '诊断项目', key: 'diagnostic-projects', icon: renderIcon('🏥') } as MenuOption,
-      { label: '行动中心', key: 'diagnostic-actions', icon: renderIcon('📋') } as MenuOption,
+      { label: t("诊断项目"), key: 'diagnostic-projects', icon: renderIcon('🏥') } as MenuOption,
+      { label: t("行动中心"), key: 'diagnostic-actions', icon: renderIcon('📋') } as MenuOption,
     ],
   },
   {
-    label: '设置',
+    label: t("设置"),
     key: 'settings',
     icon: renderIcon('⚙️'),
   } as MenuOption,
@@ -148,7 +152,7 @@ const workspaceOptions = computed(() => {
   }))
   const currentId = route.params.workspaceId as string | undefined
   if (currentId && !options.some((o) => o.value === currentId)) {
-    options.unshift({ label: workspaceName.value || '当前工作区', value: currentId })
+    options.unshift({ label: workspaceName.value || t("当前工作区"), value: currentId })
   }
   return options
 })
@@ -164,8 +168,8 @@ function handleSwitchWorkspace(value: string) {
 
 // 右上角用户菜单（同 AdminLayout：改密 / 退出）
 const userOptions = [
-  { label: '修改密码', key: 'change-password' },
-  { label: '退出登录', key: 'logout' },
+  { label: t("修改密码"), key: 'change-password' },
+  { label: t("退出登录"), key: 'logout' },
 ]
 
 function handleUserAction(key: string) {
@@ -232,14 +236,15 @@ function handleUserAction(key: string) {
           <NText v-if="workspaceDomain" depth="3" style="font-size: 12px">{{ workspaceDomain }}</NText>
         </NSpace>
         <NSpace align="center" :wrap="false">
+          <LanguageSwitcher />
           <NDropdown :options="userOptions" @select="handleUserAction">
             <NButton size="small" quaternary>
-              {{ sessionStore.me ? (sessionStore.me.displayName || sessionStore.me.username) : '未登录' }}
+              {{ sessionStore.me ? (sessionStore.me.displayName || sessionStore.me.username) : t('未登录') }}
             </NButton>
           </NDropdown>
           <NSwitch :value="appStore.darkMode" @update:value="appStore.toggleDarkMode" size="small">
-            <template #checked>暗色</template>
-            <template #unchecked>亮色</template>
+            <template #checked>{{ t('暗色') }}</template>
+            <template #unchecked>{{ t('亮色') }}</template>
           </NSwitch>
         </NSpace>
       </NLayoutHeader>
@@ -250,9 +255,7 @@ function handleUserAction(key: string) {
           :bordered="false"
           :closable="false"
           style="margin-bottom: 16px"
-        >
-          你正以平台顾问身份操作
-        </NAlert>
+        > {{ t('你正以平台顾问身份操作') }} </NAlert>
         <RouterView />
       </NLayoutContent>
     </NLayout>

@@ -26,6 +26,9 @@ import { useSessionStore } from '../../stores/session'
 import { fileToBase64 } from '../../utils/file'
 import { formatCents } from '../../utils/money'
 import { orderEventLabel, orderStatusMeta, paymentMethodLabel } from '../../utils/order'
+import { useI18n } from '@/i18n'
+const { t, locale: appLocale } = useI18n()
+
 
 const route = useRoute()
 const router = useRouter()
@@ -112,7 +115,7 @@ async function load() {
       }
     }
   } catch (e: any) {
-    message.error(e?.message || '订单详情加载失败')
+    message.error(e?.message || t("订单详情加载失败"))
   } finally {
     loading.value = false
   }
@@ -121,7 +124,7 @@ async function load() {
 onMounted(load)
 
 function fmtDate(value: string | null): string {
-  return value ? new Date(value).toLocaleString('zh-CN') : '—'
+  return value ? new Date(value).toLocaleString(appLocale.value) : '—'
 }
 
 function snapshotName(item: OrderDetailPayload['items'][number]): string {
@@ -136,9 +139,9 @@ const voucherPayment = computed(() =>
 async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text)
-    message.success('已复制')
+    message.success(t("已复制"))
   } catch {
-    message.error('复制失败，请手动选择复制')
+    message.error(t("复制失败，请手动选择复制"))
   }
 }
 
@@ -164,7 +167,7 @@ async function handlePay() {
     payUrl.value = result.payUrl
     channelOrderNo.value = result.channelOrderNo
   } catch (e: any) {
-    message.error(e?.message || '发起支付失败')
+    message.error(e?.message || t("发起支付失败"))
   } finally {
     paying.value = false
   }
@@ -183,23 +186,23 @@ function handleVoucherChange({ fileList }: { fileList: UploadFileInfo[] }) {
 async function handleUploadVoucher() {
   const file = voucherFile.value
   if (!file) {
-    message.warning('请先选择回单文件（png/jpg/pdf，≤ 7MB）')
+    message.warning(t("请先选择回单文件（png/jpg/pdf，≤ 7MB）"))
     return
   }
   if (file.size > 7 * 1024 * 1024) {
-    message.warning('回单文件不能超过 7MB')
+    message.warning(t("回单文件不能超过 7MB"))
     return
   }
   uploading.value = true
   try {
     const contentBase64 = await fileToBase64(file)
     await trpc.orders.uploadVoucher.mutate({ orderId, fileName: file.name, contentBase64 })
-    message.success('回单已上传，等待财务确认收款')
+    message.success(t("回单已上传，等待财务确认收款"))
     voucherFile.value = null
     uploadRef.value?.clear()
     await load()
   } catch (e: any) {
-    message.error(e?.message || '回单上传失败')
+    message.error(e?.message || t("回单上传失败"))
   } finally {
     uploading.value = false
   }
@@ -212,10 +215,10 @@ async function handleCancel() {
   cancelling.value = true
   try {
     await trpc.orders.cancel.mutate({ orderId })
-    message.success('订单已取消')
+    message.success(t("订单已取消"))
     await load()
   } catch (e: any) {
-    message.error(e?.message || '取消失败')
+    message.error(e?.message || t("取消失败"))
   } finally {
     cancelling.value = false
   }
@@ -246,14 +249,14 @@ function openRefund() {
 async function handleRefund() {
   const reason = refundReason.value.trim()
   if (!reason) {
-    message.warning('请填写退款原因')
+    message.warning(t("请填写退款原因"))
     return
   }
   // 金额留空 → 省略 amountCents（后端缺省=全额可退额，zod optional 语义）
   const entered = refundAmountYuan.value
   const amountCents = entered === null ? null : Math.round(entered * 100)
   if (amountCents !== null && (!Number.isFinite(amountCents) || amountCents < 1)) {
-    message.warning('退款金额须为正数（元），留空则按全额可退提交')
+    message.warning(t("退款金额须为正数（元），留空则按全额可退提交"))
     return
   }
   refunding.value = true
@@ -263,11 +266,11 @@ async function handleRefund() {
       reason,
       ...(amountCents !== null ? { amountCents } : {}),
     })
-    message.success('退款申请已提交，等待平台审批')
+    message.success(t("退款申请已提交，等待平台审批"))
     showRefundModal.value = false
     await load()
   } catch (e: any) {
-    message.error(e?.message || '退款申请失败')
+    message.error(e?.message || t("退款申请失败"))
   } finally {
     refunding.value = false
   }
@@ -275,22 +278,22 @@ async function handleRefund() {
 
 // ===== 行项表格 =====
 const itemColumns: DataTableColumns<OrderDetailPayload['items'][number]> = [
-  { title: '商品', key: 'name', minWidth: 200, render: snapshotName },
-  { title: '数量', key: 'quantity', width: 80 },
+  { title: t("商品"), key: 'name', minWidth: 200, render: snapshotName },
+  { title: t("数量"), key: 'quantity', width: 80 },
   {
-    title: '单价',
+    title: t("单价"),
     key: 'unitPriceCents',
     width: 110,
     render: (row) => `¥${formatCents(row.unitPriceCents)}`,
   },
   {
-    title: '小计',
+    title: t("小计"),
     key: 'subtotal',
     width: 110,
     render: (row) => `¥${formatCents(row.unitPriceCents * row.quantity)}`,
   },
   {
-    title: '目标 Workspace',
+    title: t("目标 Workspace"),
     key: 'workspaceId',
     width: 140,
     render: (row) => row.workspaceId ?? '—',
@@ -301,7 +304,7 @@ const itemColumns: DataTableColumns<OrderDetailPayload['items'][number]> = [
 
 /** 状态迁移展示：fromStatus → toStatus（中文标签） */
 function transitionText(from: string | null, to: string): string {
-  const fromLabel = from ? orderStatusMeta(from).label : '初始'
+  const fromLabel = from ? orderStatusMeta(from).label : t("初始")
   return `${fromLabel} → ${orderStatusMeta(to).label}`
 }
 </script>
@@ -309,14 +312,12 @@ function transitionText(from: string | null, to: string): string {
 <template>
   <div style="max-width: 1080px; margin: 0 auto; padding: 24px">
     <NSpace justify="space-between" align="center" style="margin-bottom: 16px">
-      <PageHeader title="订单详情" :subtitle="order?.orderNo" />
+      <PageHeader :title="t('订单详情')" :subtitle="order?.orderNo" />
       <NSpace align="center">
         <NTag v-if="statusMeta" size="small" :bordered="false" :type="statusMeta.type">
           {{ statusMeta.label }}
         </NTag>
-        <NButton size="small" tertiary @click="router.push({ name: 'console-orders' })">
-          返回列表
-        </NButton>
+        <NButton size="small" tertiary @click="router.push({ name: 'console-orders' })"> {{ t('返回列表') }} </NButton>
       </NSpace>
     </NSpace>
 
@@ -326,12 +327,10 @@ function transitionText(from: string | null, to: string): string {
       :bordered="false"
       :closable="false"
       style="margin-bottom: 16px"
-    >
-      当前为只读视图：支付、回单、取消与退款操作仅企业管理员（ORG_OWNER）可执行。
-    </NAlert>
+    > {{ t('当前为只读视图：支付、回单、取消与退款操作仅企业管理员（ORG_OWNER）可执行。') }} </NAlert>
 
     <NSpace v-if="loading" justify="center" style="margin-top: 96px">
-      <NText depth="3">加载中…</NText>
+      <NText depth="3">{{ t('加载中…') }}</NText>
     </NSpace>
 
     <template v-else-if="order">
@@ -339,24 +338,22 @@ function transitionText(from: string | null, to: string): string {
       <NCard
         v-if="order.status === 'PENDING_PAYMENT'"
         size="small"
-        title="对公转账收款信息"
+        :title="t('对公转账收款信息')"
         style="margin-bottom: 16px"
       >
         <template v-if="bankInfo">
           <NDescriptions :column="3" label-placement="left" size="small">
-            <NDescriptionsItem label="户名">{{ bankInfo.accountName }}</NDescriptionsItem>
-            <NDescriptionsItem label="账号">{{ bankInfo.accountNo }}</NDescriptionsItem>
-            <NDescriptionsItem label="开户行">{{ bankInfo.bankName }}</NDescriptionsItem>
+            <NDescriptionsItem :label="t('户名')">{{ bankInfo.accountName }}</NDescriptionsItem>
+            <NDescriptionsItem :label="t('账号')">{{ bankInfo.accountNo }}</NDescriptionsItem>
+            <NDescriptionsItem :label="t('开户行')">{{ bankInfo.bankName }}</NDescriptionsItem>
           </NDescriptions>
         </template>
-        <NText v-else depth="3" style="font-size: 13px">
-          平台未配置收款账户信息，请联系顾问获取收款信息。
-        </NText>
+        <NText v-else depth="3" style="font-size: 13px"> {{ t('平台未配置收款账户信息，请联系顾问获取收款信息。') }} </NText>
         <NSpace align="center" :size="8" style="margin-top: 8px">
-          <NText depth="3" style="font-size: 13px">转账请备注订单号：</NText>
+          <NText depth="3" style="font-size: 13px">{{ t('转账请备注订单号：') }}</NText>
           <NInputGroup style="width: 280px">
             <NInput :value="order.orderNo" readonly size="small" />
-            <NButton size="small" type="primary" @click="copyText(order.orderNo)">复制</NButton>
+            <NButton size="small" type="primary" @click="copyText(order.orderNo)">{{ t('复制') }}</NButton>
           </NInputGroup>
         </NSpace>
       </NCard>
@@ -368,7 +365,7 @@ function transitionText(from: string | null, to: string): string {
         style="margin-bottom: 16px"
       >
         <template v-if="order.status === 'PENDING_CONFIRMATION'">
-          <NTag type="info" :bordered="false">财务确认中</NTag>
+          <NTag type="info" :bordered="false">{{ t('财务确认中') }}</NTag>
           <NButton
             v-if="voucherPayment?.voucherFileKey"
             size="small"
@@ -376,19 +373,15 @@ function transitionText(from: string | null, to: string): string {
             tag="a"
             :href="`/files/${voucherPayment.voucherFileKey}`"
             target="_blank"
-          >
-            预览回单
-          </NButton>
+          > {{ t('预览回单') }} </NButton>
         </template>
-        <NTag v-else-if="order.status === 'REFUNDING'" type="warning" :bordered="false">
-          退款审批中
-        </NTag>
+        <NTag v-else-if="order.status === 'REFUNDING'" type="warning" :bordered="false"> {{ t('退款审批中') }} </NTag>
       </NSpace>
 
       <!-- 状态操作（仅 ORG_OWNER：与 order.create 同权限点，数据面后端判） -->
       <NSpace v-if="canOperate" :size="8" style="margin-bottom: 16px">
         <template v-if="order.status === 'PENDING_PAYMENT'">
-          <NButton size="small" type="primary" @click="openPay">在线支付</NButton>
+          <NButton size="small" type="primary" @click="openPay">{{ t('在线支付') }}</NButton>
           <NUpload
             ref="uploadRef"
             :max="1"
@@ -398,44 +391,40 @@ function transitionText(from: string | null, to: string): string {
             style="display: inline-block"
             @change="handleVoucherChange"
           >
-            <NButton size="small" tertiary>选择回单文件</NButton>
+            <NButton size="small" tertiary>{{ t('选择回单文件') }}</NButton>
           </NUpload>
-          <NButton size="small" type="primary" secondary :loading="uploading" @click="handleUploadVoucher">
-            上传回单
-          </NButton>
+          <NButton size="small" type="primary" secondary :loading="uploading" @click="handleUploadVoucher"> {{ t('上传回单') }} </NButton>
           <NPopconfirm @positive-click="handleCancel">
             <template #trigger>
-              <NButton size="small" type="warning" :loading="cancelling">取消订单</NButton>
-            </template>
-            确认取消该订单？取消后不可恢复。
-          </NPopconfirm>
+              <NButton size="small" type="warning" :loading="cancelling">{{ t('取消订单') }}</NButton>
+            </template> {{ t('确认取消该订单？取消后不可恢复。') }} </NPopconfirm>
         </template>
         <template v-else-if="['FULFILLING', 'COMPLETED', 'PARTIALLY_REFUNDED'].includes(order.status)">
           <NButton size="small" type="warning" secondary @click="openRefund">
-            {{ order.status === 'PARTIALLY_REFUNDED' ? '再次申请退款' : '申请退款' }}
+            {{ order.status === 'PARTIALLY_REFUNDED' ? t('再次申请退款') : t('申请退款') }}
           </NButton>
         </template>
       </NSpace>
 
       <!-- 订单信息 -->
-      <NCard size="small" title="订单信息" style="margin-bottom: 16px">
+      <NCard size="small" :title="t('订单信息')" style="margin-bottom: 16px">
         <NDescriptions :column="3" label-placement="left" size="small">
-          <NDescriptionsItem label="订单号">{{ order.orderNo }}</NDescriptionsItem>
-          <NDescriptionsItem label="创建时间">{{ fmtDate(order.createdAt) }}</NDescriptionsItem>
-          <NDescriptionsItem label="支付方式">{{ paymentMethodLabel(order.paymentMethod) }}</NDescriptionsItem>
-          <NDescriptionsItem label="商品总额">¥{{ formatCents(order.totalCents) }}</NDescriptionsItem>
-          <NDescriptionsItem label="优惠金额">¥{{ formatCents(order.discountCents) }}</NDescriptionsItem>
-          <NDescriptionsItem label="应付金额">
+          <NDescriptionsItem :label="t('订单号')">{{ order.orderNo }}</NDescriptionsItem>
+          <NDescriptionsItem :label="t('创建时间')">{{ fmtDate(order.createdAt) }}</NDescriptionsItem>
+          <NDescriptionsItem :label="t('支付方式')">{{ paymentMethodLabel(order.paymentMethod) }}</NDescriptionsItem>
+          <NDescriptionsItem :label="t('商品总额')">¥{{ formatCents(order.totalCents) }}</NDescriptionsItem>
+          <NDescriptionsItem :label="t('优惠金额')">¥{{ formatCents(order.discountCents) }}</NDescriptionsItem>
+          <NDescriptionsItem :label="t('应付金额')">
             <NText strong style="color: var(--primary-color)">¥{{ formatCents(order.payableCents) }}</NText>
           </NDescriptionsItem>
-          <NDescriptionsItem label="已退金额">¥{{ formatCents(order.refundedCents) }}</NDescriptionsItem>
-          <NDescriptionsItem label="支付时间">{{ fmtDate(order.paidAt) }}</NDescriptionsItem>
-          <NDescriptionsItem label="账期截止">{{ fmtDate(order.dueAt) }}</NDescriptionsItem>
+          <NDescriptionsItem :label="t('已退金额')">¥{{ formatCents(order.refundedCents) }}</NDescriptionsItem>
+          <NDescriptionsItem :label="t('支付时间')">{{ fmtDate(order.paidAt) }}</NDescriptionsItem>
+          <NDescriptionsItem :label="t('账期截止')">{{ fmtDate(order.dueAt) }}</NDescriptionsItem>
         </NDescriptions>
       </NCard>
 
       <!-- 行项 -->
-      <NCard size="small" title="商品明细" style="margin-bottom: 16px">
+      <NCard size="small" :title="t('商品明细')" style="margin-bottom: 16px">
         <NDataTable
           :columns="itemColumns"
           :data="detail?.items ?? []"
@@ -446,7 +435,7 @@ function transitionText(from: string | null, to: string): string {
       </NCard>
 
       <!-- 事件时间线 -->
-      <NCard size="small" title="订单动态">
+      <NCard size="small" :title="t('订单动态')">
         <NTimeline>
           <NTimelineItem
             v-for="event in detail?.events ?? []"
@@ -464,35 +453,31 @@ function transitionText(from: string | null, to: string): string {
     <NModal
       v-model:show="showPayModal"
       preset="card"
-      title="在线支付"
+      :title="t('在线支付')"
       style="width: 520px"
       :mask-closable="false"
     >
       <NSpace vertical :size="12">
         <NRadioGroup v-model:value="payMethod">
           <NSpace :size="16">
-            <NRadio value="WECHAT">微信支付</NRadio>
-            <NRadio value="ALIPAY">支付宝</NRadio>
+            <NRadio value="WECHAT">{{ t('微信支付') }}</NRadio>
+            <NRadio value="ALIPAY">{{ t('支付宝') }}</NRadio>
           </NSpace>
         </NRadioGroup>
-        <NText depth="3" style="font-size: 12px">
-          演示环境为 mock 渠道：发起后生成支付链接，扫码即视为支付成功回调。
-        </NText>
+        <NText depth="3" style="font-size: 12px"> {{ t('演示环境为 mock 渠道：发起后生成支付链接，扫码即视为支付成功回调。') }} </NText>
         <template v-if="payUrl">
-          <NText style="font-size: 13px">
-            支付链接已生成（渠道单号 {{ channelOrderNo }}），请复制到手机打开完成支付：
-          </NText>
+          <NText style="font-size: 13px"> {{ t('支付链接已生成（渠道单号') }} {{ channelOrderNo }}{{ t('），请复制到手机打开完成支付：') }} </NText>
           <NInputGroup>
             <NInput :value="payUrl" readonly />
-            <NButton type="primary" @click="copyText(payUrl)">复制</NButton>
+            <NButton type="primary" @click="copyText(payUrl)">{{ t('复制') }}</NButton>
           </NInputGroup>
         </template>
       </NSpace>
       <template #footer>
         <NSpace justify="end">
-          <NButton @click="showPayModal = false">关闭</NButton>
+          <NButton @click="showPayModal = false">{{ t('关闭') }}</NButton>
           <NButton type="primary" :loading="paying" @click="handlePay">
-            {{ payUrl ? '重新发起' : '发起支付' }}
+            {{ payUrl ? t('重新发起') : t('发起支付') }}
           </NButton>
         </NSpace>
       </template>
@@ -502,43 +487,40 @@ function transitionText(from: string | null, to: string): string {
     <NModal
       v-model:show="showRefundModal"
       preset="card"
-      title="申请退款"
+      :title="t('申请退款')"
       style="width: 520px"
       :mask-closable="false"
     >
       <NForm label-placement="left" label-width="90">
-        <NFormItem label="退款原因" required>
+        <NFormItem :label="t('退款原因')" required>
           <NInput
             v-model:value="refundReason"
             type="textarea"
-            placeholder="请说明退款原因（必填，500 字内）"
+            :placeholder="t('请说明退款原因（必填，500 字内）')"
             :maxlength="500"
             show-count
           />
         </NFormItem>
-        <NFormItem label="退款金额">
+        <NFormItem :label="t('退款金额')">
           <NSpace vertical :size="4" style="width: 100%">
             <NInputNumber
               v-model:value="refundAmountYuan"
               :min="0.01"
               :precision="2"
               clearable
-              placeholder="留空 = 全额可退"
+              :placeholder="t('留空 = 全额可退')"
               style="width: 200px"
             >
-              <template #suffix>元</template>
+              <template #suffix>{{ t('元') }}</template>
             </NInputNumber>
-            <NText depth="3" style="font-size: 12px">
-              剩余可退参考 ¥{{ formatCents(refundableCents) }}（应付 - 已退）；
-              部分退款后再申请时默认留空，留空提交按平台全额可退额计算。
-            </NText>
+            <NText depth="3" style="font-size: 12px"> {{ t('剩余可退参考 ¥') }}{{ formatCents(refundableCents) }}{{ t('（应付 - 已退）； 部分退款后再申请时默认留空，留空提交按平台全额可退额计算。') }} </NText>
           </NSpace>
         </NFormItem>
       </NForm>
       <template #footer>
         <NSpace justify="end">
-          <NButton @click="showRefundModal = false">取消</NButton>
-          <NButton type="primary" :loading="refunding" @click="handleRefund">提交申请</NButton>
+          <NButton @click="showRefundModal = false">{{ t('取消') }}</NButton>
+          <NButton type="primary" :loading="refunding" @click="handleRefund">{{ t('提交申请') }}</NButton>
         </NSpace>
       </template>
     </NModal>

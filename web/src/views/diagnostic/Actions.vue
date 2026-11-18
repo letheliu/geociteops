@@ -3,6 +3,9 @@ import { ref, onMounted } from 'vue'
 import { NButton, NSpace, NCard, NTag, NEmpty, NSpin, NSelect, useMessage } from 'naive-ui'
 import { trpc } from '../../api/client'
 import { DIAGNOSTIC_ACTION_HORIZON_LABELS } from '../../domain/diagnostic'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 const message = useMessage()
 const actions = ref<any[]>([])
@@ -34,7 +37,7 @@ function groupActions() {
 async function handleAccept(actionId: string) {
   try {
     await (trpc as any).diagnostic.actions.accept.mutate({ actionId })
-    message.success('已接受')
+    message.success(t("已接受"))
     await loadActions()
   } catch (err: any) {
     message.error(err.message)
@@ -44,7 +47,7 @@ async function handleAccept(actionId: string) {
 async function handleDismiss(actionId: string) {
   try {
     await (trpc as any).diagnostic.actions.dismiss.mutate({ actionId })
-    message.success('已忽略')
+    message.success(t("已忽略"))
     await loadActions()
   } catch (err: any) {
     message.error(err.message)
@@ -56,10 +59,10 @@ onMounted(loadActions)
 
 <template>
   <NSpace vertical :size="16">
-    <h2 style="margin: 0">行动中心</h2>
+    <h2 style="margin: 0">{{ t('行动中心') }}</h2>
 
     <NSpace>
-      <NSelect v-model:value="horizonFilter" :options="HORIZONS.map(h => ({ label: DIAGNOSTIC_ACTION_HORIZON_LABELS[h], value: h }))" placeholder="全部阶段" clearable style="width: 200px" />
+      <NSelect v-model:value="horizonFilter" :options="HORIZONS.map(h => ({ label: DIAGNOSTIC_ACTION_HORIZON_LABELS[h], value: h }))" :placeholder="t('全部阶段')" clearable style="width: 200px" />
     </NSpace>
 
     <NSpin :show="loading">
@@ -73,14 +76,14 @@ onMounted(loadActions)
               </NSpace>
               <p style="margin: 0; color: #666;">{{ a.description }}</p>
               <NSpace v-if="a.status === 'PROPOSED'" :size="4">
-                <NButton size="tiny" type="primary" @click="handleAccept(a.id)">接受</NButton>
-                <NButton size="tiny" @click="handleDismiss(a.id)">忽略</NButton>
+                <NButton size="tiny" type="primary" @click="handleAccept(a.id)">{{ t('接受') }}</NButton>
+                <NButton size="tiny" @click="handleDismiss(a.id)">{{ t('忽略') }}</NButton>
               </NSpace>
             </NSpace>
           </div>
         </NCard>
       </div>
-      <NEmpty v-if="!groupedActions[HORIZONS[0]]?.length && !groupedActions[HORIZONS[1]]?.length && !groupedActions[HORIZONS[2]]?.length" description="暂无行动" />
+      <NEmpty v-if="!groupedActions[HORIZONS[0]]?.length && !groupedActions[HORIZONS[1]]?.length && !groupedActions[HORIZONS[2]]?.length" :description="t('暂无行动')" />
     </NSpin>
   </NSpace>
 </template>

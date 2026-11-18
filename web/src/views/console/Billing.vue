@@ -11,6 +11,9 @@ import {
 import { useRouter } from 'vue-router'
 import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
+import { useI18n } from '@/i18n'
+const { t, locale: appLocale } = useI18n()
+
 
 const router = useRouter()
 const message = useMessage()
@@ -24,10 +27,10 @@ const subscriptions = ref<SubscriptionRow[]>([])
 const entitlements = ref<EntitlementsResult | null>(null)
 
 const SUB_STATUS_META: Record<string, { type: 'success' | 'warning' | 'default' | 'error'; label: string }> = {
-  ACTIVE: { type: 'success', label: '生效中' },
-  GRACE: { type: 'warning', label: '宽限期' },
-  EXPIRED: { type: 'error', label: '已到期' },
-  CANCELLED: { type: 'default', label: '已取消' },
+  ACTIVE: { type: 'success', label: t("生效中") },
+  GRACE: { type: 'warning', label: t("宽限期") },
+  EXPIRED: { type: 'error', label: t("已到期") },
+  CANCELLED: { type: 'default', label: t("已取消") },
 }
 
 function subStatusMeta(status: string) {
@@ -44,7 +47,7 @@ async function load() {
     subscriptions.value = subs.items
     entitlements.value = ents
   } catch (e: any) {
-    message.error(e?.message || '服务信息加载失败')
+    message.error(e?.message || t("服务信息加载失败"))
   } finally {
     loading.value = false
   }
@@ -53,19 +56,19 @@ async function load() {
 onMounted(load)
 
 function fmtDate(value: string | Date | null): string {
-  return value ? new Date(value).toLocaleDateString('zh-CN') : '—'
+  return value ? new Date(value).toLocaleDateString(appLocale.value) : '—'
 }
 
 /** 配额键 → 中文标签（与后端 CAPACITY_FIELDS ∪ OPTIONAL_CAPACITY_FIELDS 同键集） */
 const QUOTA_FIELDS: { key: keyof EntitlementsResult['usage']; label: string }[] = [
-  { key: 'maxWorkspaces', label: 'Workspace 数' },
-  { key: 'maxQueries', label: '查询数 / 月' },
-  { key: 'maxPages', label: '页面数' },
-  { key: 'diagnosticRunsPerMonth', label: '诊断次数 / 月' },
-  { key: 'samplesPerRun', label: '单次样本数' },
-  { key: 'optimizationsPerMonth', label: '优化次数 / 月' },
+  { key: 'maxWorkspaces', label: t("Workspace 数") },
+  { key: 'maxQueries', label: t("查询数 / 月") },
+  { key: 'maxPages', label: t("页面数") },
+  { key: 'diagnosticRunsPerMonth', label: t("诊断次数 / 月") },
+  { key: 'samplesPerRun', label: t("单次样本数") },
+  { key: 'optimizationsPerMonth', label: t("优化次数 / 月") },
   // M2 §3.0：单次运行采样数上限——单次参数，无月度计量，展示"上限 3 / —"不画进度条
-  { key: 'monitorSampleCountMax', label: '监测采样数上限 N' },
+  { key: 'monitorSampleCountMax', label: t("监测采样数上限 N") },
 ]
 
 /** 用量进度（百分比）：上限 0 视为未开通（null 不渲染条），超限 100+ 红色 */
@@ -97,7 +100,7 @@ function isSingleRunLimit(key: keyof EntitlementsResult['usage']): boolean {
  */
 function quotaLimitText(key: keyof EntitlementsResult['usage']): string {
   const limit = entitlements.value?.limits[key]
-  if (limit === undefined || limit === null) return key === 'monitorSampleCountMax' ? '—（不限）' : '0'
+  if (limit === undefined || limit === null) return key === 'monitorSampleCountMax' ? t("—（不限）") : '0'
   return String(limit)
 }
 
@@ -114,28 +117,24 @@ const periodLabel = computed(() => {
 <template>
   <div style="max-width: 1200px; margin: 0 auto; padding: 24px">
     <NSpace justify="space-between" align="center" style="margin-bottom: 16px">
-      <PageHeader title="我的服务" subtitle="订阅状态与企业配额用量" />
-      <NButton size="small" type="primary" @click="router.push({ name: 'console-services' })">
-        续费 / 加购
-      </NButton>
+      <PageHeader :title="t('我的服务')" :subtitle="t('订阅状态与企业配额用量')" />
+      <NButton size="small" type="primary" @click="router.push({ name: 'console-services' })"> {{ t('续费 / 加购') }} </NButton>
     </NSpace>
 
     <NSpace v-if="loading" justify="center" style="margin-top: 96px">
-      <NText depth="3">加载中…</NText>
+      <NText depth="3">{{ t('加载中…') }}</NText>
     </NSpace>
 
     <template v-else>
       <!-- 生效订阅卡片 -->
       <NEmpty
         v-if="subscriptions.length === 0"
-        description="暂无订阅记录，可前往服务商城开通。"
+        :description="t('暂无订阅记录，可前往服务商城开通。')"
         size="small"
         style="margin-bottom: 24px"
       >
         <template #extra>
-          <NButton size="small" type="primary" @click="router.push({ name: 'console-services' })">
-            去商城开通
-          </NButton>
+          <NButton size="small" type="primary" @click="router.push({ name: 'console-services' })"> {{ t('去商城开通') }} </NButton>
         </template>
       </NEmpty>
 
@@ -159,27 +158,24 @@ const periodLabel = computed(() => {
               </NTag>
             </template>
             <NSpace vertical :size="6">
-              <NText depth="3" style="font-size: 13px">起始：{{ fmtDate(sub.startAt) }}</NText>
-              <NText depth="3" style="font-size: 13px">
-                到期：<NText :type="sub.status === 'ACTIVE' ? 'default' : 'warning'">
+              <NText depth="3" style="font-size: 13px">{{ t('起始：') }}{{ fmtDate(sub.startAt) }}</NText>
+              <NText depth="3" style="font-size: 13px"> {{ t('到期：') }}<NText :type="sub.status === 'ACTIVE' ? 'default' : 'warning'">
                   {{ fmtDate(sub.endAt) }}
                 </NText>
               </NText>
             </NSpace>
             <template #footer>
-              <NButton size="tiny" tertiary @click="router.push({ name: 'console-services' })">
-                续费
-              </NButton>
+              <NButton size="tiny" tertiary @click="router.push({ name: 'console-services' })"> {{ t('续费') }} </NButton>
             </template>
           </NCard>
         </NGridItem>
       </NGrid>
 
       <!-- 配额与当月用量（§4.3 六字段进度条） -->
-      <NCard size="small" title="配额与当月用量">
+      <NCard size="small" :title="t('配额与当月用量')">
         <template #header-extra>
           <NText depth="3" style="font-size: 12px">
-            {{ periodLabel ? `统计窗口 ${periodLabel}（上海自然月）` : '暂无统计窗口' }}
+            {{ periodLabel ? `${t('统计窗口 ')}${periodLabel}${t('（上海自然月）')}` : t('暂无统计窗口') }}
           </NText>
         </template>
         <NGrid :cols="2" :x-gap="24" :y-gap="20" responsive="screen" item-responsive>
@@ -199,14 +195,12 @@ const periodLabel = computed(() => {
                 :show-indicator="false"
               />
               <NText v-else depth="3" style="font-size: 12px">
-                {{ isSingleRunLimit(field.key) ? '单次运行上限，无月度统计' : '未开通或无计量（上限 0）' }}
+                {{ isSingleRunLimit(field.key) ? t('单次运行上限，无月度统计') : t('未开通或无计量（上限 0）') }}
               </NText>
             </NSpace>
           </NGridItem>
         </NGrid>
-        <NText depth="3" style="font-size: 12px">
-          配额为各有效订阅/加购合并后的企业级池化上限；超限时软限不拦截但会收到提醒。
-        </NText>
+        <NText depth="3" style="font-size: 12px"> {{ t('配额为各有效订阅/加购合并后的企业级池化上限；超限时软限不拦截但会收到提醒。') }} </NText>
       </NCard>
     </template>
   </div>

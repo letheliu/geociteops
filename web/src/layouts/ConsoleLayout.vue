@@ -14,6 +14,10 @@ import { useAppStore } from '../stores/app'
 import { useSessionStore } from '../stores/session'
 import { trpc } from '../composables/useTrpc'
 import headerLogo from '../assets/geociteops-header.svg'
+import { useI18n } from '@/i18n'
+import LanguageSwitcher from '@/components/common/LanguageSwitcher.vue'
+const { t } = useI18n()
+
 
 const DAY_MS = 86_400_000
 
@@ -45,23 +49,23 @@ async function loadTrialBanner() {
       const days = remainingDays(new Date(trial.endAt))
       trialBanner.value = {
         type: 'info',
-        label: '试用中',
-        text: `试用剩 ${days} 天，到期后服务转为只读保留（数据不删除）。`,
+        label: t("试用中"),
+        text: `${t("试用剩 ")}${days}${t(" 天，到期后服务转为只读保留（数据不删除）。")}`,
       }
       return
     }
     if (trial.status === 'GRACE') {
       trialBanner.value = {
         type: 'warning',
-        label: '已到期 · 宽限期',
-        text: '试用已到期，当前为只读模式——数据保留，请联系平台开通正式服务。',
+        label: t("已到期 · 宽限期"),
+        text: t("试用已到期，当前为只读模式——数据保留，请联系平台开通正式服务。"),
       }
       return
     }
     trialBanner.value = {
       type: 'error',
-      label: '已到期',
-      text: '试用已到期，当前为只读模式——数据保留，请联系平台开通正式服务。',
+      label: t("已到期"),
+      text: t("试用已到期，当前为只读模式——数据保留，请联系平台开通正式服务。"),
     }
   } catch {
     // 横幅是提示性信息：查询失败不打断控制台使用
@@ -76,7 +80,7 @@ watch(() => route.name, () => void loadTrialBanner())
 const inWorkspace = computed(() => route.params.workspaceId !== undefined)
 
 // 企业名（requires:'customer' 守卫保证到这里的必是客户，me().organization 恒有值；兜底文案）
-const orgName = computed(() => sessionStore.me?.organization?.name ?? '企业控制台')
+const orgName = computed(() => sessionStore.me?.organization?.name ?? t("企业控制台"))
 
 // 点击左侧区域回控制台首页
 function goHome() {
@@ -85,8 +89,8 @@ function goHome() {
 
 // 右上角用户菜单（同 WorkspaceLayout / AdminLayout：改密 / 退出）
 const userOptions = [
-  { label: '修改密码', key: 'change-password' },
-  { label: '退出登录', key: 'logout' },
+  { label: t("修改密码"), key: 'change-password' },
+  { label: t("退出登录"), key: 'logout' },
 ]
 
 function handleUserAction(key: string) {
@@ -104,26 +108,26 @@ function handleUserAction(key: string) {
 // 已按 orgRole 隐藏）；Billing/Invoices 任意客户角色可见（orgProcedure()）；
 // 点击由 handleMenuSelect 统一按路由名跳转
 const menuOptions = computed<MenuOption[]>(() => [
-  { label: '总览', key: 'console-home' },
+  { label: t("总览"), key: 'console-home' },
   {
-    label: '服务与购买',
+    label: t("服务与购买"),
     key: 'purchase',
     children: [
-      { label: '服务商城', key: 'console-services' },
-      ...(sessionStore.isOrgViewer ? [] : [{ label: '我的订单', key: 'console-orders' }]),
-      { label: '我的服务', key: 'console-billing' },
-      { label: '发票管理', key: 'console-invoices' },
+      { label: t("服务商城"), key: 'console-services' },
+      ...(sessionStore.isOrgViewer ? [] : [{ label: t("我的订单"), key: 'console-orders' }]),
+      { label: t("我的服务"), key: 'console-billing' },
+      { label: t("发票管理"), key: 'console-invoices' },
     ],
   },
   {
-    label: '企业设置',
+    label: t("企业设置"),
     key: 'settings',
     children: [
-      { label: '企业信息', key: 'console-org-info' },
+      { label: t("企业信息"), key: 'console-org-info' },
       ...(sessionStore.isOrgOwner
         ? [
-            { label: '成员管理', key: 'console-members' },
-            { label: 'API 凭证', key: 'console-credentials' },
+            { label: t("成员管理"), key: 'console-members' },
+            { label: t("API 凭证"), key: 'console-credentials' },
           ]
         : []),
     ],
@@ -165,17 +169,18 @@ function handleMenuSelect(key: string) {
           <img :src="headerLogo" alt="GeoCiteOps" style="height: 30px; width: auto; flex-shrink: 0">
         </div>
         <NText strong style="font-size: 15px">{{ orgName }}</NText>
-        <NText depth="3" style="font-size: 12px">企业控制台</NText>
+        <NText depth="3" style="font-size: 12px">{{ t('企业控制台') }}</NText>
       </NSpace>
       <NSpace align="center" :wrap="false">
+        <LanguageSwitcher />
         <NDropdown :options="userOptions" @select="handleUserAction">
           <NButton size="small" quaternary>
-            {{ sessionStore.me ? (sessionStore.me.displayName || sessionStore.me.username) : '未登录' }}
+            {{ sessionStore.me ? (sessionStore.me.displayName || sessionStore.me.username) : t('未登录') }}
           </NButton>
         </NDropdown>
         <NSwitch :value="appStore.darkMode" size="small" @update:value="appStore.toggleDarkMode">
-          <template #checked>暗色</template>
-          <template #unchecked>亮色</template>
+          <template #checked>{{ t('暗色') }}</template>
+          <template #unchecked>{{ t('亮色') }}</template>
         </NSwitch>
       </NSpace>
     </NLayoutHeader>
@@ -193,7 +198,7 @@ function handleMenuSelect(key: string) {
       <NSpace align="center" :size="10" :wrap="false">
         <NText strong style="font-size: 13px">{{ trialBanner.label }}</NText>
         <NText style="font-size: 13px">{{ trialBanner.text }}</NText>
-        <NButton size="tiny" tertiary @click="router.push({ name: 'console-services' })">开通正式服务</NButton>
+        <NButton size="tiny" tertiary @click="router.push({ name: 'console-services' })">{{ t('开通正式服务') }}</NButton>
       </NSpace>
     </NAlert>
     <NLayoutContent content-style="overflow: auto;">

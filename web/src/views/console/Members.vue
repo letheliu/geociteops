@@ -16,6 +16,9 @@ import type { DataTableColumns, SelectOption } from 'naive-ui'
 import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
 import { useSessionStore } from '../../stores/session'
+import { useI18n } from '@/i18n'
+const { t, locale: appLocale } = useI18n()
+
 
 const message = useMessage()
 const sessionStore = useSessionStore()
@@ -29,9 +32,9 @@ const loading = ref(false)
 const items = ref<MemberRow[]>([])
 
 const ORG_ROLE_META: Record<string, { type: 'warning' | 'info' | 'default'; label: string }> = {
-  ORG_OWNER: { type: 'warning', label: '企业管理员' },
-  ORG_MEMBER: { type: 'info', label: '成员' },
-  ORG_VIEWER: { type: 'default', label: '只读' },
+  ORG_OWNER: { type: 'warning', label: t("企业管理员") },
+  ORG_MEMBER: { type: 'info', label: t("成员") },
+  ORG_VIEWER: { type: 'default', label: t("只读") },
 }
 
 function orgRoleMeta(role: string | null) {
@@ -45,7 +48,7 @@ async function load() {
   try {
     items.value = await trpc.org.members.list.query()
   } catch (e: any) {
-    message.error(e?.message || '加载失败')
+    message.error(e?.message || t("加载失败"))
   } finally {
     loading.value = false
   }
@@ -59,7 +62,7 @@ async function loadWorkspaces() {
     const result = await trpc.org.workspaces.list.query({ page: 1, pageSize: 100 })
     workspaceOptions.value = result.items.map((w: WorkspaceRow) => ({ label: w.name, value: w.id }))
   } catch (e: any) {
-    message.error(e?.message || '工作区列表加载失败')
+    message.error(e?.message || t("工作区列表加载失败"))
   }
 }
 
@@ -89,9 +92,9 @@ function closeSecret() {
 async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text)
-    message.success('已复制')
+    message.success(t("已复制"))
   } catch {
-    message.error('复制失败，请手动选择复制')
+    message.error(t("复制失败，请手动选择复制"))
   }
 }
 
@@ -108,8 +111,8 @@ const createForm = ref({
 })
 
 const roleOptions: SelectOption[] = [
-  { label: '成员（ORG_MEMBER，按工作区授权）', value: 'ORG_MEMBER' },
-  { label: '只读（ORG_VIEWER，任何工作区最多 VIEW）', value: 'ORG_VIEWER' },
+  { label: t("成员（ORG_MEMBER，按工作区授权）"), value: 'ORG_MEMBER' },
+  { label: t("只读（ORG_VIEWER，任何工作区最多 VIEW）"), value: 'ORG_VIEWER' },
 ]
 
 function openCreate() {
@@ -120,7 +123,7 @@ function openCreate() {
 async function handleCreate() {
   const f = createForm.value
   if (!f.displayName.trim()) {
-    message.warning('请填写姓名')
+    message.warning(t("请填写姓名"))
     return
   }
   creating.value = true
@@ -132,10 +135,10 @@ async function handleCreate() {
       ...(f.email.trim() ? { email: f.email.trim() } : {}),
     })
     showCreate.value = false
-    showSecret('成员已创建', result.password)
+    showSecret(t("成员已创建"), result.password)
     await load()
   } catch (e: any) {
-    message.error(e?.message || '创建失败')
+    message.error(e?.message || t("创建失败"))
   } finally {
     creating.value = false
   }
@@ -145,9 +148,9 @@ async function handleCreate() {
 async function handleResetPassword(row: MemberRow) {
   try {
     const result = await trpc.org.members.resetPassword.mutate({ userId: row.user.id })
-    showSecret(`重置 ${row.user.username || row.user.displayName} 的密码`, result.password)
+    showSecret(`${t("重置 ")}${row.user.username || row.user.displayName}${t(" 的密码")}`, result.password)
   } catch (e: any) {
-    message.error(e?.message || '重置失败')
+    message.error(e?.message || t("重置失败"))
   }
 }
 
@@ -155,10 +158,10 @@ async function handleToggleStatus(row: MemberRow) {
   try {
     const next = row.user.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE'
     await trpc.org.members.setStatus.mutate({ userId: row.user.id, status: next })
-    message.success(next === 'DISABLED' ? '已禁用' : '已启用')
+    message.success(next === 'DISABLED' ? t("已禁用") : t("已启用"))
     await load()
   } catch (e: any) {
-    message.error(e?.message || '操作失败')
+    message.error(e?.message || t("操作失败"))
   }
 }
 
@@ -166,9 +169,9 @@ async function handleToggleStatus(row: MemberRow) {
 type AccessValue = 'MANAGE' | 'OPERATE' | 'VIEW'
 
 const accessOptions: SelectOption[] = [
-  { label: 'MANAGE（管理）', value: 'MANAGE' },
-  { label: 'OPERATE（操作）', value: 'OPERATE' },
-  { label: 'VIEW（只读）', value: 'VIEW' },
+  { label: t("MANAGE（管理）"), value: 'MANAGE' },
+  { label: t("OPERATE（操作）"), value: 'OPERATE' },
+  { label: t("VIEW（只读）"), value: 'VIEW' },
 ]
 
 /** 展开行的草稿（按 userId 隔离）：workspace 未选/权限默认 VIEW */
@@ -189,7 +192,7 @@ function draftFor(userId: string) {
 async function handleSetAccess(row: MemberRow) {
   const d = draftFor(row.user.id)
   if (!d.workspaceId) {
-    message.warning('请先选择 Workspace')
+    message.warning(t("请先选择 Workspace"))
     return
   }
   savingAccessId.value = row.user.id
@@ -200,9 +203,9 @@ async function handleSetAccess(row: MemberRow) {
       access: d.access,
     })
     const wsName = workspaceOptions.value.find((o) => o.value === d.workspaceId)?.label ?? d.workspaceId
-    message.success(`已授权：${wsName} × ${d.access}`)
+    message.success(`${t("已授权：")}${wsName} × ${d.access}`)
   } catch (e: any) {
-    message.error(e?.message || '授权失败')
+    message.error(e?.message || t("授权失败"))
   } finally {
     savingAccessId.value = null
   }
@@ -214,19 +217,19 @@ function renderExpand(row: MemberRow) {
     return h(
       NText,
       { depth: '3', style: 'font-size: 13px' },
-      { default: () => '企业管理员天然拥有本企业全部 Workspace 的管理权限，无需单独授权。' },
+      { default: () => t("企业管理员天然拥有本企业全部 Workspace 的管理权限，无需单独授权。") },
     )
   }
   const d = draftFor(row.user.id)
   return h('div', { style: 'padding: 4px 0' }, [
     h(NSpace, { align: 'center', size: 8, wrap: true }, {
       default: () => [
-        h(NText, { depth: '3', style: 'font-size: 13px' }, { default: () => '授予/调整：' }),
+        h(NText, { depth: '3', style: 'font-size: 13px' }, { default: () => t("授予/调整：") }),
         h(NSelect, {
           value: d.workspaceId,
           options: workspaceOptions.value,
           filterable: true,
-          placeholder: '选择 Workspace',
+          placeholder: t("选择 Workspace"),
           style: 'width: 260px',
           onUpdateValue: (v: string) => {
             d.workspaceId = v
@@ -248,14 +251,14 @@ function renderExpand(row: MemberRow) {
             loading: savingAccessId.value === row.user.id,
             onClick: () => handleSetAccess(row),
           },
-          { default: () => '保存' },
+          { default: () => t("保存") },
         ),
         h(
           NText,
           { depth: '3', style: 'font-size: 12px' },
           {
             default: () =>
-              '重复保存即覆盖调整；只读成员（ORG_VIEWER）即使授予更高权限也只生效 VIEW。',
+              t("重复保存即覆盖调整；只读成员（ORG_VIEWER）即使授予更高权限也只生效 VIEW。"),
           },
         ),
       ],
@@ -265,10 +268,10 @@ function renderExpand(row: MemberRow) {
 
 const columns: DataTableColumns<MemberRow> = [
   { type: 'expand', renderExpand },
-  { title: '用户名', key: 'username', width: 150, render: (row) => row.user.username || '—' },
-  { title: '姓名', key: 'displayName', width: 140, render: (row) => row.user.displayName },
+  { title: t("用户名"), key: 'username', width: 150, render: (row) => row.user.username || '—' },
+  { title: t("姓名"), key: 'displayName', width: 140, render: (row) => row.user.displayName },
   {
-    title: '企业角色',
+    title: t("企业角色"),
     key: 'orgRole',
     width: 120,
     render: (row) =>
@@ -279,7 +282,7 @@ const columns: DataTableColumns<MemberRow> = [
       ),
   },
   {
-    title: '状态',
+    title: t("状态"),
     key: 'status',
     width: 90,
     render: (row) =>
@@ -290,18 +293,18 @@ const columns: DataTableColumns<MemberRow> = [
           bordered: false,
           type: row.user.status === 'ACTIVE' ? 'success' : 'default',
         },
-        { default: () => (row.user.status === 'ACTIVE' ? '启用' : '禁用') },
+        { default: () => (row.user.status === 'ACTIVE' ? t("启用") : t("禁用")) },
       ),
   },
   {
-    title: '最近登录',
+    title: t("最近登录"),
     key: 'lastLoginAt',
     width: 170,
     render: (row) =>
-      row.user.lastLoginAt ? new Date(row.user.lastLoginAt).toLocaleString('zh-CN') : '—',
+      row.user.lastLoginAt ? new Date(row.user.lastLoginAt).toLocaleString(appLocale.value) : '—',
   },
   {
-    title: '操作',
+    title: t("操作"),
     key: 'actions',
     width: 220,
     render(row) {
@@ -310,18 +313,18 @@ const columns: DataTableColumns<MemberRow> = [
           h(
             NButton,
             { size: 'tiny', onClick: () => handleResetPassword(row) },
-            { default: () => '重置密码' },
+            { default: () => t("重置密码") },
           ),
           row.user.status === 'ACTIVE'
             ? h(NPopconfirm, { onPositiveClick: () => handleToggleStatus(row) }, {
                 trigger: () =>
-                  h(NButton, { size: 'tiny', type: 'warning' }, { default: () => '禁用' }),
-                default: () => '确认禁用该账号？禁用后其会话立即失效。',
+                  h(NButton, { size: 'tiny', type: 'warning' }, { default: () => t("禁用") }),
+                default: () => t("确认禁用该账号？禁用后其会话立即失效。"),
               })
             : h(
                 NButton,
                 { size: 'tiny', type: 'success', onClick: () => handleToggleStatus(row) },
-                { default: () => '启用' },
+                { default: () => t("启用") },
               ),
         ],
       })
@@ -336,15 +339,15 @@ const columns: DataTableColumns<MemberRow> = [
     <NResult
       v-if="!isOwner"
       status="403"
-      title="无权访问"
-      description="成员管理仅企业管理员（ORG_OWNER）可用。"
+      :title="t('无权访问')"
+      :description="t('成员管理仅企业管理员（ORG_OWNER）可用。')"
       style="margin-top: 96px"
     />
 
     <template v-else>
       <NSpace justify="space-between" align="center" style="margin-bottom: 16px">
-        <PageHeader title="成员管理" subtitle="企业成员的账号、角色与工作区授权" />
-        <NButton type="primary" @click="openCreate">+ 新建成员</NButton>
+        <PageHeader :title="t('成员管理')" :subtitle="t('企业成员的账号、角色与工作区授权')" />
+        <NButton type="primary" @click="openCreate">{{ t('+ 新建成员') }}</NButton>
       </NSpace>
 
       <NCard>
@@ -363,32 +366,29 @@ const columns: DataTableColumns<MemberRow> = [
     <NModal
       v-model:show="showCreate"
       preset="card"
-      title="新建成员"
+      :title="t('新建成员')"
       style="width: 500px"
       :mask-closable="false"
     >
       <NForm label-placement="left" label-width="100">
-        <NFormItem label="姓名">
-          <NInput v-model:value="createForm.displayName" placeholder="展示姓名（必填）" />
+        <NFormItem :label="t('姓名')">
+          <NInput v-model:value="createForm.displayName" :placeholder="t('展示姓名（必填）')" />
         </NFormItem>
-        <NFormItem label="企业角色">
+        <NFormItem :label="t('企业角色')">
           <NSelect v-model:value="createForm.orgRole" :options="roleOptions" />
         </NFormItem>
-        <NFormItem label="用户名（可选）">
-          <NInput v-model:value="createForm.username" placeholder="登录用户名（3-64 字符，留空自动生成）" />
+        <NFormItem :label="t('用户名（可选）')">
+          <NInput v-model:value="createForm.username" :placeholder="t('登录用户名（3-64 字符，留空自动生成）')" />
         </NFormItem>
-        <NFormItem label="邮箱（可选）">
+        <NFormItem :label="t('邮箱（可选）')">
           <NInput v-model:value="createForm.email" placeholder="name@company.com" />
         </NFormItem>
       </NForm>
-      <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 8px">
-        不填密码时由系统生成临时密码，创建成功后一次性展示，成员首次登录需改密。
-        工作区权限在列表行展开的"工作区授权"中单独授予。
-      </div>
+      <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 8px"> {{ t('不填密码时由系统生成临时密码，创建成功后一次性展示，成员首次登录需改密。 工作区权限在列表行展开的"工作区授权"中单独授予。') }} </div>
       <template #footer>
         <NSpace justify="end">
-          <NButton @click="showCreate = false">取消</NButton>
-          <NButton type="primary" :loading="creating" @click="handleCreate">创建</NButton>
+          <NButton @click="showCreate = false">{{ t('取消') }}</NButton>
+          <NButton type="primary" :loading="creating" @click="handleCreate">{{ t('创建') }}</NButton>
         </NSpace>
       </template>
     </NModal>
@@ -403,17 +403,15 @@ const columns: DataTableColumns<MemberRow> = [
       @update:show="(v: boolean) => { if (!v) closeSecret() }"
     >
       <NSpace vertical :size="12">
-        <NText type="warning" style="font-size: 13px">
-          临时密码仅此一次展示，关闭后不可再查看，请立即复制并转交本人（首次登录将强制改密）。
-        </NText>
+        <NText type="warning" style="font-size: 13px"> {{ t('临时密码仅此一次展示，关闭后不可再查看，请立即复制并转交本人（首次登录将强制改密）。') }} </NText>
         <NInputGroup>
           <NInput :value="secretText" readonly />
-          <NButton type="primary" @click="copyText(secretText)">复制</NButton>
+          <NButton type="primary" @click="copyText(secretText)">{{ t('复制') }}</NButton>
         </NInputGroup>
       </NSpace>
       <template #footer>
         <NSpace justify="end">
-          <NButton type="primary" @click="closeSecret">我已保存，关闭</NButton>
+          <NButton type="primary" @click="closeSecret">{{ t('我已保存，关闭') }}</NButton>
         </NSpace>
       </template>
     </NModal>

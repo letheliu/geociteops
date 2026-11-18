@@ -9,6 +9,9 @@ import type { DataTableColumns } from 'naive-ui'
 import PageHeader from '../../components/common/PageHeader.vue'
 import ScoreBar from '../../components/common/ScoreBar.vue'
 import { trpc } from '../../composables/useTrpc'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 const message = useMessage()
 const router = useRouter()
@@ -38,7 +41,7 @@ async function loadData() {
   try {
     data.value = await trpc.content.pages.list.query()
   } catch (e: any) {
-    message.error(e?.message || '加载失败')
+    message.error(e?.message || t("加载失败"))
   } finally {
     loading.value = false
   }
@@ -48,7 +51,7 @@ onMounted(loadData)
 
 async function handleAdd() {
   if (!formData.value.url || !formData.value.currentContent) {
-    message.warning('请填写 URL 和内容')
+    message.warning(t("请填写 URL 和内容"))
     return
   }
   submitting.value = true
@@ -58,12 +61,12 @@ async function handleAdd() {
       pageType: formData.value.pageType,
       currentContent: formData.value.currentContent,
     })
-    message.success('已保存')
+    message.success(t("已保存"))
     showModal.value = false
     formData.value = { url: '', pageType: 'blog', currentContent: '' }
     await loadData()
   } catch (e: any) {
-    message.error(e?.message || '保存失败')
+    message.error(e?.message || t("保存失败"))
   } finally {
     submitting.value = false
   }
@@ -71,7 +74,7 @@ async function handleAdd() {
 
 const columns: DataTableColumns<any> = [
   {
-    title: '状态',
+    title: t("状态"),
     key: 'status',
     width: 100,
     render(row) {
@@ -79,9 +82,9 @@ const columns: DataTableColumns<any> = [
     },
   },
   { title: 'URL', key: 'url', ellipsis: { tooltip: true } },
-  { title: '类型', key: 'pageType', width: 100 },
+  { title: t("类型"), key: 'pageType', width: 100 },
   {
-    title: '分数',
+    title: t("分数"),
     key: 'optimizationScore',
     width: 140,
     render(row) {
@@ -95,7 +98,7 @@ const columns: DataTableColumns<any> = [
     render(row) {
       return h(NSpace, { size: 4 }, {
         default: () => [
-          h(NButton, { size: 'small', quaternary: true, onClick: () => router.push(`/content/pages/${row.id}`) }, { default: () => '查看' }),
+          h(NButton, { size: 'small', quaternary: true, onClick: () => router.push(`/content/pages/${row.id}`) }, { default: () => t("查看") }),
         ],
       })
     },
@@ -105,10 +108,10 @@ const columns: DataTableColumns<any> = [
 
 <template>
   <div>
-    <PageHeader title="内容页面" subtitle="管理需要优化的页面内容" />
+    <PageHeader :title="t('内容页面')" :subtitle="t('管理需要优化的页面内容')" />
 
     <NSpace justify="end" style="margin-bottom: 16px">
-      <NButton type="primary" @click="showModal = true">+ 新增页面</NButton>
+      <NButton type="primary" @click="showModal = true">{{ t('+ 新增页面') }}</NButton>
     </NSpace>
 
     <NCard>
@@ -121,20 +124,20 @@ const columns: DataTableColumns<any> = [
       />
     </NCard>
 
-    <NModal v-model:show="showModal" preset="card" title="新增页面" style="width: 640px">
+    <NModal v-model:show="showModal" preset="card" :title="t('新增页面')" style="width: 640px">
       <NForm>
         <NFormItem label="URL">
           <NInput v-model:value="formData.url" placeholder="/features/ai-search" />
         </NFormItem>
-        <NFormItem label="页面类型">
+        <NFormItem :label="t('页面类型')">
           <NSelect v-model:value="formData.pageType" :options="pageTypeOptions" />
         </NFormItem>
-        <NFormItem label="原始内容">
-          <NInput v-model:value="formData.currentContent" type="textarea" :rows="10" placeholder="粘贴页面原始内容..." />
+        <NFormItem :label="t('原始内容')">
+          <NInput v-model:value="formData.currentContent" type="textarea" :rows="10" :placeholder="t('粘贴页面原始内容...')" />
         </NFormItem>
         <NSpace justify="end">
-          <NButton @click="showModal = false">取消</NButton>
-          <NButton type="primary" :loading="submitting" @click="handleAdd">保存</NButton>
+          <NButton @click="showModal = false">{{ t('取消') }}</NButton>
+          <NButton type="primary" :loading="submitting" @click="handleAdd">{{ t('保存') }}</NButton>
         </NSpace>
       </NForm>
     </NModal>

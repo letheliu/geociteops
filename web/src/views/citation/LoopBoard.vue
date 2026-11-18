@@ -8,6 +8,9 @@ import type { DataTableColumns } from 'naive-ui'
 import PageHeader from '../../components/common/PageHeader.vue'
 import EmptyState from '../../components/common/EmptyState.vue'
 import { trpc } from '../../composables/useTrpc'
+import { useI18n } from '@/i18n'
+const { t, locale: appLocale } = useI18n()
+
 
 /**
  * 闭环看板（M2 §3.3 规格 §8）。
@@ -21,10 +24,10 @@ const rows = ref<any[]>([])
 const optimizationsAllowed = ref(true)
 
 const typeLabels: Record<string, string> = {
-  OPTIMIZE_FOR_QUERY: '查询优化',
-  REWRITE_CONTENT: '内容重写',
-  GENERATE_SCHEMA: 'Schema 生成',
-  UPDATE_KG: '知识图谱更新',
+  OPTIMIZE_FOR_QUERY: t("查询优化"),
+  REWRITE_CONTENT: t("内容重写"),
+  GENERATE_SCHEMA: t("Schema 生成"),
+  UPDATE_KG: t("知识图谱更新"),
 }
 
 function fmt(value: number | null | undefined, digits = 3): string {
@@ -36,13 +39,13 @@ function pct(value: number | null | undefined): string {
 }
 
 function fmtTime(value: string | Date | null | undefined): string {
-  return value ? new Date(value).toLocaleString('zh-CN') : '—'
+  return value ? new Date(value).toLocaleString(appLocale.value) : '—'
 }
 
 /** Δ：正绿负红；基线空或未验证显示 —；AWAITING 显"待下次监测" */
 function deltaCell(row: any, value: number | null, formatter: (v: number) => string) {
   if (row.status !== 'VERIFIED' || value === null) {
-    return h(NTag, { size: 'small', type: 'default' }, { default: () => '待下次监测' })
+    return h(NTag, { size: 'small', type: 'default' }, { default: () => t("待下次监测") })
   }
   const color = value > 0 ? '#18a058' : value < 0 ? '#d03050' : '#888'
   return h('span', { style: { color, fontWeight: 600 } }, { default: () => formatter(value) })
@@ -55,7 +58,7 @@ async function loadData() {
     rows.value = result.rows
     optimizationsAllowed.value = result.optimizationsAllowed
   } catch (e: any) {
-    message.error(e?.message || '加载失败')
+    message.error(e?.message || t("加载失败"))
   } finally {
     loading.value = false
   }
@@ -69,11 +72,11 @@ function gotoTrend(row: any) {
 
 const columns: DataTableColumns<any> = [
   {
-    title: '查询',
+    title: t("查询"),
     key: 'queryText',
     ellipsis: { tooltip: true },
     render(row) {
-      if (!row.queryText) return h('span', { style: { color: '#999' } }, { default: () => '（查询已删除）' })
+      if (!row.queryText) return h('span', { style: { color: '#999' } }, { default: () => t("（查询已删除）") })
       return h(NSpace, { size: 4, vertical: true }, {
         default: () => [
           h('span', {}, { default: () => row.queryText }),
@@ -85,20 +88,20 @@ const columns: DataTableColumns<any> = [
     },
   },
   {
-    title: '基线',
+    title: t("基线"),
     key: 'baseline',
     width: 190,
     render(row) {
       return h(NSpace, { size: 4, vertical: true }, {
         default: () => [
           h('span', {}, { default: () => `SOV ${fmt(row.baselineSovMean)}` }),
-          h('span', {}, { default: () => `提及 ${pct(row.baselineMentionRate)}` }),
+          h('span', {}, { default: () => `${t("提及 ")}${pct(row.baselineMentionRate)}` }),
           h(
             NTooltip,
             {},
             {
-              trigger: () => h('span', { style: { color: '#999', fontSize: '12px' } }, { default: () => `样本 ${row.baselineValidSamples ?? '—'}` }),
-              default: () => '有效样本数：OK 且有 SOV 分数的采样条数。样本越少，指标波动越大。',
+              trigger: () => h('span', { style: { color: '#999', fontSize: '12px' } }, { default: () => `${t("样本 ")}${row.baselineValidSamples ?? '—'}` }),
+              default: () => t("有效样本数：OK 且有 SOV 分数的采样条数。样本越少，指标波动越大。"),
             },
           ),
         ],
@@ -106,7 +109,7 @@ const columns: DataTableColumns<any> = [
     },
   },
   {
-    title: '动作',
+    title: t("动作"),
     key: 'action',
     width: 170,
     render(row) {
@@ -119,19 +122,19 @@ const columns: DataTableColumns<any> = [
     },
   },
   {
-    title: '验证',
+    title: t("验证"),
     key: 'verified',
     width: 190,
     render(row) {
       if (row.status !== 'VERIFIED') {
-        return h('span', { style: { color: '#999' } }, { default: () => '等待下次监测回填' })
+        return h('span', { style: { color: '#999' } }, { default: () => t("等待下次监测回填") })
       }
       return h(NSpace, { size: 4, vertical: true }, {
         default: () => [
           h('span', {}, { default: () => `SOV ${fmt(row.verifiedSovMean)}` }),
-          h('span', {}, { default: () => `提及 ${pct(row.verifiedMentionRate)}` }),
+          h('span', {}, { default: () => `${t("提及 ")}${pct(row.verifiedMentionRate)}` }),
           h('span', { style: { color: '#999', fontSize: '12px' } }, {
-            default: () => `样本 ${row.verifiedValidSamples ?? '—'} · ${fmtTime(row.verifiedAt)}`,
+            default: () => `${t("样本 ")}${row.verifiedValidSamples ?? '—'} · ${fmtTime(row.verifiedAt)}`,
           }),
         ],
       })
@@ -159,7 +162,7 @@ const columns: DataTableColumns<any> = [
       return h(
         NButton,
         { size: 'tiny', quaternary: true, onClick: () => gotoTrend(row) },
-        { default: () => '趋势' },
+        { default: () => t("趋势") },
       )
     },
   },
@@ -168,19 +171,15 @@ const columns: DataTableColumns<any> = [
 
 <template>
   <div>
-    <PageHeader title="闭环看板" subtitle="薄弱点 → 建议 → 发布 → 回填 → Δ" />
+    <PageHeader :title="t('闭环看板')" :subtitle="t('薄弱点 → 建议 → 发布 → 回填 → Δ')" />
 
-    <NAlert type="info" style="margin-bottom: 16px" :show-icon="true">
-      Δ 为发布后首个有效监测运行的观测值之差，反映「改动后被观测到的变化」，不等于改动的因果效应；样本数越少波动越大。
-    </NAlert>
+    <NAlert type="info" style="margin-bottom: 16px" :show-icon="true"> {{ t('Δ 为发布后首个有效监测运行的观测值之差，反映「改动后被观测到的变化」，不等于改动的因果效应；样本数越少波动越大。') }} </NAlert>
 
     <NCard>
       <NSpace vertical style="margin-bottom: 12px">
-        <NAlert v-if="!optimizationsAllowed" type="warning" :show-icon="true">
-          当前套餐不含内容优化：可查看已发布的闭环记录，但无法新建优化任务，请联系开通。
-        </NAlert>
+        <NAlert v-if="!optimizationsAllowed" type="warning" :show-icon="true"> {{ t('当前套餐不含内容优化：可查看已发布的闭环记录，但无法新建优化任务，请联系开通。') }} </NAlert>
         <NSpace justify="end">
-          <NButton size="small" @click="loadData">刷新</NButton>
+          <NButton size="small" @click="loadData">{{ t('刷新') }}</NButton>
         </NSpace>
       </NSpace>
 
@@ -192,7 +191,7 @@ const columns: DataTableColumns<any> = [
         :bordered="false"
         :row-key="(row: any) => row.taskId"
       />
-      <EmptyState v-else-if="!loading" description="在「引用报告」的薄弱查询卡中点击一键优化，即可创建闭环任务" />
+      <EmptyState v-else-if="!loading" :description="t('在「引用报告」的薄弱查询卡中点击一键优化，即可创建闭环任务')" />
     </NCard>
   </div>
 </template>

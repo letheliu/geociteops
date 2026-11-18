@@ -16,6 +16,9 @@ import { trpc } from '../../composables/useTrpc'
 import { useSessionStore } from '../../stores/session'
 import { formatCents } from '../../utils/money'
 import { orderStatusMeta, paymentMethodLabel } from '../../utils/order'
+import { useI18n } from '@/i18n'
+const { t, locale: appLocale } = useI18n()
+
 
 const router = useRouter()
 const message = useMessage()
@@ -41,7 +44,7 @@ async function load() {
     items.value = result.items
     total.value = result.total
   } catch (e: any) {
-    message.error(e?.message || '订单列表加载失败')
+    message.error(e?.message || t("订单列表加载失败"))
   } finally {
     loading.value = false
   }
@@ -59,7 +62,7 @@ function itemsSummary(row: OrderRow): string {
 
 const columns: DataTableColumns<OrderRow> = [
   {
-    title: '订单号',
+    title: t("订单号"),
     key: 'orderNo',
     width: 190,
     render: (row) =>
@@ -68,25 +71,25 @@ const columns: DataTableColumns<OrderRow> = [
       }),
   },
   {
-    title: '创建时间',
+    title: t("创建时间"),
     key: 'createdAt',
     width: 170,
-    render: (row) => new Date(row.createdAt).toLocaleString('zh-CN'),
+    render: (row) => new Date(row.createdAt).toLocaleString(appLocale.value),
   },
   {
-    title: '商品',
+    title: t("商品"),
     key: 'items',
     minWidth: 220,
     render: itemsSummary,
   },
   {
-    title: '应付金额',
+    title: t("应付金额"),
     key: 'payableCents',
     width: 110,
     render: (row) => `¥${formatCents(row.payableCents)}`,
   },
   {
-    title: '状态',
+    title: t("状态"),
     key: 'status',
     width: 110,
     render: (row) => {
@@ -95,17 +98,17 @@ const columns: DataTableColumns<OrderRow> = [
     },
   },
   {
-    title: '支付方式',
+    title: t("支付方式"),
     key: 'paymentMethod',
     width: 100,
     render: (row) => paymentMethodLabel(row.paymentMethod),
   },
   {
-    title: '操作',
+    title: t("操作"),
     key: 'actions',
     width: 90,
     render: (row) =>
-      h(NButton, { size: 'tiny', onClick: () => goDetail(row) }, { default: () => '详情' }),
+      h(NButton, { size: 'tiny', onClick: () => goDetail(row) }, { default: () => t("详情") }),
   },
 ]
 
@@ -122,20 +125,18 @@ function handlePageChange(next: number) {
 <template>
   <div style="max-width: 1200px; margin: 0 auto; padding: 24px">
     <NSpace justify="space-between" align="center" style="margin-bottom: 16px">
-      <PageHeader title="我的订单" subtitle="本企业全部订单与支付进度" />
+      <PageHeader :title="t('我的订单')" :subtitle="t('本企业全部订单与支付进度')" />
       <NButton
         v-if="!isOrgViewer"
         tertiary
         size="small"
         @click="router.push({ name: 'console-services' })"
-      >
-        去商城下单
-      </NButton>
+      > {{ t('去商城下单') }} </NButton>
     </NSpace>
 
     <!-- 只读账号空态（遗留 D1）：不调接口不渲染表格 -->
     <NCard v-if="isOrgViewer">
-      <NEmpty description="只读账号无订单访问权限——如需查看或下单，请联系企业管理员调整角色。" />
+      <NEmpty :description="t('只读账号无订单访问权限——如需查看或下单，请联系企业管理员调整角色。')" />
     </NCard>
 
     <NCard v-else>
@@ -153,9 +154,7 @@ function handlePageChange(next: number) {
           showSizePicker: false,
         }"
       />
-      <NText depth="3" style="font-size: 12px">
-        待支付订单请在详情页完成在线支付或对公转账回单上传；退款与开票入口均在订单详情。
-      </NText>
+      <NText depth="3" style="font-size: 12px"> {{ t('待支付订单请在详情页完成在线支付或对公转账回单上传；退款与开票入口均在订单详情。') }} </NText>
     </NCard>
   </div>
 </template>

@@ -16,6 +16,9 @@ import {
 import { trpc } from '../../api/client'
 import { DEFAULT_PLATFORMS } from './platform-defs'
 import type { PlatformDef } from './platform-defs'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 const props = withDefaults(
   defineProps<{
@@ -64,13 +67,13 @@ async function handleSave() {
   for (const f of p.fields) {
     const v = (fieldValues.value[f.envKey] ?? '').trim()
     if (f.required && !v) {
-      message.warning(`请填写 ${p.label} 的${f.label}`)
+      message.warning(`${t("请填写 ")}${p.label}${t(" 的")}${f.label}`)
       return
     }
     if (v) values[f.envKey] = v
   }
   if (Object.keys(values).length === 0) {
-    message.warning('至少填写一个字段（留空保存将清空该平台配置，如需清除请联系处理）')
+    message.warning(t("至少填写一个字段（留空保存将清空该平台配置，如需清除请联系处理）"))
     return
   }
   saving.value = true
@@ -85,11 +88,11 @@ async function handleSave() {
       platform: p.key,
       values,
     })
-    message.success(`${p.label} 凭证已保存`)
+    message.success(`${p.label}${t(" 凭证已保存")}`)
     showModal.value = false
     emit('saved', p.key)
   } catch (e: any) {
-    message.error(e?.message || '保存失败')
+    message.error(e?.message || t("保存失败"))
   } finally {
     saving.value = false
   }
@@ -110,7 +113,7 @@ async function handleSave() {
         size="small"
         style="font-weight: 600"
       >
-        {{ summaryOf(p.key).configured ? '已配置' : '未配置' }}
+        {{ summaryOf(p.key).configured ? t('已配置') : t('未配置') }}
       </NTag>
       <NText v-if="summaryOf(p.key).hint" depth="3" style="font-size: 12px">
         ····{{ summaryOf(p.key).hint }}
@@ -122,33 +125,31 @@ async function handleSave() {
         type="primary"
         @click="openConfigure(p)"
       >
-        {{ summaryOf(p.key).configured ? '重新配置' : '配置' }}
+        {{ summaryOf(p.key).configured ? t('重新配置') : t('配置') }}
       </NButton>
     </div>
 
     <NModal
       v-model:show="showModal"
       preset="card"
-      :title="`配置 ${activePlatform?.label ?? ''} 凭证`"
+      :title="`${t('配置 ')}${activePlatform?.label ?? ''}${t(' 凭证')}`"
       style="width: 520px"
     >
-      <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 12px">
-        出于安全考虑不回显已保存的凭证；保存将整体覆盖该平台的现有配置（未填写的可选项会被清除）。
-      </div>
+      <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 12px"> {{ t('出于安全考虑不回显已保存的凭证；保存将整体覆盖该平台的现有配置（未填写的可选项会被清除）。') }} </div>
       <NForm label-placement="left" label-width="auto">
         <NFormItem v-for="f in activePlatform?.fields ?? []" :key="f.envKey" :label="f.label">
           <NInput
             v-model:value="fieldValues[f.envKey]"
             type="password"
             show-password-on="click"
-            :placeholder="f.required ? '必填' : '可选，留空不覆盖为空'"
+            :placeholder="f.required ? t('必填') : t('可选，留空不覆盖为空')"
           />
         </NFormItem>
       </NForm>
       <template #footer>
         <NSpace justify="end">
-          <NButton @click="showModal = false">取消</NButton>
-          <NButton type="primary" :loading="saving" @click="handleSave">保存</NButton>
+          <NButton @click="showModal = false">{{ t('取消') }}</NButton>
+          <NButton type="primary" :loading="saving" @click="handleSave">{{ t('保存') }}</NButton>
         </NSpace>
       </template>
     </NModal>

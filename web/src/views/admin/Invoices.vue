@@ -16,6 +16,9 @@ import { trpc } from '../../composables/useTrpc'
 import { fileToBase64 } from '../../utils/file'
 import { formatCents } from '../../utils/money'
 import { invoiceStatusMeta } from '../../utils/order'
+import { useI18n } from '@/i18n'
+const { t, locale: appLocale } = useI18n()
+
 
 const message = useMessage()
 
@@ -48,10 +51,10 @@ const pageSize = ref(20)
 const statusFilter = ref<string | null>('PENDING')
 
 const statusOptions: SelectOption[] = [
-  { label: '待开具（默认）', value: 'PENDING' },
-  { label: '已开具', value: 'ISSUED' },
-  { label: '已驳回', value: 'REJECTED' },
-  { label: '全部状态', value: '' },
+  { label: t("待开具（默认）"), value: 'PENDING' },
+  { label: t("已开具"), value: 'ISSUED' },
+  { label: t("已驳回"), value: 'REJECTED' },
+  { label: t("全部状态"), value: '' },
 ]
 
 async function load() {
@@ -65,7 +68,7 @@ async function load() {
     items.value = result.items
     total.value = result.total
   } catch (e: any) {
-    message.error(e?.message || '发票列表加载失败')
+    message.error(e?.message || t("发票列表加载失败"))
   } finally {
     loading.value = false
   }
@@ -90,7 +93,7 @@ function handlePageSizeChange(ps: number) {
 }
 
 function fmtDate(value: string | null): string {
-  return value ? new Date(value).toLocaleString('zh-CN') : '—'
+  return value ? new Date(value).toLocaleString(appLocale.value) : '—'
 }
 
 /** orderIds（Json 通道）安全转 string[] */
@@ -144,12 +147,12 @@ async function handleIssue() {
   if (!row) return
   const invoiceNo = issueNo.value.trim()
   if (!invoiceNo) {
-    message.warning('请填写发票号')
+    message.warning(t("请填写发票号"))
     return
   }
   const file = issueFile.value
   if (file && file.size > 7 * 1024 * 1024) {
-    message.warning('发票文件不能超过 7MB')
+    message.warning(t("发票文件不能超过 7MB"))
     return
   }
   issuing.value = true
@@ -159,12 +162,12 @@ async function handleIssue() {
       invoiceNo,
       ...(file ? { fileName: file.name, contentBase64: await fileToBase64(file) } : {}),
     })
-    message.success('发票已登记开具，客户侧可下载')
+    message.success(t("发票已登记开具，客户侧可下载"))
     showIssueModal.value = false
     uploadRef.value?.clear()
     await load()
   } catch (e: any) {
-    message.error(e?.message || '登记失败')
+    message.error(e?.message || t("登记失败"))
   } finally {
     issuing.value = false
   }
@@ -187,17 +190,17 @@ async function handleReject() {
   if (!row) return
   const reason = rejectReason.value.trim()
   if (!reason) {
-    message.warning('请填写驳回原因')
+    message.warning(t("请填写驳回原因"))
     return
   }
   rejecting.value = true
   try {
     await trpc.admin.invoices.reject.mutate({ invoiceId: row.id, reason })
-    message.success('开票申请已驳回')
+    message.success(t("开票申请已驳回"))
     showRejectModal.value = false
     await load()
   } catch (e: any) {
-    message.error(e?.message || '驳回失败')
+    message.error(e?.message || t("驳回失败"))
   } finally {
     rejecting.value = false
   }
@@ -205,7 +208,7 @@ async function handleReject() {
 
 const columns: DataTableColumns<InvoiceRow> = [
   {
-    title: '状态',
+    title: t("状态"),
     key: 'status',
     width: 100,
     render: (row) => {
@@ -214,55 +217,55 @@ const columns: DataTableColumns<InvoiceRow> = [
     },
   },
   {
-    title: '企业',
+    title: t("企业"),
     key: 'organizationId',
     width: 150,
     ellipsis: { tooltip: true },
     render: (row) => row.organizationId,
   },
   {
-    title: '开票抬头',
+    title: t("开票抬头"),
     key: 'titleSnapshot',
     minWidth: 150,
     ellipsis: { tooltip: true },
     render: (row) => titleSummary(row.titleSnapshot),
   },
   {
-    title: '金额',
+    title: t("金额"),
     key: 'amountCents',
     width: 110,
     render: (row) => `¥${formatCents(row.amountCents)}`,
   },
   {
-    title: '关联订单',
+    title: t("关联订单"),
     key: 'orderIds',
     width: 110,
     render: (row) => {
       const ids = orderIdList(row)
-      return ids.length > 0 ? `${ids.length} 笔（合并）` : '—'
+      return ids.length > 0 ? `${ids.length}${t(" 笔（合并）")}` : '—'
     },
   },
   {
-    title: '发票号',
+    title: t("发票号"),
     key: 'invoiceNo',
     width: 160,
     render: (row) => row.invoiceNo ?? '—',
   },
   {
-    title: '备注',
+    title: t("备注"),
     key: 'remark',
     minWidth: 140,
     ellipsis: { tooltip: true },
     render: (row) => row.remark ?? '—',
   },
   {
-    title: '申请时间',
+    title: t("申请时间"),
     key: 'createdAt',
     width: 170,
     render: (row) => fmtDate(row.createdAt),
   },
   {
-    title: '操作',
+    title: t("操作"),
     key: 'actions',
     width: 170,
     render: (row) => {
@@ -270,10 +273,10 @@ const columns: DataTableColumns<InvoiceRow> = [
         return h(NSpace, { size: 'small' }, {
           default: () => [
             h(NButton, { size: 'tiny', type: 'primary', onClick: () => openIssue(row) }, {
-              default: () => '登记',
+              default: () => t("登记"),
             }),
             h(NButton, { size: 'tiny', type: 'warning', onClick: () => openReject(row) }, {
-              default: () => '驳回',
+              default: () => t("驳回"),
             }),
           ],
         })
@@ -282,7 +285,7 @@ const columns: DataTableColumns<InvoiceRow> = [
         return h(
           NButton,
           { size: 'tiny', tertiary: true, tag: 'a', href: row.fileUrl, target: '_blank' },
-          { default: () => '下载' },
+          { default: () => t("下载") },
         )
       }
       return '—'
@@ -293,13 +296,13 @@ const columns: DataTableColumns<InvoiceRow> = [
 
 <template>
   <div>
-    <PageHeader title="发票管理" subtitle="客户开票申请的登记（发票号 + PDF）与驳回" />
+    <PageHeader :title="t('发票管理')" :subtitle="t('客户开票申请的登记（发票号 + PDF）与驳回')" />
 
     <NSpace justify="space-between" align="center" style="margin-bottom: 16px">
       <NSelect
         v-model:value="statusFilter"
         :options="statusOptions"
-        placeholder="全部状态"
+        :placeholder="t('全部状态')"
         style="width: 180px"
         @update:value="handleSearch"
       />
@@ -329,21 +332,20 @@ const columns: DataTableColumns<InvoiceRow> = [
     <NModal
       v-model:show="showIssueModal"
       preset="card"
-      title="登记签发"
+      :title="t('登记签发')"
       style="width: 520px"
       :mask-closable="false"
     >
       <NForm label-placement="left" label-width="90">
-        <NFormItem label="申请">
+        <NFormItem :label="t('申请')">
           <NText>
             {{ titleSummary(issueRow?.titleSnapshot ?? null) }} · ¥{{ formatCents(issueRow?.amountCents ?? null) }}
-            · {{ issueOrderCount() }} 笔订单
-          </NText>
+            · {{ issueOrderCount() }} {{ t('笔订单') }} </NText>
         </NFormItem>
-        <NFormItem label="发票号" required>
-          <NInput v-model:value="issueNo" placeholder="全局唯一（≤64 字符）" :maxlength="64" />
+        <NFormItem :label="t('发票号')" required>
+          <NInput v-model:value="issueNo" :placeholder="t('全局唯一（≤64 字符）')" :maxlength="64" />
         </NFormItem>
-        <NFormItem label="发票 PDF">
+        <NFormItem :label="t('发票 PDF')">
           <NSpace vertical :size="4" style="width: 100%">
             <NUpload
               ref="uploadRef"
@@ -353,18 +355,16 @@ const columns: DataTableColumns<InvoiceRow> = [
               :show-file-list="true"
               @change="handleIssueFileChange"
             >
-              <NButton size="small" tertiary>选择发票文件</NButton>
+              <NButton size="small" tertiary>{{ t('选择发票文件') }}</NButton>
             </NUpload>
-            <NText depth="3" style="font-size: 12px">
-              可选；pdf/png/jpg，≤7MB，登记后客户侧可下载。
-            </NText>
+            <NText depth="3" style="font-size: 12px"> {{ t('可选；pdf/png/jpg，≤7MB，登记后客户侧可下载。') }} </NText>
           </NSpace>
         </NFormItem>
       </NForm>
       <template #footer>
         <NSpace justify="end">
-          <NButton @click="showIssueModal = false">取消</NButton>
-          <NButton type="primary" :loading="issuing" @click="handleIssue">登记开具</NButton>
+          <NButton @click="showIssueModal = false">{{ t('取消') }}</NButton>
+          <NButton type="primary" :loading="issuing" @click="handleIssue">{{ t('登记开具') }}</NButton>
         </NSpace>
       </template>
     </NModal>
@@ -373,19 +373,19 @@ const columns: DataTableColumns<InvoiceRow> = [
     <NModal
       v-model:show="showRejectModal"
       preset="card"
-      title="驳回开票申请"
+      :title="t('驳回开票申请')"
       style="width: 480px"
       :mask-closable="false"
     >
       <NForm label-placement="left" label-width="90">
-        <NFormItem label="申请">
+        <NFormItem :label="t('申请')">
           <NText>¥{{ formatCents(rejectRow?.amountCents ?? null) }} · {{ rejectRow?.organizationId }}</NText>
         </NFormItem>
-        <NFormItem label="驳回原因" required>
+        <NFormItem :label="t('驳回原因')" required>
           <NInput
             v-model:value="rejectReason"
             type="textarea"
-            placeholder="将作为备注展示给客户（如抬头信息不全），200 字内"
+            :placeholder="t('将作为备注展示给客户（如抬头信息不全），200 字内')"
             :maxlength="200"
             show-count
           />
@@ -393,8 +393,8 @@ const columns: DataTableColumns<InvoiceRow> = [
       </NForm>
       <template #footer>
         <NSpace justify="end">
-          <NButton @click="showRejectModal = false">取消</NButton>
-          <NButton type="warning" :loading="rejecting" @click="handleReject">确认驳回</NButton>
+          <NButton @click="showRejectModal = false">{{ t('取消') }}</NButton>
+          <NButton type="warning" :loading="rejecting" @click="handleReject">{{ t('确认驳回') }}</NButton>
         </NSpace>
       </template>
     </NModal>

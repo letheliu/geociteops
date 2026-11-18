@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useSessionStore } from '../stores/session'
 import { workspaceIdHeader } from '../stores/workspace-header'
+import { t } from '../i18n'
 
 /**
  * 路由树：
@@ -418,11 +419,14 @@ const TITLE_MAP: Record<string, string> = {
   'diagnostic-actions': '行动中心',
 }
 
+export function updateDocumentTitle(routeName: unknown): void {
+  const suffix = ' · GEO Console'
+  const label = TITLE_MAP[routeName as string]
+  document.title = label ? `${t(label)}${suffix}` : `GeoCiteOps${suffix}`
+}
+
 router.afterEach((to) => {
   // 进入 /console/w/:workspaceId 时让 tRPC 客户端带上 x-workspace-id，离开时清除
   workspaceIdHeader.value = (to.params.workspaceId as string) ?? null
-
-  const suffix = ' · GEO Console'
-  const label = TITLE_MAP[to.name as string]
-  document.title = label ? `${label}${suffix}` : `GeoCiteOps${suffix}`
+  updateDocumentTitle(to.name)
 })

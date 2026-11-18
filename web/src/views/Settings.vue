@@ -22,6 +22,9 @@ import PageHeader from '../components/common/PageHeader.vue'
 import PlatformCredentials from '../components/admin/PlatformCredentials.vue'
 import { trpc } from '../composables/useTrpc'
 import { useSessionStore } from '../stores/session'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 type WorkspaceProjection = Awaited<ReturnType<typeof trpc.workspace.get.query>>
 
@@ -113,7 +116,7 @@ watch(
 async function handleSaveBasic() {
   const f = form.value
   if (!f.name.trim() || !f.defaultBrandName.trim()) {
-    message.warning('名称与默认品牌名必填')
+    message.warning(t("名称与默认品牌名必填"))
     return
   }
   savingBasic.value = true
@@ -129,10 +132,10 @@ async function handleSaveBasic() {
       ...(f.domain.trim() ? { domain: f.domain.trim() } : {}),
       ...(f.llmsTxtUrl.trim() ? { llmsTxtUrl: f.llmsTxtUrl.trim() } : {}),
     })
-    message.success('基本信息已保存')
+    message.success(t("基本信息已保存"))
     await load()
   } catch (e: any) {
-    message.error(e?.message || '保存失败')
+    message.error(e?.message || t("保存失败"))
   } finally {
     savingBasic.value = false
   }
@@ -153,7 +156,7 @@ async function refreshMonitorScope() {
 
 async function handleSaveMonitor() {
   if (!Number.isInteger(monitorSampleCount.value) || monitorSampleCount.value < 1 || monitorSampleCount.value > 10) {
-    message.warning('采样次数需在 1..10 之间')
+    message.warning(t("采样次数需在 1..10 之间"))
     return
   }
   savingMonitor.value = true
@@ -168,12 +171,12 @@ async function handleSaveMonitor() {
     })
     message.success(
       nClamped.value
-        ? `监测配置已保存。注意：当前规模下每次运行实际只跑 ${effectiveN.value} 次采样（总量上限 ${UNIT_CAP}）`
-        : '监测配置已保存',
+        ? `${t("监测配置已保存。注意：当前规模下每次运行实际只跑 ")}${effectiveN.value}${t(" 次采样（总量上限 ")}${UNIT_CAP}）`
+        : t("监测配置已保存"),
     )
     await load()
   } catch (e: any) {
-    message.error(e?.message || '保存失败')
+    message.error(e?.message || t("保存失败"))
   } finally {
     savingMonitor.value = false
   }
@@ -190,10 +193,10 @@ async function handleSaveCompetitors() {  savingCompetitors.value = true
       workspaceId: workspaceId.value,
       competitors: list,
     })
-    message.success('竞品已保存')
+    message.success(t("竞品已保存"))
     await load()
   } catch (e: any) {
-    message.error(e?.message || '保存失败')
+    message.error(e?.message || t("保存失败"))
   } finally {
     savingCompetitors.value = false
   }
@@ -202,54 +205,52 @@ async function handleSaveCompetitors() {  savingCompetitors.value = true
 
 <template>
   <div>
-    <PageHeader title="设置" subtitle="工作区基础信息、竞品与 AI 平台凭证" />
+    <PageHeader :title="t('设置')" :subtitle="t('工作区基础信息、竞品与 AI 平台凭证')" />
 
     <NSpin :show="loading">
-      <NEmpty v-if="!loading && !ws" description="无法加载工作区信息（缺少工作区上下文或无权限）" style="padding: 48px 0" />
+      <NEmpty v-if="!loading && !ws" :description="t('无法加载工作区信息（缺少工作区上下文或无权限）')" style="padding: 48px 0" />
       <NSpace v-else-if="ws" vertical :size="16">
         <NAlert
           v-if="!canWrite"
           type="info"
           :bordered="false"
           :closable="false"
-        >
-          工作区设置（基础信息、竞品、AI 平台凭证）仅企业管理员（ORG_OWNER）可修改，当前为只读。
-        </NAlert>
+        > {{ t('工作区设置（基础信息、竞品、AI 平台凭证）仅企业管理员（ORG_OWNER）可修改，当前为只读。') }} </NAlert>
 
-        <NCard title="基本信息">
+        <NCard :title="t('基本信息')">
           <template #header-extra>
             <NTag :bordered="false" size="small">{{ ws.status }}</NTag>
           </template>
           <NForm label-placement="left" label-width="110" style="max-width: 560px">
-            <NFormItem label="名称">
+            <NFormItem :label="t('名称')">
               <NInput v-model:value="form.name" :disabled="!canWrite" />
             </NFormItem>
-            <NFormItem label="默认品牌名">
+            <NFormItem :label="t('默认品牌名')">
               <NInput v-model:value="form.defaultBrandName" :disabled="!canWrite" />
             </NFormItem>
-            <NFormItem label="域名">
+            <NFormItem :label="t('域名')">
               <NInput
                 v-model:value="form.domain"
                 :disabled="!canWrite"
-                placeholder="example.com（留空则保持不变）"
+                :placeholder="t('example.com（留空则保持不变）')"
               />
             </NFormItem>
             <NFormItem label="llms.txt URL">
               <NInput
                 v-model:value="form.llmsTxtUrl"
                 :disabled="!canWrite"
-                placeholder="https://…（留空则保持不变）"
+                :placeholder="t('https://…（留空则保持不变）')"
               />
             </NFormItem>
           </NForm>
           <NSpace v-if="canWrite" justify="start">
-            <NButton type="primary" :loading="savingBasic" @click="handleSaveBasic">保存基本信息</NButton>
+            <NButton type="primary" :loading="savingBasic" @click="handleSaveBasic">{{ t('保存基本信息') }}</NButton>
           </NSpace>
         </NCard>
 
-        <NCard title="监测设置">
+        <NCard :title="t('监测设置')">
           <NSpace vertical :size="16">
-            <NFormItem label="每次运行采样次数 N" style="margin-bottom: 0">
+            <NFormItem :label="t('每次运行采样次数 N')" style="margin-bottom: 0">
               <NInputNumber
                 v-model:value="monitorSampleCount"
                 :min="1"
@@ -257,41 +258,32 @@ async function handleSaveCompetitors() {  savingCompetitors.value = true
                 :disabled="!canWrite"
                 style="width: 160px"
               />
-              <div style="font-size: 12px; color: var(--text-color-3); margin-top: 4px">
-                单次 AI 回答有随机性，N 次采样取聚合值（默认 5，可选 1..10）。N 越大越准，但耗时与调用量按 N 倍增长。
-              </div>
+              <div style="font-size: 12px; color: var(--text-color-3); margin-top: 4px"> {{ t('单次 AI 回答有随机性，N 次采样取聚合值（默认 5，可选 1..10）。N 越大越准，但耗时与调用量按 N 倍增长。') }} </div>
             </NFormItem>
 
-            <NFormItem label="监测节奏" style="margin-bottom: 0">
+            <NFormItem :label="t('监测节奏')" style="margin-bottom: 0">
               <NRadioGroup v-model:value="monitorSchedule" :disabled="!canWrite">
-                <NRadioButton value="DAILY">每日 02:00</NRadioButton>
-                <NRadioButton value="WEEKLY">每周日 03:00</NRadioButton>
-                <NRadioButton value="OFF">关闭</NRadioButton>
+                <NRadioButton value="DAILY">{{ t('每日 02:00') }}</NRadioButton>
+                <NRadioButton value="WEEKLY">{{ t('每周日 03:00') }}</NRadioButton>
+                <NRadioButton value="OFF">{{ t('停用') }}</NRadioButton>
               </NRadioGroup>
-              <div style="font-size: 12px; color: var(--text-color-3); margin-top: 4px">
-                均按 Asia/Shanghai 时区执行；同一工作区同一天只会有一次定时运行（重触发会续跑当次运行，不重复新建）。
-              </div>
+              <div style="font-size: 12px; color: var(--text-color-3); margin-top: 4px"> {{ t('均按 Asia/Shanghai 时区执行；同一工作区同一天只会有一次定时运行（重触发会续跑当次运行，不重复新建）。') }} </div>
             </NFormItem>
 
             <div
               v-if="nClamped"
               style="font-size: 12px; color: var(--warning-color); background: var(--warning-color-2); padding: 8px 12px; border-radius: 6px"
-            >
-              当前规模：{{ activeQueryCount }} 个查询 × {{ activePlatformCount }} 个平台，总量上限 {{ UNIT_CAP }}。
-              设定 N={{ monitorSampleCount }} 会被钳制为每次运行实际跑 <b>{{ effectiveN }}</b> 次采样。
-            </div>
-            <div v-else style="font-size: 12px; color: var(--text-color-3)">
-              当前规模：{{ activeQueryCount }} 个查询 × {{ activePlatformCount }} 个平台，
-              每次运行实际采样 {{ activeQueryCount * activePlatformCount * effectiveN }} 次（上限 {{ UNIT_CAP }}）。
+            > {{ t('当前规模：') }}{{ activeQueryCount }} {{ t('个查询 ×') }} {{ activePlatformCount }} {{ t('个平台，总量上限') }} {{ UNIT_CAP }}{{ t('。 设定 N=') }}{{ monitorSampleCount }} {{ t('会被钳制为每次运行实际跑') }} <b>{{ effectiveN }}</b> {{ t('次采样。') }} </div>
+            <div v-else style="font-size: 12px; color: var(--text-color-3)"> {{ t('当前规模：') }}{{ activeQueryCount }} {{ t('个查询 ×') }} {{ activePlatformCount }} {{ t('个平台， 每次运行实际采样') }} {{ activeQueryCount * activePlatformCount * effectiveN }} {{ t('次（上限') }} {{ UNIT_CAP }}）。
             </div>
 
             <NSpace v-if="canWrite" justify="start">
-              <NButton type="primary" :loading="savingMonitor" @click="handleSaveMonitor">保存监测设置</NButton>
+              <NButton type="primary" :loading="savingMonitor" @click="handleSaveMonitor">{{ t('保存监测设置') }}</NButton>
             </NSpace>
           </NSpace>
         </NCard>
 
-        <NCard title="竞品配置">
+        <NCard :title="t('竞品配置')">
           <NSelect
             v-model:value="competitors"
             multiple
@@ -299,19 +291,17 @@ async function handleSaveCompetitors() {  savingCompetitors.value = true
             tag
             clearable
             :disabled="!canWrite"
-            placeholder="输入竞品名后回车添加，如 Northwind Ink"
+            :placeholder="t('输入竞品名后回车添加，如 Northwind Ink')"
             :options="competitors.map((c) => ({ label: c, value: c }))"
             style="max-width: 560px"
           />
           <NSpace v-if="canWrite" justify="start" style="margin-top: 12px">
-            <NButton type="primary" :loading="savingCompetitors" @click="handleSaveCompetitors">保存竞品</NButton>
+            <NButton type="primary" :loading="savingCompetitors" @click="handleSaveCompetitors">{{ t('保存竞品') }}</NButton>
           </NSpace>
         </NCard>
 
-        <NCard title="AI 平台凭证">
-          <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 12px">
-            凭证明文不入库也不回显；重新配置为整体覆盖写密文，hint 仅显示 key 末 4 位。
-          </div>
+        <NCard :title="t('AI 平台凭证')">
+          <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 12px"> {{ t('凭证明文不入库也不回显；重新配置为整体覆盖写密文，hint 仅显示 key 末 4 位。') }} </div>
           <PlatformCredentials
             :workspace-id="workspaceId"
             :platform-summary="ws.platformSummary"

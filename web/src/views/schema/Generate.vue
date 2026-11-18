@@ -5,6 +5,9 @@ import {
 } from 'naive-ui'
 import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 const message = useMessage()
 const submitting = ref(false)
@@ -41,13 +44,13 @@ watch(selectedType, () => {
 
 async function handleGenerate() {
   if (!form.value['pageUrl']) {
-    message.warning('请输入页面 URL')
+    message.warning(t("请输入页面 URL"))
     return
   }
   // Check required fields
   for (const f of currentDef.value.required) {
     if (!form.value[f]?.trim()) {
-      message.warning(`请填写必填字段: ${f}`)
+      message.warning(`${t("请填写必填字段: ")}${f}`)
       return
     }
   }
@@ -72,9 +75,9 @@ async function handleGenerate() {
       schemaType: selectedType.value as any,
       fields,
     })
-    message.success('生成成功')
+    message.success(t("生成成功"))
   } catch (e: any) {
-    message.error(e?.message || '生成失败')
+    message.error(e?.message || t("生成失败"))
   } finally {
     submitting.value = false
   }
@@ -90,39 +93,39 @@ const previewJsonLd = computed(() => {
 
 <template>
   <div>
-    <PageHeader title="生成 JSON-LD" subtitle="手动生成 Schema.org 结构化数据" />
+    <PageHeader :title="t('生成 JSON-LD')" :subtitle="t('手动生成 Schema.org 结构化数据')" />
 
     <NCard>
       <NForm label-placement="top">
-        <NFormItem label="页面 URL">
+        <NFormItem :label="t('页面 URL')">
           <NInput v-model:value="form['pageUrl']" placeholder="/about" />
         </NFormItem>
 
-        <NFormItem label="Schema 类型">
+        <NFormItem :label="t('Schema 类型')">
           <NSelect v-model:value="selectedType" :options="schemaTypes" />
         </NFormItem>
 
-        <div style="font-weight: 600; margin: 12px 0 8px; font-size: 13px">必填字段</div>
+        <div style="font-weight: 600; margin: 12px 0 8px; font-size: 13px">{{ t('必填字段') }}</div>
         <NSpace vertical :size="8">
           <NFormItem v-for="f in currentDef.required" :key="f" :label="f">
-            <NInput v-model:value="form[f]" :placeholder="`输入 ${f}`" />
+            <NInput v-model:value="form[f]" :placeholder="`${t('输入 ')}${f}`" />
           </NFormItem>
         </NSpace>
 
-        <div v-if="currentDef.optional.length" style="font-weight: 600; margin: 12px 0 8px; font-size: 13px">可选字段</div>
+        <div v-if="currentDef.optional.length" style="font-weight: 600; margin: 12px 0 8px; font-size: 13px">{{ t('可选字段') }}</div>
         <NSpace vertical :size="8">
           <NFormItem v-for="f in currentDef.optional" :key="f" :label="f">
-            <NInput v-model:value="form[f]" :placeholder="`输入 ${f}（JSON 对象也可）`" />
+            <NInput v-model:value="form[f]" :placeholder="`${t('输入 ')}${f}${t('（JSON 对象也可）')}`" />
           </NFormItem>
         </NSpace>
 
         <NSpace justify="end" style="margin-top: 16px">
-          <NButton type="primary" :loading="submitting" @click="handleGenerate">生成并保存</NButton>
+          <NButton type="primary" :loading="submitting" @click="handleGenerate">{{ t('生成并保存') }}</NButton>
         </NSpace>
       </NForm>
     </NCard>
 
-    <NCard v-if="previewJsonLd" title="生成结果" style="margin-top: 16px">
+    <NCard v-if="previewJsonLd" :title="t('生成结果')" style="margin-top: 16px">
       <pre style="background: var(--code-color); padding: 12px; border-radius: 6px; overflow: auto; font-size: 12px; margin: 0"><NCode :code="previewJsonLd" language="json" /></pre>
     </NCard>
   </div>

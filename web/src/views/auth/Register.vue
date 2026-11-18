@@ -9,6 +9,9 @@ import { NAlert, NButton, NCard, NForm, NFormItem, NInput, NSpace, NText, useMes
 import { trpc } from '../../composables/useTrpc'
 import { useSessionStore } from '../../stores/session'
 import { postLoginTarget } from '../../utils/post-login'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 const router = useRouter()
 const message = useMessage()
@@ -38,11 +41,11 @@ onMounted(loadRegistrationEnabled)
 function validate(): string | null {
   const username = form.value.username.trim()
   if (username.length < USERNAME_MIN || username.length > USERNAME_MAX) {
-    return `用户名长度需在 ${USERNAME_MIN}-${USERNAME_MAX} 位`
+    return `${t("用户名长度需在 ")}${USERNAME_MIN}-${USERNAME_MAX}${t(" 位")}`
   }
   const email = form.value.email.trim()
-  if (email && !EMAIL_PATTERN.test(email)) return '邮箱格式不正确'
-  if (!form.value.password) return '请输入密码'
+  if (email && !EMAIL_PATTERN.test(email)) return t("邮箱格式不正确")
+  if (!form.value.password) return t("请输入密码")
   return null
 }
 
@@ -67,7 +70,7 @@ async function handleRegister() {
     await sessionStore.fetchMe()
     router.push(postLoginTarget(sessionStore.me))
   } catch (e: any) {
-    message.error(e?.message || '注册失败')
+    message.error(e?.message || t("注册失败"))
   } finally {
     loading.value = false
   }
@@ -76,46 +79,42 @@ async function handleRegister() {
 
 <template>
   <div style="height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--body-color)">
-    <NCard style="width: 460px; max-width: 90vw" title="注册试用" size="medium">
+    <NCard style="width: 460px; max-width: 90vw" :title="t('注册试用')" size="medium">
       <template #header-extra>
-        <NButton text type="primary" @click="router.push({ name: 'login' })">已有账号，登录</NButton>
+        <NButton text type="primary" @click="router.push({ name: 'login' })">{{ t('已有账号，登录') }}</NButton>
       </template>
 
       <NSpace vertical :size="12">
-        <NAlert v-if="registrationEnabled === false" type="warning" :bordered="false">
-          当前未开放自助注册，请联系平台开通。
-        </NAlert>
+        <NAlert v-if="registrationEnabled === false" type="warning" :bordered="false"> {{ t('当前未开放自助注册，请联系平台开通。') }} </NAlert>
 
         <template v-else>
-          <NText depth="3" style="font-size: 13px">
-            注册即开通 7 天试用租户：1 个工作区、10 条查询、单次监测采样上限 3。试用到期后数据保留为只读。
-          </NText>
+          <NText depth="3" style="font-size: 13px"> {{ t('注册即开通 7 天试用租户：1 个工作区、10 条查询、单次监测采样上限 3。试用到期后数据保留为只读。') }} </NText>
           <NForm @submit.prevent="handleRegister">
-            <NFormItem label="用户名">
+            <NFormItem :label="t('用户名')">
               <NInput
                 v-model:value="form.username"
-                placeholder="3-64 位，注册后不可修改"
+                :placeholder="t('3-64 位，注册后不可修改')"
                 :input-props="{ autocomplete: 'username' }"
               />
             </NFormItem>
-            <NFormItem label="邮箱（可选）">
+            <NFormItem :label="t('邮箱（可选）')">
               <NInput
                 v-model:value="form.email"
-                placeholder="仅作为联系方式，不做验证"
+                :placeholder="t('仅作为联系方式，不做验证')"
                 :input-props="{ autocomplete: 'email' }"
               />
             </NFormItem>
-            <NFormItem label="密码">
+            <NFormItem :label="t('密码')">
               <NInput
                 v-model:value="form.password"
                 type="password"
                 show-password-on="click"
-                placeholder="至少 8 位，含大小写字母与数字"
+                :placeholder="t('至少 8 位，含大小写字母与数字')"
                 :input-props="{ autocomplete: 'new-password' }"
               />
             </NFormItem>
-            <NFormItem label="品牌名（可选）">
-              <NInput v-model:value="form.brandName" placeholder="缺省与用户名相同" />
+            <NFormItem :label="t('品牌名（可选）')">
+              <NInput v-model:value="form.brandName" :placeholder="t('缺省与用户名相同')" />
             </NFormItem>
             <NButton
               type="primary"
@@ -123,9 +122,7 @@ async function handleRegister() {
               :loading="loading"
               :disabled="registrationEnabled !== true"
               @click="handleRegister"
-            >
-              注册并开通试用
-            </NButton>
+            > {{ t('注册并开通试用') }} </NButton>
           </NForm>
         </template>
       </NSpace>
