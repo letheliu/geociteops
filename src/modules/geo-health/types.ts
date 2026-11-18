@@ -13,6 +13,10 @@ export type { LocalizedText, ReadinessGrade }
 
 export type GeoHealthStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'PARTIAL' | 'FAILED'
 
+export type GeoHealthTrigger = 'MANUAL' | 'SCHEDULED'
+
+export type GeoHealthCadence = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CRON'
+
 export type PillarId = 'agentReadiness' | 'citations' | 'citability' | 'structuredSignals'
 
 export const PILLAR_IDS: PillarId[] = ['agentReadiness', 'citations', 'citability', 'structuredSignals']
@@ -212,6 +216,7 @@ export interface GeoHealthCheckSummary {
   brandName: string
   siteUrl: string
   status: GeoHealthStatus
+  trigger: GeoHealthTrigger
   score: number | null
   grade: ReadinessGrade | null
   error: string | null
@@ -227,6 +232,69 @@ export interface GeoHealthCheckDetail extends GeoHealthCheckSummary {
   language: HealthLanguage
   progress: GeoHealthProgress
   report: GeoHealthReport | null
+  /** Compared with the previous finished check for the same brand and site. Null when this is the first. */
+  diff: GeoHealthDiff | null
+}
+
+export interface PillarDelta {
+  pillar: PillarId
+  previous: number | null
+  current: number | null
+  /** Current minus previous. Null when either side has no score. */
+  delta: number | null
+}
+
+export interface GeoHealthDiff {
+  previousId: string
+  previousAt: string
+  previousScore: number
+  currentScore: number
+  /** Current minus previous. Positive means the score went up. */
+  scoreDelta: number
+  previousGrade: ReadinessGrade
+  currentGrade: ReadinessGrade
+  pillars: PillarDelta[]
+  /** Action ids present now that the previous report did not have. */
+  newActions: GeoHealthAction[]
+  /** Action ids the previous report had and this one does not. */
+  resolvedActions: GeoHealthAction[]
+  /** Same action id, and the impact rank went up. */
+  regressedActions: GeoHealthAction[]
+  /** Pillars whose score fell. */
+  regressedPillars: PillarId[]
+}
+
+export interface GeoScorePoint {
+  id: string
+  at: string
+  /** Asia/Shanghai day, same bucket as the citation trend. */
+  date: string
+  score: number
+  grade: ReadinessGrade
+  brandName: string
+  trigger: GeoHealthTrigger
+  pillars: Record<PillarId, number | null>
+}
+
+export interface GeoHealthScheduleSummary {
+  id: string
+  brandName: string
+  siteUrl: string
+  industry: string | null
+  competitors: string[]
+  userQueries: string[]
+  language: HealthLanguage
+  cadence: GeoHealthCadence
+  cron: string
+  timezone: 'Asia/Shanghai'
+  enabled: boolean
+  lastCheckId: string | null
+  lastRunAt: string | null
+  lastStatus: GeoHealthStatus | null
+  nextRunAt: string | null
+  running: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 export interface GeoHealthStartInput {

@@ -561,6 +561,7 @@ async function main() {
     dispatch: (checkId) => services.geoHealth.dispatch(checkId),
     runPillar: (checkId, pillar) => services.geoHealth.runPillarJob(checkId, pillar),
     finalize: (checkId) => services.geoHealth.finalize(checkId),
+    runDue: () => services.geoHealth.runDueSchedules().then(() => undefined),
   })
 
   await fastify.listen({ port, host: '0.0.0.0' })

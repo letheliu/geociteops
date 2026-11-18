@@ -1,12 +1,16 @@
 import type { Prisma, PrismaClient } from '@prisma/client'
 import type { QuerySource } from '@prisma/client'
-import { assertPublicHttpUrl, SsrfError } from '../agent-readiness/ssrf.js'
+import { dayKey } from '../citation-monitor/aggregate.js'
 import type { ReadinessGrade } from '../agent-readiness/types.js'
 import { publicError, GeoHealthError } from './errors.js'
+import { diffReports } from './diff.js'
 import { conclude, runPillar, type GeoHealthRunDeps, type PillarBundle } from './orchestrator.js'
 import { exportFilename, renderJson, renderMarkdown } from './export.js'
+import { renderHealthPdf } from './pdf.js'
 import { emptyProgress, isTerminal, progressPercent } from './score.js'
-import type { GeoHealthRunInput } from './run-input.js'
+import { prepareHealthFields, type GeoHealthRunInput } from './run-input.js'
+import { createScheduleRunner, type ScheduleRunner } from './schedule.js'
+import { persistCitationSnapshot } from './snapshot.js'
 import type {
   GeoHealthCheckDetail,
   GeoHealthCheckSummary,
@@ -14,6 +18,8 @@ import type {
   GeoHealthReport,
   GeoHealthStartInput,
   GeoHealthStatus,
+  GeoHealthTrigger,
+  GeoScorePoint,
   HealthLanguage,
   PillarId,
   PillarRunStatus,
@@ -24,9 +30,15 @@ export const GEO_HEALTH_QUEUES = {
   dispatch: 'geo-health-dispatch',
   pillar: 'geo-health-pillar',
   finalize: 'geo-health-finalize',
+  /** One tick a minute. It only starts schedules whose nextRunAt has passed. */
+  schedule: 'geo-health-schedule',
 } as const
 
+export const GEO_HEALTH_TICK_CRON = '* * * * *'
+export const GEO_HEALTH_TICK_TZ = 'Asia/Shanghai'
+
 const EARLY_PILLARS: PillarId[] = ['agentReadiness', 'citations', 'citability']
+const DISPATCH_SEND = { retryLimit: 2, retryDelay: 15, expireInSeconds: 120 }
 
 export interface GeoHealthDispatchJob {
   checkId: string
@@ -100,21 +112,6 @@ function asReport(value: unknown): GeoHealthReport | null {
 
 const GEO_REPORT_VERSION = 1
 
-function cleanList(values: string[] | undefined, max: number, itemMax: number): string[] {
-  const out: string[] = []
-  const seen = new Set<string>()
-  for (const raw of values ?? []) {
-    const text = raw.trim()
-    if (!text) continue
-    const key = text.toLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(text.slice(0, itemMax))
-    if (out.length >= max) break
-  }
-  return out
-}
-
 type CheckRow = {
   id: string
   workspaceId: string
@@ -131,6 +128,8 @@ type CheckRow = {
   pillarResults: unknown
   report: unknown
   error: string | null
+  trigger?: string | null
+  scheduleId?: string | null
   createdAt: Date
   startedAt: Date | null
   finishedAt: Date | null
@@ -142,6 +141,7 @@ function toSummary(row: CheckRow): GeoHealthCheckSummary {
     brandName: row.brandName,
     siteUrl: row.siteUrl,
     status: row.status as GeoHealthStatus,
+    trigger: row.trigger === 'SCHEDULED' ? 'SCHEDULED' : 'MANUAL',
     score: row.score,
     grade: asGrade(row.grade),
     error: row.error,
@@ -163,12 +163,25 @@ function inputFromRow(row: CheckRow): GeoHealthRunInput {
   }
 }
 
+export interface GeoHealthExportFile {
+  filename: string
+  mime: string
+  content: string
+  encoding: 'utf8' | 'base64'
+}
+
 export interface GeoHealthService {
   start(workspaceId: string, input: GeoHealthStartInput): Promise<GeoHealthCheckSummary>
   get(workspaceId: string, id: string): Promise<GeoHealthCheckDetail>
   list(workspaceId: string, limit?: number): Promise<GeoHealthCheckSummary[]>
+  trend(workspaceId: string, limit?: number): Promise<{ points: GeoScorePoint[] }>
   saveQueries(workspaceId: string, id: string): Promise<{ saved: number; skipped: number }>
-  exportReport(workspaceId: string, id: string, format: 'markdown' | 'json'): Promise<{ filename: string; mime: string; content: string }>
+  exportReport(workspaceId: string, id: string, format: 'markdown' | 'json' | 'pdf'): Promise<GeoHealthExportFile>
+  listSchedules: ScheduleRunner['list']
+  saveSchedule: ScheduleRunner['save']
+  setScheduleEnabled: ScheduleRunner['setEnabled']
+  removeSchedule: ScheduleRunner['remove']
+  runDueSchedules: ScheduleRunner['runDue']
   dispatch(checkId: string): Promise<void>
   runPillarJob(checkId: string, pillar: PillarId): Promise<void>
   finalize(checkId: string): Promise<void>
@@ -185,6 +198,11 @@ export function createGeoHealthService(deps: {
   const db = deps.prisma.geoHealthCheck
   const now = deps.now ?? (() => new Date())
   const execute = deps.runPillar ?? runPillar
+  const schedules = createScheduleRunner({
+    prisma: deps.prisma,
+    now,
+    enqueue: (checkId) => deps.boss.send(GEO_HEALTH_QUEUES.dispatch, { checkId }, DISPATCH_SEND),
+  })
 
   async function markFailed(id: string, message: string): Promise<void> {
     await db.update({
@@ -239,49 +257,24 @@ export function createGeoHealthService(deps: {
 
   return {
     async start(workspaceId, input) {
-      const brandName = input.brandName?.trim() ?? ''
-      if (!brandName || brandName.length > 80) {
-        throw new GeoHealthError('BAD_INPUT', '品牌名需要 1 到 80 个字符')
-      }
-      const industry = input.industry?.trim() || null
-      if (industry && industry.length > 80) {
-        throw new GeoHealthError('BAD_INPUT', '行业最长 80 个字符')
-      }
-      const language = input.language ?? 'auto'
-      if (language !== 'zh' && language !== 'en' && language !== 'auto') {
-        throw new GeoHealthError('BAD_INPUT', '语言只能是 zh、en 或 auto')
-      }
-      let siteUrl: string
-      try {
-        siteUrl = assertPublicHttpUrl(input.siteUrl.trim()).toString()
-      } catch (err) {
-        if (err instanceof SsrfError) {
-          const code = /无效/.test(err.message) ? 'INVALID_URL' : 'SSRF_BLOCKED'
-          throw new GeoHealthError(code, err.message)
-        }
-        throw err
-      }
-
+      const prepared = prepareHealthFields(input)
       const row = await db.create({
         data: {
           workspaceId,
-          brandName,
-          siteUrl,
-          industry,
-          competitors: cleanList(input.competitors, 8, 80),
-          userQueries: cleanList(input.queries, 10, 300),
-          language,
+          brandName: prepared.brandName,
+          siteUrl: prepared.siteUrl,
+          industry: prepared.industry,
+          competitors: prepared.competitors,
+          userQueries: prepared.userQueries,
+          language: prepared.language,
           status: 'QUEUED',
+          trigger: 'MANUAL',
           progress: emptyProgress() as unknown as Prisma.InputJsonValue,
         },
       })
 
       try {
-        const jobId = await deps.boss.send(GEO_HEALTH_QUEUES.dispatch, { checkId: row.id }, {
-          retryLimit: 2,
-          retryDelay: 15,
-          expireInSeconds: 120,
-        })
+        const jobId = await deps.boss.send(GEO_HEALTH_QUEUES.dispatch, { checkId: row.id }, DISPATCH_SEND)
         if (!jobId) {
           await markFailed(row.id, '任务队列没有接受体检任务')
           throw new GeoHealthError('QUEUE_UNAVAILABLE', '任务队列没有接受体检任务')
@@ -298,6 +291,8 @@ export function createGeoHealthService(deps: {
     async get(workspaceId, id) {
       const row = await db.findFirst({ where: { id, workspaceId } })
       if (!row) throw new GeoHealthError('NOT_FOUND', '体检记录不存在')
+      const report = asReport(row.report)
+      const diff = report ? await previousDiff(deps.prisma, row as CheckRow, report) : null
       return {
         ...toSummary(row as CheckRow),
         industry: row.industry,
@@ -305,7 +300,8 @@ export function createGeoHealthService(deps: {
         userQueries: asStringList(row.userQueries),
         language: asLanguage(row.language),
         progress: asProgress(row.progress),
-        report: asReport(row.report),
+        report,
+        diff,
       }
     },
 
@@ -354,6 +350,20 @@ export function createGeoHealthService(deps: {
       return { saved, skipped }
     },
 
+    async trend(workspaceId, limit = 30) {
+      const take = Math.min(Math.max(limit, 1), 100)
+      const rows = await db.findMany({
+        where: { workspaceId, status: { in: ['SUCCEEDED', 'PARTIAL'] } },
+        orderBy: { createdAt: 'desc' },
+        take,
+      })
+      const points = rows
+        .map((row) => toScorePoint(row as CheckRow))
+        .filter((point): point is GeoScorePoint => point !== null)
+        .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+      return { points }
+    },
+
     async exportReport(workspaceId, id, format) {
       const row = await db.findFirst({ where: { id, workspaceId } })
       if (!row) throw new GeoHealthError('NOT_FOUND', '体检记录不存在')
@@ -364,12 +374,23 @@ export function createGeoHealthService(deps: {
           filename: exportFilename(report, 'json'),
           mime: 'application/json; charset=utf-8',
           content: renderJson(report),
+          encoding: 'utf8' as const,
+        }
+      }
+      if (format === 'pdf') {
+        const bytes = await renderHealthPdf(report)
+        return {
+          filename: exportFilename(report, 'pdf'),
+          mime: 'application/pdf',
+          content: bytes.toString('base64'),
+          encoding: 'base64' as const,
         }
       }
       return {
         filename: exportFilename(report, 'md'),
         mime: 'text/markdown; charset=utf-8',
         content: renderMarkdown(report),
+        encoding: 'utf8' as const,
       }
     },
 
@@ -467,7 +488,20 @@ export function createGeoHealthService(deps: {
           .join('；')
           .slice(0, 500)
         : null
-      await db.updateMany({
+      let citationRunId: string | null = null
+      if (status !== 'FAILED') {
+        try {
+          citationRunId = await persistCitationSnapshot(deps.prisma, {
+            workspaceId: row.workspaceId,
+            checkId,
+            report,
+            startedAt: now(),
+          })
+        } catch (err) {
+          console.error(`[geo-health] citation snapshot failed check=${checkId}:`, err)
+        }
+      }
+      const written = await db.updateMany({
         where: { id: checkId, status: { in: ['QUEUED', 'RUNNING'] } },
         data: {
           status,
@@ -476,8 +510,71 @@ export function createGeoHealthService(deps: {
           report: report as unknown as Prisma.InputJsonValue,
           error,
           finishedAt: now(),
+          ...(citationRunId ? { citationRunId } : {}),
         },
       })
+      if (written.count === 0) return
+      if (row.scheduleId) {
+        await deps.prisma.geoHealthSchedule.updateMany({
+          where: { id: row.scheduleId, runningCheckId: checkId },
+          data: { runningCheckId: null, lastStatus: status, lastCheckId: checkId },
+        })
+      }
+    },
+
+    listSchedules: schedules.list,
+    saveSchedule: schedules.save,
+    setScheduleEnabled: schedules.setEnabled,
+    removeSchedule: schedules.remove,
+    runDueSchedules: schedules.runDue,
+  }
+}
+
+async function previousDiff(prisma: PrismaClient, row: CheckRow, report: GeoHealthReport) {
+  const rows = await prisma.geoHealthCheck.findMany({
+    where: {
+      workspaceId: row.workspaceId,
+      brandName: row.brandName,
+      siteUrl: row.siteUrl,
+      status: { in: ['SUCCEEDED', 'PARTIAL'] },
+      createdAt: { lt: row.createdAt },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 8,
+  })
+  const previous = [...rows]
+    .filter((candidate) => candidate.id !== row.id)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .map((candidate) => ({ candidate, report: asReport(candidate.report) }))
+    .find((item) => item.report)
+  if (!previous?.report) return null
+  const at = previous.candidate.finishedAt ?? previous.candidate.createdAt
+  return {
+    ...diffReports(previous.report, report),
+    previousId: previous.candidate.id,
+    previousAt: at.toISOString(),
+  }
+}
+
+function toScorePoint(row: CheckRow): GeoScorePoint | null {
+  const report = asReport(row.report)
+  if (!report || row.score == null) return null
+  if (row.status !== 'SUCCEEDED' && row.status !== 'PARTIAL') return null
+  const at = row.finishedAt ?? row.createdAt
+  const trigger: GeoHealthTrigger = row.trigger === 'SCHEDULED' ? 'SCHEDULED' : 'MANUAL'
+  return {
+    id: row.id,
+    at: at.toISOString(),
+    date: dayKey(at),
+    score: report.score,
+    grade: report.grade,
+    brandName: row.brandName,
+    trigger,
+    pillars: {
+      agentReadiness: report.pillars.agentReadiness.score,
+      citations: report.pillars.citations.score,
+      citability: report.pillars.citability.score,
+      structuredSignals: report.pillars.structuredSignals.score,
     },
   }
 }

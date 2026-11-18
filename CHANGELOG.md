@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **GEO health follow-ups.** Export a branded PDF (pdfkit + bundled Noto Sans SC, no Chromium). Schedule a rerun per workspace, brand, and site (daily, weekly, monthly, or cron) on a pg-boss tick; a schedule will not start a second check while one is still running. Each finished check writes its citation snapshot into the share-of-voice trend as `HEALTH_CHECK`, and the health page charts the overall score and the four pillars. `get` includes a diff against the previous report for the same brand and site. See [docs/geo-health.md](./docs/geo-health.md).
 - **Demo snapshot for Agent Readiness and the GEO health check.** `pnpm demo:reset` now stores one fictional ZoomerAI audit and one fictional health report beside the existing citation seed. The numbers are not hand-written: checks go through `buildReport`, the overall score and the action list go through `conclude`. The report text says the samples are fictional.
 - **README tour.** English and Simplified Chinese READMEs lead with the one-click health check, a short flow, a qualitative comparison, and an FAQ. Screenshots and a short GIF of the fictional workspace live in `docs/assets/`.
 - **Starter task list** in [docs/good-first-issues.md](./docs/good-first-issues.md). These are suggestions, not GitHub issues.

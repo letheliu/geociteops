@@ -42,6 +42,7 @@ model Workspace {
   diagnosticActions  DiagnosticAction[]
   agentReadinessAudits AgentReadinessAudit[]
   geoHealthChecks      GeoHealthCheck[]
+  geoHealthSchedules   GeoHealthSchedule[]
 
   orderItems        OrderItem[]
   serviceDeliveries ServiceDelivery[]
@@ -318,6 +319,8 @@ model CitationRun {
   /// 闭环任务侧的基线/验证反向字段（Run 删除即置空，不牵连任务）
   baselineForTasks OptimizationTask[] @relation("BaselineRun")
   verifiedForTasks OptimizationTask[] @relation("VerifiedRun")
+  /// 体检引用快照写入的 Run。删 Run 只清空体检上的指针，报告还在。
+  geoHealthChecks GeoHealthCheck[]
 
   @@index([workspaceId, startedAt])
 }
@@ -478,6 +481,8 @@ enum QuerySource {
   PAA
   MANUAL
   COMPETITOR
+  /// 体检快照新建、且查询库里还没有的问题。状态为 PAUSED，不进定时监测。
+  HEALTH_CHECK
 }
 
 enum QueryStatus {
@@ -495,6 +500,8 @@ enum CitationRunStatus {
 enum CitationTrigger {
   SCHEDULED
   MANUAL
+  /// 一次 GEO 体检的引用快照。趋势图上单独标记，不占用监测的每日 slot。
+  HEALTH_CHECK
 }
 
 enum CitationEventStatus {
@@ -554,6 +561,18 @@ enum GeoHealthStatus {
   FAILED
 }
 
+enum GeoHealthTrigger {
+  MANUAL
+  SCHEDULED
+}
+
+enum GeoHealthCadence {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CRON
+}
+
 /// 一次一键 GEO 体检。report 为版本化 GeoHealthReport（version 1）。
 /// agentReadiness 整包嵌入 AgentReadinessReport，不另拆一套字段。
 model GeoHealthCheck {
@@ -577,13 +596,54 @@ model GeoHealthCheck {
   pillarResults Json?
   report        Json?
   error         String?
+  trigger       GeoHealthTrigger @default(MANUAL)
+  scheduleId    String?
+  /// 引用快照写入的 CitationRun。没有样本时为空。
+  citationRunId String?
   createdAt     DateTime        @default(now())
   startedAt     DateTime?
   finishedAt    DateTime?
   updatedAt     DateTime        @updatedAt
   workspace     Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  schedule      GeoHealthSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  citationRun   CitationRun?    @relation(fields: [citationRunId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, createdAt])
+  @@index([workspaceId, brandName, createdAt])
+  @@index([scheduleId])
+}
+
+/// 一个工作区里，同一品牌 + 同一站点一份计划。时区固定 Asia/Shanghai。
+model GeoHealthSchedule {
+  id             String           @id @default(cuid())
+  workspaceId    String
+  brandName      String
+  /// 小写品牌名，和 siteUrl 一起唯一。
+  brandKey       String
+  siteUrl        String
+  industry       String?
+  competitors    Json             @default("[]")
+  userQueries    Json             @default("[]")
+  language       String           @default("auto")
+  cadence        GeoHealthCadence
+  /// 5 段 cron，预设节奏也会写成对应的表达式。
+  cron           String
+  timezone       String           @default("Asia/Shanghai")
+  enabled        Boolean          @default(true)
+  lastCheckId    String?
+  lastRunAt      DateTime?
+  lastStatus     String?
+  nextRunAt      DateTime?
+  /// 这份计划正在跑的体检。非空且那次还在 QUEUED/RUNNING 时不再开新的。
+  runningCheckId String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  checks         GeoHealthCheck[]
+
+  @@unique([workspaceId, brandKey, siteUrl])
+  @@index([workspaceId, enabled])
+  @@index([enabled, nextRunAt])
 }
 
 model PublicationRecord {

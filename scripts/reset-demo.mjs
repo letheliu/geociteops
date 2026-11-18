@@ -42,6 +42,7 @@ const prisma = new PrismaClient()
 async function truncateDemoData(workspaceId) {
   await prisma.optimizationTask.deleteMany({ where: { workspaceId } })
   await prisma.schemaRecord.deleteMany({ where: { workspaceId } })
+  await prisma.geoHealthSchedule.deleteMany({ where: { workspaceId } })
   await prisma.geoHealthCheck.deleteMany({ where: { workspaceId } })
   await prisma.agentReadinessAudit.deleteMany({ where: { workspaceId } })
   await prisma.citationEvent.deleteMany({ where: { workspaceId } })
