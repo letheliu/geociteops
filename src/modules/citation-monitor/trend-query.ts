@@ -11,6 +11,7 @@ import {
   toTrendPoint,
   type AggregateEvent,
   type RunStatus,
+  type RunTrigger,
   type TrendPoint,
 } from './aggregate.js'
 import { MAX_TREND_RANGE_DAYS } from './aggregate.js'
@@ -119,7 +120,7 @@ export async function loadTrendPoints(prisma: PrismaClient, input: TrendQueryInp
         // 终态以 Run 行存值为准；RUNNING 期间用采样实况推导，避免轮询期间"完成度"倒退
         status: (run.status === 'RUNNING' ? agg.status : run.status) as RunStatus,
         slotKey: run.slotKey,
-        trigger: run.trigger as 'SCHEDULED' | 'MANUAL',
+        trigger: run.trigger as RunTrigger,
         agg,
       }),
     )
@@ -150,7 +151,7 @@ export interface RunListRow {
   id: string
   date: string
   startedAt: string
-  trigger: 'SCHEDULED' | 'MANUAL' | 'LEGACY'
+  trigger: RunTrigger
   sampleCount: number
   validSamples: number
   failedSamples: number

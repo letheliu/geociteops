@@ -4,6 +4,7 @@ import { NCard, NGrid, NGridItem, NStatistic, NSpace, NEmpty, NSpin, NTag, NRadi
 import { useRouter } from 'vue-router'
 import { trpc } from '../composables/useTrpc'
 import TrendChart, { type TrendPoint } from '../components/TrendChart.vue'
+import GeoScoreChart, { type GeoScorePoint } from '../components/GeoScoreChart.vue'
 
 const router = useRouter()
 const loading = ref(true)
@@ -16,6 +17,7 @@ const queryCount = ref<number>(0)
 const pendingTasks = ref<number>(0)
 const recentEvents = ref<any[]>([])
 const trendPoints = ref<TrendPoint[]>([])
+const scorePoints = ref<GeoScorePoint[]>([])
 const rangeDays = ref(7)
 
 async function loadData(days = rangeDays.value) {
@@ -28,11 +30,12 @@ async function loadData(days = rangeDays.value) {
     end: now.toISOString(),
   }
   try {
-    const [trend, queries, tasks, report] = await Promise.all([
+    const [trend, queries, tasks, report, healthTrend] = await Promise.all([
       trpc.citation.trend.query({ dateRange }),
       trpc.citation.queries.list.query(),
       trpc.tasks.list.query({ status: 'pending' }),
       trpc.citation.getReport.query({ dateRange }),
+      trpc.geoHealth.trend.query({ limit: 30 }).catch(() => ({ points: [] })),
     ])
 
     // 口径：sovMean = 份额（SOV 正名）；提及率单列，不再混叫 SOV
@@ -42,6 +45,7 @@ async function loadData(days = rangeDays.value) {
     failedSamples.value = trend.period.failedSamples
     runCount.value = trend.period.pointCount
     trendPoints.value = trend.points as unknown as TrendPoint[]
+    scorePoints.value = healthTrend.points as GeoScorePoint[]
     queryCount.value = Array.isArray(queries) ? queries.length : 0
     pendingTasks.value = Array.isArray(tasks) ? tasks.length : 0
     recentEvents.value = (report.events || []).slice(0, 5)
@@ -105,6 +109,15 @@ onMounted(() => loadData(7))
           </NCard>
         </NGridItem>
       </NGrid>
+
+      <NCard v-if="scorePoints.length > 0" title="GEO 分数趋势">
+        <NSpace vertical :size="4">
+          <span style="font-size: 12px; color: var(--text-color-3)">
+            一次体检一个点。引用快照同时出现在下面的监测趋势里，蓝菱形标成「体检」。
+          </span>
+          <GeoScoreChart :points="scorePoints" height="280px" />
+        </NSpace>
+      </NCard>
 
       <NCard title="监测趋势">
         <NSpace vertical :size="4">

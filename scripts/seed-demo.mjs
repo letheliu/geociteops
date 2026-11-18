@@ -42,14 +42,15 @@ console.log('🧹 清理该 workspace 的旧演示数据（保证幂等）...')
 await prisma.$transaction([
   prisma.optimizationTask.deleteMany({ where: { workspaceId: WS_ID } }),
   prisma.schemaRecord.deleteMany({ where: { workspaceId: WS_ID } }),
+  // 计划和体检先于 Run 删除：快照 Run 挂在体检上，SetNull 也能删，这里只是把顺序写清楚
+  prisma.geoHealthSchedule.deleteMany({ where: { workspaceId: WS_ID } }),
+  prisma.geoHealthCheck.deleteMany({ where: { workspaceId: WS_ID } }),
+  prisma.agentReadinessAudit.deleteMany({ where: { workspaceId: WS_ID } }),
   prisma.citationEvent.deleteMany({ where: { workspaceId: WS_ID } }),
   // Run 删除会 Cascade 掉挂在其下的采样行；放在 citationEvent 之后是幂等兜底
   prisma.citationRun.deleteMany({ where: { workspaceId: WS_ID } }),
   prisma.citationQuery.deleteMany({ where: { workspaceId: WS_ID } }),
   prisma.contentPage.deleteMany({ where: { workspaceId: WS_ID } }),
-  // 体检和就绪审计不挂在上面那些表上，重置时单独清，避免历史列表越积越长
-  prisma.geoHealthCheck.deleteMany({ where: { workspaceId: WS_ID } }),
-  prisma.agentReadinessAudit.deleteMany({ where: { workspaceId: WS_ID } }),
 ])
 // KgEntity/KgRelation 通过 entity 间接归属，先删关系再删实体
 const oldEntities = await prisma.kgEntity.findMany({ where: { workspaceId: WS_ID }, select: { id: true } })
@@ -703,9 +704,15 @@ for (const r of RELATIONS) {
 }
 console.log(`✅ KgRelation 已填充: ${RELATIONS.length} 条关系`)
 
-// === 9. Agent 就绪 + GEO 体检（虚构样本，分数走产品公式）===
+// === 9. 原有的就绪审计 + 一份体检，另加 Acme Draw 的四次体检 ===
+// Acme Draw（https://acmedraw.example）是虚构品牌。四次体检里最新一次比峰值低，
+// 引用快照写进 CitationRun，趋势图上标成体检。每周一 04:00 复跑。
 const { buildDemoReports } = await import('./lib/demo-reports.ts')
+const { buildAcmeDrawSeries } = await import('./lib/acme-draw-health.ts')
+const { persistCitationSnapshot } = await import('../src/modules/geo-health/snapshot.ts')
+const { nextRunAfter } = await import('../src/modules/geo-health/cron.ts')
 const demoReports = buildDemoReports({ generatedAt: new Date(NOW - 2 * 3600000) })
+const acmeSeries = buildAcmeDrawSeries({ now: new Date(NOW) })
 const auditFinished = new Date(NOW - 2 * 3600000)
 const auditStarted = new Date(auditFinished.getTime() - 4000)
 await prisma.agentReadinessAudit.create({
@@ -723,7 +730,7 @@ await prisma.agentReadinessAudit.create({
 })
 const healthFinished = new Date(NOW - 2 * 3600000 + 60_000)
 const healthStarted = new Date(healthFinished.getTime() - 20_000)
-const pillarStamp = {
+const originalStamp = {
   status: 'SUCCEEDED',
   error: null,
   startedAt: healthStarted.toISOString(),
@@ -744,10 +751,10 @@ await prisma.geoHealthCheck.create({
     progress: {
       percent: 100,
       pillars: {
-        agentReadiness: pillarStamp,
-        citations: pillarStamp,
-        citability: pillarStamp,
-        structuredSignals: pillarStamp,
+        agentReadiness: originalStamp,
+        citations: originalStamp,
+        citability: originalStamp,
+        structuredSignals: originalStamp,
       },
     },
     pillarResults: demoReports.health.pillars,
@@ -757,8 +764,86 @@ await prisma.geoHealthCheck.create({
     createdAt: healthStarted,
   },
 })
-console.log(`✅ Agent 就绪演示审计: ${demoReports.readiness.score} ${demoReports.readiness.grade}（虚构样本）`)
-console.log(`✅ GEO 体检演示报告: ${demoReports.health.score} ${demoReports.health.grade}（虚构样本，${demoReports.healthStatus}）`)
+
+let latestCheck = null
+for (const point of acmeSeries) {
+  const healthFinished = new Date(point.generatedAt.getTime() + 60_000)
+  const healthStarted = new Date(healthFinished.getTime() - 20_000)
+  const pillarStamp = {
+    status: 'SUCCEEDED',
+    error: null,
+    startedAt: healthStarted.toISOString(),
+    finishedAt: healthFinished.toISOString(),
+  }
+  const check = await prisma.geoHealthCheck.create({
+    data: {
+      workspaceId: WS_ID,
+      brandName: point.health.brandName,
+      siteUrl: point.health.siteUrl,
+      industry: point.health.industry,
+      competitors: point.competitors,
+      userQueries: point.userQueries,
+      language: 'zh',
+      status: point.healthStatus,
+      trigger: point.trigger,
+      score: point.health.score,
+      grade: point.health.grade,
+      progress: {
+        percent: 100,
+        pillars: {
+          agentReadiness: pillarStamp,
+          citations: pillarStamp,
+          citability: pillarStamp,
+          structuredSignals: pillarStamp,
+        },
+      },
+      pillarResults: point.health.pillars,
+      report: point.health,
+      startedAt: healthStarted,
+      finishedAt: healthFinished,
+      createdAt: healthStarted,
+    },
+  })
+  const citationRunId = await persistCitationSnapshot(prisma, {
+    workspaceId: WS_ID,
+    checkId: check.id,
+    report: point.health,
+    startedAt: healthFinished,
+  })
+  if (citationRunId) {
+    await prisma.geoHealthCheck.update({ where: { id: check.id }, data: { citationRunId } })
+  }
+  latestCheck = check
+  console.log(`   Acme Draw ${point.daysAgo} 天前 ${point.trigger} ${point.health.score} ${point.health.grade}`)
+}
+const nextMonday = nextRunAfter('0 4 * * 1', new Date(NOW))
+const schedule = await prisma.geoHealthSchedule.create({
+  data: {
+    workspaceId: WS_ID,
+    brandName: 'Acme Draw',
+    brandKey: 'acme draw',
+    siteUrl: 'https://acmedraw.example/',
+    industry: '插画生成',
+    competitors: ['Northwind Ink', 'Lumen Sketch', 'Harbor Paint'],
+    userQueries: ['Acme Draw 是什么', '团队用的 AI 插画工具怎么选'],
+    language: 'zh',
+    cadence: 'WEEKLY',
+    cron: '0 4 * * 1',
+    timezone: 'Asia/Shanghai',
+    enabled: true,
+    lastCheckId: latestCheck.id,
+    lastRunAt: latestCheck.finishedAt,
+    lastStatus: latestCheck.status,
+    nextRunAt: nextMonday,
+    runningCheckId: null,
+  },
+})
+await prisma.geoHealthCheck.update({
+  where: { id: latestCheck.id },
+  data: { scheduleId: schedule.id },
+})
+console.log(`✅ Agent 就绪演示审计: ${demoReports.readiness.score} ${demoReports.readiness.grade}`)
+console.log(`✅ Acme Draw 体检: ${acmeSeries.length} 份，最新 ${latestCheck.score} ${latestCheck.grade}；每周一 04:00 复跑（https://acmedraw.example）`)
 
 // === 汇总 ===
 // 注意：KgRelation 没有直接的 workspaceId 字段，通过实体间接归属

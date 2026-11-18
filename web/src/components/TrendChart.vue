@@ -28,7 +28,7 @@ export interface TrendPoint {
   id: string
   date: string
   startedAt: string
-  trigger: 'SCHEDULED' | 'MANUAL' | 'LEGACY'
+  trigger: 'SCHEDULED' | 'MANUAL' | 'LEGACY' | 'HEALTH_CHECK'
   sampleCount: number
   validSamples: number
   failedSamples: number
@@ -67,6 +67,7 @@ function pct(v: number | null): string {
 
 /** 单点的视觉样式：PARTIAL 三角、legacy 菱形、常规圆点 */
 function pointStyle(p: TrendPoint) {
+  if (p.trigger === 'HEALTH_CHECK') return { symbol: 'diamond', symbolSize: 12, itemStyle: { color: '#2080f0' } }
   if (p.status === 'PARTIAL') return { symbol: 'triangle', symbolSize: 11 }
   if (p.legacy) return { symbol: 'diamond', symbolSize: 9 }
   return { symbol: 'circle', symbolSize: 7 }
@@ -127,6 +128,7 @@ const option = computed(() => {
           `有效采样：${p.validSamples}${p.failedSamples > 0 ? ` · 失败 ${p.failedSamples}` : ''}`,
           `N：${p.sampleCount} 次采样`,
           `状态：${statusText[p.status] ?? p.status}`,
+          p.trigger === 'HEALTH_CHECK' ? '来源：GEO 体检（引用快照写入这条趋势）' : '',
           p.slotKey ? `槽位：${p.slotKey}` : '',
           p.legacy ? '<span style="opacity:.7">历史为事件级聚合口径，与 Run 级口径不保证逐日相等</span>' : '',
         ].filter(Boolean)
@@ -189,6 +191,7 @@ const option = computed(() => {
 })
 
 const hasData = computed(() => props.series.some((p) => p[metric.value] !== null))
+const hasHealthCheck = computed(() => props.series.some((p) => p.trigger === 'HEALTH_CHECK'))
 </script>
 
 <template>
@@ -201,6 +204,9 @@ const hasData = computed(() => props.series.some((p) => p[metric.value] !== null
       </NRadioGroup>
     </div>
 
+    <div v-if="hasHealthCheck" style="font-size: 12px; color: var(--text-color-3); margin-bottom: 6px">
+      蓝菱形来自 GEO 体检的引用快照，不是定时监测的 N 次采样。
+    </div>
     <NEmpty v-if="!hasData" description="暂无趋势数据，请先触发一次监测" style="padding: 48px 0" />
     <VChart v-else :option="option" :style="{ height }" autoresize />
   </div>

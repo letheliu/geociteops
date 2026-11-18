@@ -216,5 +216,8 @@ describe('geo health service', () => {
     expect(markdown.content).toContain(String(detail.score))
     const json = await service.exportReport('ws-1', created.id, 'json')
     expect(JSON.parse(json.content).version).toBe(1)
+    const pdf = await service.exportReport('ws-1', created.id, 'pdf')
+    expect(pdf.encoding).toBe('base64')
+    expect(Buffer.from(pdf.content, 'base64').subarray(0, 5).toString()).toBe('%PDF-')
   })
 })

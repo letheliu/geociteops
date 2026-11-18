@@ -53,6 +53,16 @@ const check = await geo.geoHealth.start.mutate({
   siteUrl: 'https://acme.example/',
 })
 const health = await geo.geoHealth.get.query({ id: check.id })
+
+// PDF bytes are base64. Markdown and JSON come back as utf-8 text.
+const pdf = await geo.geoHealth.export.query({ id: check.id, format: 'pdf' })
+
+// Re-run this brand every Monday at 04:00 Asia/Shanghai.
+await geo.geoHealth.saveSchedule.mutate({
+  brandName: 'Acme',
+  siteUrl: 'https://acme.example/',
+  cadence: 'WEEKLY',
+})
 ```
 
 ## Authentication

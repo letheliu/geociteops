@@ -125,7 +125,7 @@ export function renderJson(report: GeoHealthReport): string {
   return JSON.stringify(report, null, 2)
 }
 
-export function exportFilename(report: GeoHealthReport, ext: 'md' | 'json'): string {
+export function exportFilename(report: GeoHealthReport, ext: 'md' | 'json' | 'pdf'): string {
   const day = report.generatedAt.slice(0, 10)
   const slug = report.brandName.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 40) || 'geo-health'
   return `geo-health-${slug}-${day}.${ext}`

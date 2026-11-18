@@ -33,7 +33,7 @@ export interface AggregateEvent {
 }
 
 export type RunStatus = 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED'
-export type RunTrigger = 'SCHEDULED' | 'MANUAL' | 'LEGACY'
+export type RunTrigger = 'SCHEDULED' | 'MANUAL' | 'LEGACY' | 'HEALTH_CHECK'
 
 /** 趋势一次范围的最大天数（规格 §8） */
 export const MAX_TREND_RANGE_DAYS = 366

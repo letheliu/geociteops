@@ -66,11 +66,56 @@ export const geoHealthRouter = router({
   export: protectedProcedure
     .input(z.object({
       id: z.string().min(1),
-      format: z.enum(['markdown', 'json']),
+      format: z.enum(['markdown', 'json', 'pdf']),
     }))
     .query(async ({ ctx, input }) => {
       try {
         return await ctx.services.geoHealth.exportReport(ctx.workspace.id, input.id, input.format)
+      } catch (err) {
+        handleError(err)
+      }
+    }),
+
+  trend: protectedProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(100).optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      return ctx.services.geoHealth.trend(ctx.workspace.id, input?.limit)
+    }),
+
+  schedules: protectedProcedure
+    .query(async ({ ctx }) => {
+      return ctx.services.geoHealth.listSchedules(ctx.workspace.id)
+    }),
+
+  saveSchedule: protectedProcedure
+    .input(startInput.extend({
+      id: z.string().min(1).optional(),
+      cadence: z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'CRON']),
+      cron: z.string().trim().max(80).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await ctx.services.geoHealth.saveSchedule(ctx.workspace.id, input)
+      } catch (err) {
+        handleError(err)
+      }
+    }),
+
+  setScheduleEnabled: protectedProcedure
+    .input(z.object({ id: z.string().min(1), enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await ctx.services.geoHealth.setScheduleEnabled(ctx.workspace.id, input.id, input.enabled)
+      } catch (err) {
+        handleError(err)
+      }
+    }),
+
+  removeSchedule: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await ctx.services.geoHealth.removeSchedule(ctx.workspace.id, input.id)
       } catch (err) {
         handleError(err)
       }

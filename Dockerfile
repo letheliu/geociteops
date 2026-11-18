@@ -50,6 +50,8 @@ COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
 COPY prisma ./prisma
 COPY scripts ./scripts
+# 体检 PDF 的中文字体（约 8MB，见 assets/fonts/SOURCE.txt）。运行时从 /app/assets 读取。
+COPY assets ./assets
 
 # pnpm-workspace.yaml 的 allowBuilds 已放行 prisma / @prisma/client / @zvec/zvec 的构建脚本
 RUN pnpm exec prisma generate
@@ -138,6 +140,8 @@ RUN sed -i 's/\r$//' /app/scripts/docker-entrypoint.sh \
 COPY --from=build /app/scripts ./scripts
 # src 源码：reset-demo / seed-demo 经 tsx 运行时要 import src/core 下的信封与向量模块
 COPY --from=build /app/src ./src
+# 中文字体：PDF 由 pdfkit 在进程内生成，不安装 Chromium，也不装系统 CJK 包。
+COPY --from=build /app/assets ./assets
 
 # 向量库与上传目录：compose 会把命名卷挂到这两个路径
 RUN mkdir -p /app/data/zvec /app/data/uploads
