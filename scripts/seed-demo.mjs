@@ -3,7 +3,7 @@
 // （tsx 运行以支持经信封加解密读写 platformConfig——import 自 src/core/crypto/envelope.ts）
 //
 // 数据叙事（呼应 docs/介绍.md 第三模块「闭环」）：
-//   监测发现 Acme Draw 在 AI 搜索里 SOV 偏低（被虚构竞品 Northstar / Inkloom / Bristle 压制）
+//   监测发现 Acme Draw 在 AI 搜索里 SOV 偏低（被虚构竞品 Northwind Ink / Lumen Sketch / Harbor Paint 压制）
 //   → 内容页面评分不足，生成优化任务
 //   → 生成 Schema.org + llms.txt 结构化信号
 //   → 构建品牌知识图谱
@@ -42,14 +42,15 @@ console.log('🧹 清理该 workspace 的旧演示数据（保证幂等）...')
 await prisma.$transaction([
   prisma.optimizationTask.deleteMany({ where: { workspaceId: WS_ID } }),
   prisma.schemaRecord.deleteMany({ where: { workspaceId: WS_ID } }),
+  // 计划和体检先于 Run 删除：快照 Run 挂在体检上，SetNull 也能删，这里只是把顺序写清楚
+  prisma.geoHealthSchedule.deleteMany({ where: { workspaceId: WS_ID } }),
+  prisma.geoHealthCheck.deleteMany({ where: { workspaceId: WS_ID } }),
+  prisma.agentReadinessAudit.deleteMany({ where: { workspaceId: WS_ID } }),
   prisma.citationEvent.deleteMany({ where: { workspaceId: WS_ID } }),
   // Run 删除会 Cascade 掉挂在其下的采样行；放在 citationEvent 之后是幂等兜底
   prisma.citationRun.deleteMany({ where: { workspaceId: WS_ID } }),
   prisma.citationQuery.deleteMany({ where: { workspaceId: WS_ID } }),
   prisma.contentPage.deleteMany({ where: { workspaceId: WS_ID } }),
-  // 体检和就绪审计不挂在上面那些表上，重置时单独清，避免历史列表越积越长
-  prisma.geoHealthCheck.deleteMany({ where: { workspaceId: WS_ID } }),
-  prisma.agentReadinessAudit.deleteMany({ where: { workspaceId: WS_ID } }),
 ])
 // KgEntity/KgRelation 通过 entity 间接归属，先删关系再删实体
 const oldEntities = await prisma.kgEntity.findMany({ where: { workspaceId: WS_ID }, select: { id: true } })
@@ -60,10 +61,9 @@ if (oldEntities.length > 0) {
 console.log('   已清理')
 
 // === 1. 竞品配置（写入 platformConfig.competitors，信封加密落库）===
-// 竞品都是虚构品牌，域名用保留的 .example，不能落到真实公司：
-// northstar.example、inkloom.example、bristle.example、
-// opencanvas.example、pixelwright.example、huebench.example
-const COMPETITORS = ['Northstar', 'Inkloom', 'Bristle', 'OpenCanvas', 'Pixelwright', 'Huebench']
+// 与 scripts/lib/acme-draw-health.ts、scripts/lib/demo-reports.ts 同一份虚构竞品。
+// 域名都是保留的 .example：northwind.example、lumen.example、harbor.example。
+const COMPETITORS = ['Northwind Ink', 'Lumen Sketch', 'Harbor Paint']
 // 读：信封密文（string 且 isEncryptedConfig）→ 解密出明文 JSON 字符串再 parse；
 //     防御：非信封（旧明文对象）原样处理，null/其他类型归一为空对象
 const rawConfig = ws.platformConfig
@@ -93,7 +93,7 @@ console.log(`✅ 竞品配置已写入（信封加密）: ${COMPETITORS.join(', 
 const QUERIES = [
   { queryText: 'AI 图像生成工具推荐', intentType: 'comparison', cluster: '工具选型', source: 'MANUAL', priority: 1 },
   { queryText: '国内可用的 AI 绘画软件有哪些', intentType: 'comparison', cluster: '工具选型', source: 'GOOGLE_SUGGEST', priority: 1 },
-  { queryText: 'Northstar 中文替代品', intentType: 'comparison', cluster: '工具选型', source: 'COMPETITOR', priority: 2 },
+  { queryText: 'Northwind Ink 有没有可自托管的替代', intentType: 'comparison', cluster: '工具选型', source: 'COMPETITOR', priority: 2 },
   { queryText: 'AI 图像生成怎么用', intentType: 'howto', cluster: '使用教程', source: 'PAA', priority: 2 },
   { queryText: 'Acme Draw 是什么', intentType: 'definitional', cluster: '品牌认知', source: 'MANUAL', priority: 1 },
   { queryText: '免费的 AI 画图工具', intentType: 'comparison', cluster: '工具选型', source: 'GOOGLE_SUGGEST', priority: 2 },
@@ -148,14 +148,14 @@ function seededRandom(seed) {
 
 const sampleAnswers = {
   mentioned: [
-    '推荐几款 AI 图像生成工具：Northstar（northstar.example）以艺术质感著称，Acme Draw 支持中文提示词和画布式编辑，Bristle（bristle.example）适合快速出图。',
-    '在这些工具中，Acme Draw（acmedraw.example）提供多租户 SaaS 和画布编辑；Inkloom（inkloom.example）和 Bristle 也值得关注。',
+    '推荐几款 AI 图像生成工具：Northwind Ink（northwind.example）以艺术质感著称，Acme Draw 支持中文提示词和画布式编辑，Harbor Paint（harbor.example）适合快速出图。',
+    '在这些工具中，Acme Draw（acmedraw.example）提供多租户 SaaS 和画布编辑；Lumen Sketch（lumen.example）和 Harbor Paint 也值得关注。',
     '如果追求中文体验，Acme Draw 支持原生中文提示词，且内置可视化图层编辑器，适合团队协作场景。',
   ],
   notMentioned: [
-    '常见的 AI 图像生成工具包括 Northstar、OpenCanvas（opencanvas.example）、Pixelwright（pixelwright.example），也有 Inkloom、Bristle。',
-    '可以看看 Northstar（艺术风格强）或 OpenCanvas（可自行部署），Bristle 也有不少示例作品。',
-    'Northstar 和 Pixelwright 在图像质量和提示词理解上经常被一起提到。',
+    '常见的 AI 图像生成工具包括 Northwind Ink、Lumen Sketch（lumen.example）、Harbor Paint（harbor.example）。',
+    '可以看看 Northwind Ink（艺术风格强）或 Lumen Sketch（可自行部署），Harbor Paint 也有不少示例作品。',
+    'Northwind Ink 和 Harbor Paint 在图像质量和提示词理解上经常被一起提到。',
   ],
 }
 
@@ -474,7 +474,7 @@ console.log(`✅ OptimizationTask 已填充: ${TASKS.length} 个任务（${TASKS
 // 指标为演示值（不逐点对齐真实 run 聚合），口径字段名与后端一致。
 const CLOSED_LOOP_TASKS = [
   {
-    queryIndex: 2, // 'Northstar 中文替代品'
+    queryIndex: 2, // 'Northwind Ink 有没有可自托管的替代'
     pageIndex: 0,
     status: 'VERIFIED',
     publishedAgoDays: 6,
@@ -487,7 +487,7 @@ const CLOSED_LOOP_TASKS = [
     verifiedMentionRate: 0.42,
     verifiedValidSamples: 24,
     verifiedAgoDays: 1,
-    suggestion: 'Northstar 中文替代品「AI 图像生成工具推荐」下 Acme Draw 的 SOV 仅 12%。建议在首页补齐：价格区间、支持的中文提示词数量、画布编辑能力，并给出「Acme Draw 是一款……」定义句与 2026 年用户规模数据。',
+    suggestion: '「Northwind Ink 有没有可自托管的替代」下 Acme Draw 的 SOV 仅 12%。建议在首页补齐：价格区间、支持的中文提示词数量、画布编辑能力，并给出「Acme Draw 是一款……」定义句与 2026 年用户规模数据。',
     originalContent: '（发布前原文）首页原正文：介绍 Acme Draw 产品与功能。',
   },
   {
@@ -551,7 +551,7 @@ for (const t of CLOSED_LOOP_TASKS) {
           queryText: createdQueries[t.queryIndex].queryText,
           baselineSovMean: t.baselineSovMean,
           baselineMentionRate: t.baselineMentionRate,
-          topCompetitor: 'Northstar',
+          topCompetitor: 'Northwind Ink',
           runId: baselineRun?.id ?? null,
         },
       },
@@ -628,10 +628,10 @@ const SCHEMAS = [
         },
         {
           '@type': 'Question',
-          name: 'Acme Draw 和 Northstar 有什么区别？',
+          name: 'Acme Draw 和 Northwind Ink 有什么区别？',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'Acme Draw 面向国内用户，支持中文提示词、画布式可视化编辑、多租户团队协作和 ComfyUI 工作流集成；Northstar 更侧重艺术风格，需英文提示词且无画布编辑。',
+            text: 'Acme Draw 支持中文提示词、画布式可视化编辑和多租户团队协作；Northwind Ink（northwind.example）更侧重艺术风格，需英文提示词且无画布编辑。',
           },
         },
       ],
@@ -656,9 +656,9 @@ console.log(`✅ SchemaRecord 已填充: ${SCHEMAS.length} 条（${SCHEMAS.map(s
 // === 7. 知识图谱（KgEntity + KgRelation）===
 const ENTITIES = [
   { name: 'Acme Draw', type: 'SoftwareApplication', properties: { url: 'https://acmedraw.example', description: '多租户 AI 图像生成平台', launchDate: '2024', pricingModel: 'Freemium' } },
-  { name: 'Northstar', type: 'SoftwareApplication', properties: { url: 'https://northstar.example', description: '艺术风格 AI 图像生成工具', pricingModel: 'Subscription' } },
-  { name: 'Inkloom', type: 'SoftwareApplication', properties: { url: 'https://inkloom.example', description: '虚构的 AI 图像生成工具' } },
-  { name: 'Bristle', type: 'SoftwareApplication', properties: { url: 'https://bristle.example', description: '虚构的 AI 图像生成工具' } },
+  { name: 'Northwind Ink', type: 'SoftwareApplication', properties: { url: 'https://northwind.example', description: '虚构的艺术风格 AI 图像生成工具', pricingModel: 'Subscription' } },
+  { name: 'Lumen Sketch', type: 'SoftwareApplication', properties: { url: 'https://lumen.example', description: '虚构的 AI 图像生成工具' } },
+  { name: 'Harbor Paint', type: 'SoftwareApplication', properties: { url: 'https://harbor.example', description: '虚构的 AI 图像生成工具' } },
   { name: 'ComfyUI', type: 'Technology', properties: { description: '基于节点的 AI 图像生成工作流引擎' } },
   { name: 'Nuxt 4', type: 'Technology', properties: { description: 'Vue 3 元框架', url: 'https://nuxt.com' } },
   { name: 'Konva.js', type: 'Technology', properties: { description: 'Canvas 可视化图层库' } },
@@ -682,9 +682,9 @@ for (const e of ENTITIES) {
 console.log(`✅ KgEntity 已填充: ${ENTITIES.length} 个实体`)
 
 const RELATIONS = [
-  { from: 'Acme Draw', to: 'Northstar', type: 'competitor', properties: { note: '同为 AI 图像生成赛道' } },
-  { from: 'Acme Draw', to: 'Inkloom', type: 'competitor', properties: {} },
-  { from: 'Acme Draw', to: 'Bristle', type: 'competitor', properties: {} },
+  { from: 'Acme Draw', to: 'Northwind Ink', type: 'competitor', properties: { note: '同为 AI 图像生成赛道' } },
+  { from: 'Acme Draw', to: 'Lumen Sketch', type: 'competitor', properties: {} },
+  { from: 'Acme Draw', to: 'Harbor Paint', type: 'competitor', properties: {} },
   { from: 'Acme Draw', to: 'ComfyUI', type: 'integrates', properties: { note: '集成 ComfyUI 工作流' } },
   { from: 'Acme Draw', to: 'Nuxt 4', type: 'builtWith', properties: {} },
   { from: 'Acme Draw', to: 'Konva.js', type: 'builtWith', properties: {} },
@@ -706,9 +706,15 @@ for (const r of RELATIONS) {
 }
 console.log(`✅ KgRelation 已填充: ${RELATIONS.length} 条关系`)
 
-// === 9. Agent 就绪 + GEO 体检（虚构样本，分数走产品公式）===
+// === 9. 原有的就绪审计 + 一份体检，另加 Acme Draw 的四次体检 ===
+// Acme Draw（https://acmedraw.example）是虚构品牌。四次体检里最新一次比峰值低，
+// 引用快照写进 CitationRun，趋势图上标成体检。每周一 04:00 复跑。
 const { buildDemoReports } = await import('./lib/demo-reports.ts')
+const { buildAcmeDrawSeries } = await import('./lib/acme-draw-health.ts')
+const { persistCitationSnapshot } = await import('../src/modules/geo-health/snapshot.ts')
+const { nextRunAfter } = await import('../src/modules/geo-health/cron.ts')
 const demoReports = buildDemoReports({ generatedAt: new Date(NOW - 2 * 3600000) })
+const acmeSeries = buildAcmeDrawSeries({ now: new Date(NOW) })
 const auditFinished = new Date(NOW - 2 * 3600000)
 const auditStarted = new Date(auditFinished.getTime() - 4000)
 await prisma.agentReadinessAudit.create({
@@ -726,7 +732,7 @@ await prisma.agentReadinessAudit.create({
 })
 const healthFinished = new Date(NOW - 2 * 3600000 + 60_000)
 const healthStarted = new Date(healthFinished.getTime() - 20_000)
-const pillarStamp = {
+const originalStamp = {
   status: 'SUCCEEDED',
   error: null,
   startedAt: healthStarted.toISOString(),
@@ -747,10 +753,10 @@ await prisma.geoHealthCheck.create({
     progress: {
       percent: 100,
       pillars: {
-        agentReadiness: pillarStamp,
-        citations: pillarStamp,
-        citability: pillarStamp,
-        structuredSignals: pillarStamp,
+        agentReadiness: originalStamp,
+        citations: originalStamp,
+        citability: originalStamp,
+        structuredSignals: originalStamp,
       },
     },
     pillarResults: demoReports.health.pillars,
@@ -760,8 +766,86 @@ await prisma.geoHealthCheck.create({
     createdAt: healthStarted,
   },
 })
-console.log(`✅ Agent 就绪演示审计: ${demoReports.readiness.score} ${demoReports.readiness.grade}（虚构样本）`)
-console.log(`✅ GEO 体检演示报告: ${demoReports.health.score} ${demoReports.health.grade}（虚构样本，${demoReports.healthStatus}）`)
+
+let latestCheck = null
+for (const point of acmeSeries) {
+  const healthFinished = new Date(point.generatedAt.getTime() + 60_000)
+  const healthStarted = new Date(healthFinished.getTime() - 20_000)
+  const pillarStamp = {
+    status: 'SUCCEEDED',
+    error: null,
+    startedAt: healthStarted.toISOString(),
+    finishedAt: healthFinished.toISOString(),
+  }
+  const check = await prisma.geoHealthCheck.create({
+    data: {
+      workspaceId: WS_ID,
+      brandName: point.health.brandName,
+      siteUrl: point.health.siteUrl,
+      industry: point.health.industry,
+      competitors: point.competitors,
+      userQueries: point.userQueries,
+      language: 'zh',
+      status: point.healthStatus,
+      trigger: point.trigger,
+      score: point.health.score,
+      grade: point.health.grade,
+      progress: {
+        percent: 100,
+        pillars: {
+          agentReadiness: pillarStamp,
+          citations: pillarStamp,
+          citability: pillarStamp,
+          structuredSignals: pillarStamp,
+        },
+      },
+      pillarResults: point.health.pillars,
+      report: point.health,
+      startedAt: healthStarted,
+      finishedAt: healthFinished,
+      createdAt: healthStarted,
+    },
+  })
+  const citationRunId = await persistCitationSnapshot(prisma, {
+    workspaceId: WS_ID,
+    checkId: check.id,
+    report: point.health,
+    startedAt: healthFinished,
+  })
+  if (citationRunId) {
+    await prisma.geoHealthCheck.update({ where: { id: check.id }, data: { citationRunId } })
+  }
+  latestCheck = check
+  console.log(`   Acme Draw ${point.daysAgo} 天前 ${point.trigger} ${point.health.score} ${point.health.grade}`)
+}
+const nextMonday = nextRunAfter('0 4 * * 1', new Date(NOW))
+const schedule = await prisma.geoHealthSchedule.create({
+  data: {
+    workspaceId: WS_ID,
+    brandName: 'Acme Draw',
+    brandKey: 'acme draw',
+    siteUrl: 'https://acmedraw.example/',
+    industry: '插画生成',
+    competitors: ['Northwind Ink', 'Lumen Sketch', 'Harbor Paint'],
+    userQueries: ['Acme Draw 是什么', '团队用的 AI 插画工具怎么选'],
+    language: 'zh',
+    cadence: 'WEEKLY',
+    cron: '0 4 * * 1',
+    timezone: 'Asia/Shanghai',
+    enabled: true,
+    lastCheckId: latestCheck.id,
+    lastRunAt: latestCheck.finishedAt,
+    lastStatus: latestCheck.status,
+    nextRunAt: nextMonday,
+    runningCheckId: null,
+  },
+})
+await prisma.geoHealthCheck.update({
+  where: { id: latestCheck.id },
+  data: { scheduleId: schedule.id },
+})
+console.log(`✅ Agent 就绪演示审计: ${demoReports.readiness.score} ${demoReports.readiness.grade}`)
+console.log(`✅ Acme Draw 体检: ${acmeSeries.length} 份，最新 ${latestCheck.score} ${latestCheck.grade}；每周一 04:00 复跑（https://acmedraw.example）`)
 
 // === 汇总 ===
 // 注意：KgRelation 没有直接的 workspaceId 字段，通过实体间接归属

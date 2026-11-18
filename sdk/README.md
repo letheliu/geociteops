@@ -9,6 +9,9 @@ mention your brand, optimizes the content those engines can cite, and publishes 
 This package gives you a fully typed client for the workspace API — no hand-written request builders,
 no drift between the server router and your editor.
 
+Coding agents should use [`@geociteops/mcp`](https://github.com/letheliu/geociteops/blob/main/docs/mcp.md)
+instead of calling this client directly. The MCP server is built on `createGeoClient`.
+
 ## Install
 
 ```bash
@@ -50,6 +53,16 @@ const check = await geo.geoHealth.start.mutate({
   siteUrl: 'https://acme.example/',
 })
 const health = await geo.geoHealth.get.query({ id: check.id })
+
+// PDF bytes are base64. Markdown and JSON come back as utf-8 text.
+const pdf = await geo.geoHealth.export.query({ id: check.id, format: 'pdf' })
+
+// Re-run this brand every Monday at 04:00 Asia/Shanghai.
+await geo.geoHealth.saveSchedule.mutate({
+  brandName: 'Acme',
+  siteUrl: 'https://acme.example/',
+  cadence: 'WEEKLY',
+})
 ```
 
 ## Authentication
@@ -69,7 +82,7 @@ wherever you keep secrets.
 | --- | --- | --- |
 | `serviceUrl` | yes | Base URL of your GeoCiteOps API, e.g. `http://localhost:4000` |
 | `apiKey` | yes | Workspace API key |
-| `workspaceId` | no | Convenience default for `x-workspace-id`; can also be passed per call |
+| `workspaceId` | no | Sent as `x-workspace-id`. A workspace API key is already bound to one workspace; the API ignores this header on the API-key channel and uses the key's workspace. |
 
 ## Self-hosting
 

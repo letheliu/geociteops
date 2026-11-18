@@ -34,12 +34,15 @@
     "dotenv": "^16.4.0",
     "fastify": "^4.28.0",
     "fuzzysort": "^3.1.0",
+    "pdfkit": "^0.20.2",
     "pg-boss": "^10.1.0",
     "prisma": "^5.18.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
+    "@types/pdfkit": "^0.17.7",
+    "pdfjs-dist": "^6.5.438",
     "tsx": "^4.16.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"

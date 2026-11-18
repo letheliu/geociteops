@@ -23,6 +23,19 @@ English · [简体中文](./README.zh-CN.md)
 
 GeoCiteOps is a self-hosted **Generative Engine Optimization (GEO)** platform. GEO is the work of making your pages more likely to be quoted by AI answer engines, the way SEO is the work of being found on a results page.
 
+## Use in Claude Code / Cursor
+
+GeoCiteOps runs inside the editor. `@geociteops/mcp` is the MCP server Claude Code, Cursor, and Claude Desktop call. Agent readiness, `llms.txt`, and JSON-LD work with no API key. Health checks, citation runs, rewrites, and the knowledge graph use your workspace key.
+
+```bash
+claude mcp add --transport stdio geociteops \
+  --env GEOCITEOPS_API_URL=http://localhost:4000 \
+  --env GEOCITEOPS_API_KEY=<workspace-api-key> \
+  -- npx -y @geociteops/mcp
+```
+
+Copy [integrations/cursor/mcp.json](./integrations/cursor/mcp.json) into Cursor's `.cursor/mcp.json`. To install the Claude Code skill pack from this repo: `claude plugin marketplace add letheliu/geociteops`, then `claude plugin install geociteops@geociteops`. Tools, prompts, and the other client configs are in [docs/mcp.md](./docs/mcp.md).
+
 ## Demo
 
 The walkthrough brand is **Acme Draw**, a fictional AI image product at `https://acmedraw.example`. The `.example` TLD is reserved, so the site cannot belong to anyone. Nothing in the seed is a live crawl or a live model answer. The scores use the same formulas as a real run (`buildReport`, `conclude`, and the weights in `src/modules/geo-health/weights.ts`). Load it with `pnpm demo:reset`.
@@ -52,7 +65,7 @@ To open the fictional dataset instead of auditing a real site:
 pnpm demo:reset
 ```
 
-Sign in as `demo-viewer` (override with `DEMO_USERNAME`). Set `DEMO_ACCOUNT_PASSWORD` before the first reset if you want to choose the password. If it is unset, the script prints one once and does not store it in plaintext. Setting it later does not change an account that already exists. The console lands on the workspace: overview for share of voice, **GEO 体检** for the health report, **Agent 就绪** for the crawler audit.
+Sign in as `demo-viewer` (override with `DEMO_USERNAME`). Set `DEMO_ACCOUNT_PASSWORD` before the first reset if you want to choose the password. If it is unset, the script prints one once and does not store it in plaintext. Setting it later does not change an account that already exists. The console lands on the workspace: overview for share of voice, **GEO 体检** for the health report, **Agent 就绪** for the crawler audit. The same reset also stores a separate sample for the fictional brand Acme Draw (`https://acmedraw.example`): four checks, a weekly schedule, and a score chart. Blue diamonds on the share-of-voice chart are those Acme Draw snapshots.
 
 ## How it works
 
@@ -91,7 +104,7 @@ Illustrative only. This is how the work is shaped, not a benchmark and not a pri
 
 | Area | What you can do |
 | --- | --- |
-| GEO health check | One form. Four pillars: Agent Readiness, a one-shot citation snapshot, citability of the homepage and a few sitemap pages, and Schema.org / `llms.txt`, plus at most ten actions. See [docs/geo-health.md](./docs/geo-health.md). |
+| GEO health check | One form. Four pillars, at most ten actions, a branded PDF, a daily/weekly/monthly rerun, and the score on a trend chart. The citation snapshot also shows up on the share-of-voice chart, marked as a health check. See [docs/geo-health.md](./docs/geo-health.md). |
 | Agent Readiness | Score one public URL for AI crawlers and answer engines: robots.txt per crawler, `llms.txt`, sitemap, page signals, markdown, and whether a bot user-agent is blocked. See [docs/agent-readiness.md](./docs/agent-readiness.md). |
 | Citation monitoring | The adapters mounted in `src/server.ts`: DeepSeek, Doubao, Qwen, ERNIE, Perplexity, ChatGPT Search, and Gemini. Share of voice, mention rate, citation rate, rank, and a trend of runs. |
 | Content optimization | Atomize a page, score how citable it is, rewrite weak passages, generate FAQ-style answers, and check E-E-A-T. |
@@ -103,6 +116,9 @@ Illustrative only. This is how the work is shaped, not a benchmark and not a pri
 
 ```text
 ┌──────────────────────────────────────────────────────┐
+│ Editors (Claude Code, Cursor, Claude Desktop)        │
+│ @geociteops/mcp — stdio, optional local HTTP         │
+├──────────────────────────────────────────────────────┤
 │ Web Console (Vue 3 + Naive UI + Vite)                │
 │ Dashboard · GEO Health · Query Library · Reports     │
 │ Content · KG · Agent Readiness                       │
@@ -407,6 +423,8 @@ src/
 ├── workers/              # citation scheduler, readiness audit, health check (pg-boss)
 └── router.ts             # root tRPC router
 sdk/                      # typed tRPC client (@geociteops/sdk)
+mcp/                      # MCP server for coding agents (@geociteops/mcp)
+integrations/claude-code/ # Claude Code plugin and skills
 web/                      # Vue 3 console (package name geociteops-web)
 prisma/                   # schema.prisma
 ```
@@ -454,9 +472,10 @@ The repo is MIT. You pay for the computer it runs on and for any engine or LLM A
 - [x] Content atomization, scoring, and rewriting
 - [x] JSON-LD and `llms.txt` generation
 - [x] Agent Readiness audit (robots, llms.txt, sitemap, page signals, markdown, bot access)
-- [x] One-click GEO health check (readiness + citations + citability + structured signals)
+- [x] One-click GEO health check (readiness + citations + citability + structured signals, PDF, schedule, score trend)
 - [x] Knowledge graph extraction and export
 - [x] Containerized one-command deployment (Docker Compose, four services)
+- [x] MCP server for Claude Code, Cursor, and other clients (`@geociteops/mcp`)
 - [x] Closed loop: a weak query → a rewrite suggestion → a human publish → the next run fills in the delta
 - [ ] Register the adapters that are not mounted yet, and richer share-of-voice views
 

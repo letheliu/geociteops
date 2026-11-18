@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "geociteops": {
+      "command": "npx",
+      "args": ["-y", "@geociteops/mcp"],
+      "env": {
+        "GEOCITEOPS_API_URL": "http://localhost:4000",
+        "GEOCITEOPS_API_KEY": "",
+        "GEOCITEOPS_WORKSPACE_ID": ""
+      }
+    }
+  }
+}

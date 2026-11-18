@@ -35,11 +35,12 @@ const ROBOTS_DENIED = new Set([
 const QUERIES = [
   { text: 'Acme Draw 是什么', kind: 'brand' },
   { text: '国内好用的 AI 画图工具有哪些', kind: 'category' },
-  { text: 'Northstar 有没有好用的中文替代', kind: 'comparison' },
+  { text: 'Northwind Ink 有没有可自托管的替代', kind: 'comparison' },
   { text: '免费的 AI 绘画软件推荐', kind: 'category' },
 ]
 
-const COMPETITORS = ['Northstar', 'Inkloom', 'Bristle', 'Huebench']
+// Same three names as scripts/lib/acme-draw-health.ts and scripts/seed-demo.mjs.
+const COMPETITORS = ['Northwind Ink', 'Lumen Sketch', 'Harbor Paint']
 
 /**
  * 每个样本是「一个引擎、一个问题、一次回答」。
@@ -47,14 +48,14 @@ const COMPETITORS = ['Northstar', 'Inkloom', 'Bristle', 'Huebench']
  * share 是该答案里这个名字的精确份额，品牌自己的份额在 sov 字段。
  */
 const SAMPLES = [
-  row('deepseek', 0, { mentioned: true, cited: true, rank: 2, sov: 0.22, urls: ['https://acmedraw.example', 'https://northstar.example'], comps: { Northstar: [1, 0.45], Inkloom: [3, 0.18] } }),
-  row('doubao', 0, { mentioned: true, cited: false, rank: 4, sov: 0.18, urls: ['https://northstar.example'], comps: { Northstar: [1, 0.5], Inkloom: [2, 0.32] } }),
-  row('deepseek', 1, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://inkloom.example'], comps: { Northstar: [1, 0.4], Inkloom: [2, 0.35], Bristle: [3, 0.25] } }),
-  row('doubao', 1, { mentioned: true, cited: false, rank: 5, sov: 0.12, urls: ['https://northstar.example'], comps: { Northstar: [1, 0.48], Bristle: [2, 0.22], Huebench: [4, 0.18] } }),
-  row('deepseek', 2, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://northstar.example'], comps: { Northstar: [1, 0.7], Inkloom: [2, 0.3] } }),
-  row('doubao', 2, { mentioned: false, cited: false, rank: null, sov: 0, urls: [], comps: { Northstar: [1, 0.55], Inkloom: [2, 0.25], Huebench: [3, 0.2] } }),
-  row('deepseek', 3, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://huebench.example'], comps: { Inkloom: [1, 0.4], Huebench: [2, 0.35], Bristle: [3, 0.25] } }),
-  row('doubao', 3, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://huebench.example'], comps: { Huebench: [1, 0.42], Inkloom: [2, 0.33], Bristle: [3, 0.25] } }),
+  row('deepseek', 0, { mentioned: true, cited: true, rank: 2, sov: 0.22, urls: ['https://acmedraw.example', 'https://northwind.example'], comps: { 'Northwind Ink': [1, 0.45], 'Lumen Sketch': [3, 0.18] } }),
+  row('doubao', 0, { mentioned: true, cited: false, rank: 4, sov: 0.18, urls: ['https://northwind.example'], comps: { 'Northwind Ink': [1, 0.5], 'Lumen Sketch': [2, 0.32] } }),
+  row('deepseek', 1, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://lumen.example'], comps: { 'Northwind Ink': [1, 0.4], 'Lumen Sketch': [2, 0.35], 'Harbor Paint': [3, 0.25] } }),
+  row('doubao', 1, { mentioned: true, cited: false, rank: 5, sov: 0.12, urls: ['https://northwind.example'], comps: { 'Northwind Ink': [1, 0.48], 'Harbor Paint': [2, 0.22], 'Lumen Sketch': [4, 0.18] } }),
+  row('deepseek', 2, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://northwind.example'], comps: { 'Northwind Ink': [1, 0.7], 'Lumen Sketch': [2, 0.3] } }),
+  row('doubao', 2, { mentioned: false, cited: false, rank: null, sov: 0, urls: [], comps: { 'Northwind Ink': [1, 0.55], 'Lumen Sketch': [2, 0.25], 'Harbor Paint': [3, 0.2] } }),
+  row('deepseek', 3, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://harbor.example'], comps: { 'Lumen Sketch': [1, 0.4], 'Harbor Paint': [2, 0.35], 'Northwind Ink': [3, 0.25] } }),
+  row('doubao', 3, { mentioned: false, cited: false, rank: null, sov: 0, urls: ['https://harbor.example'], comps: { 'Harbor Paint': [1, 0.42], 'Lumen Sketch': [2, 0.33], 'Northwind Ink': [3, 0.25] } }),
 ]
 
 function row(platform, queryIndex, spec) {

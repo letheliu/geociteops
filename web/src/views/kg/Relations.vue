@@ -107,7 +107,7 @@ const columns: DataTableColumns<any> = [
           <NInput v-model:value="formData.relationType" placeholder="competitor" />
         </NFormItem>
         <NFormItem label="目标实体">
-          <NInput v-model:value="formData.toName" placeholder="Northstar" />
+          <NInput v-model:value="formData.toName" placeholder="Northwind Ink" />
         </NFormItem>
         <NFormItem label="属性 (JSON)">
           <NInput v-model:value="formData.properties" type="textarea" :rows="3" placeholder="{}" />

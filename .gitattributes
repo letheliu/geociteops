@@ -5,5 +5,7 @@
 # 高危文件显式兜底（shebang 对 \r 零容忍）
 *.sh text eol=lf
 Dockerfile text eol=lf
+*.otf binary
+*.ttf binary
 web/Dockerfile text eol=lf
 web/nginx.conf text eol=lf

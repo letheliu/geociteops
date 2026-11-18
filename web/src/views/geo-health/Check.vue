@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import {
-  NButton, NCard, NDataTable, NGrid, NGridItem, NInput, NProgress, NRadioButton, NRadioGroup,
-  NSpace, NSpin, NTag, NText, useMessage,
+  NButton, NCard, NDataTable, NGrid, NGridItem, NInput, NPopconfirm, NProgress, NRadioButton, NRadioGroup,
+  NSpace, NSpin, NSwitch, NTag, NText, useMessage,
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import PageHeader from '../../components/common/PageHeader.vue'
+import GeoScoreChart, { type GeoScorePoint } from '../../components/GeoScoreChart.vue'
 import { trpc } from '../../composables/useTrpc'
 
 type Detail = Awaited<ReturnType<typeof trpc.geoHealth.get.query>>
 type Summary = Awaited<ReturnType<typeof trpc.geoHealth.list.query>>[number]
 type Report = NonNullable<Detail['report']>
+type Schedule = Awaited<ReturnType<typeof trpc.geoHealth.schedules.query>>[number]
+type Cadence = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CRON'
 
 const message = useMessage()
 const brandName = ref('')
@@ -19,9 +22,15 @@ const industry = ref('')
 const competitorsText = ref('')
 const queriesText = ref('')
 const language = ref<'auto' | 'zh' | 'en'>('auto')
+const cadence = ref<Cadence>('WEEKLY')
+const cronText = ref('0 4 * * 1')
+const selectedScheduleId = ref<string | null>(null)
 const starting = ref(false)
 const saving = ref(false)
+const savingSchedule = ref(false)
 const history = ref<Summary[]>([])
+const schedules = ref<Schedule[]>([])
+const scorePoints = ref<GeoScorePoint[]>([])
 const current = ref<Detail | null>(null)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -46,6 +55,13 @@ const STATUS_LABEL: Record<string, string> = {
   warn: '警告',
   fail: '未通过',
   unknown: '未知',
+}
+
+const CADENCE_LABEL: Record<string, string> = {
+  DAILY: '每天 04:00',
+  WEEKLY: '每周一 04:00',
+  MONTHLY: '每月 1 日 04:00',
+  CRON: '自定义',
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -98,8 +114,7 @@ function stopPolling() {
   }
 }
 
-function downloadText(filename: string, content: string, mime: string) {
-  const blob = new Blob([content], { type: mime })
+function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
@@ -108,8 +123,33 @@ function downloadText(filename: string, content: string, mime: string) {
   URL.revokeObjectURL(url)
 }
 
+function downloadText(filename: string, content: string, mime: string) {
+  downloadBlob(filename, new Blob([content], { type: mime }))
+}
+
+function downloadBase64(filename: string, content: string, mime: string) {
+  const binary = atob(content)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+  downloadBlob(filename, new Blob([bytes], { type: mime }))
+}
+
+function when(value: string | null | undefined): string {
+  if (!value) return '—'
+  return new Date(value).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+}
+
 async function loadHistory() {
   history.value = await trpc.geoHealth.list.query({ limit: 20 })
+}
+
+async function loadSchedules() {
+  schedules.value = await trpc.geoHealth.schedules.query()
+}
+
+async function loadTrend() {
+  const result = await trpc.geoHealth.trend.query({ limit: 30 })
+  scorePoints.value = result.points
 }
 
 async function loadCheck(id: string, poll: boolean) {
@@ -117,7 +157,7 @@ async function loadCheck(id: string, poll: boolean) {
   current.value = row
   if (row.status === 'SUCCEEDED' || row.status === 'PARTIAL' || row.status === 'FAILED') {
     stopPolling()
-    await loadHistory()
+    await Promise.all([loadHistory(), loadTrend()])
     return
   }
   if (poll && !pollTimer) {
@@ -165,13 +205,85 @@ async function saveQueries() {
   }
 }
 
-async function exportReport(format: 'markdown' | 'json') {
+async function exportReport(format: 'markdown' | 'json' | 'pdf') {
   if (!current.value) return
   try {
     const file = await trpc.geoHealth.export.query({ id: current.value.id, format })
-    downloadText(file.filename, file.content, file.mime)
+    if (file.encoding === 'base64') downloadBase64(file.filename, file.content, file.mime)
+    else downloadText(file.filename, file.content, file.mime)
   } catch (err: unknown) {
     message.error(err instanceof Error ? err.message : '导出失败')
+  }
+}
+
+function formPayload() {
+  return {
+    brandName: brandName.value.trim(),
+    siteUrl: siteUrl.value.trim(),
+    ...(industry.value.trim() ? { industry: industry.value.trim() } : {}),
+    ...(linesOf(competitorsText.value).length > 0 ? { competitors: linesOf(competitorsText.value).slice(0, 8) } : {}),
+    ...(linesOf(queriesText.value).length > 0 ? { queries: linesOf(queriesText.value).slice(0, 10) } : {}),
+    language: language.value,
+  }
+}
+
+async function saveSchedule() {
+  if (!brandName.value.trim() || !siteUrl.value.trim()) {
+    message.warning('请填写品牌名和官网')
+    return
+  }
+  if (cadence.value === 'CRON' && !cronText.value.trim()) {
+    message.warning('请填写 cron')
+    return
+  }
+  savingSchedule.value = true
+  try {
+    const saved = await trpc.geoHealth.saveSchedule.mutate({
+      ...(selectedScheduleId.value ? { id: selectedScheduleId.value } : {}),
+      ...formPayload(),
+      cadence: cadence.value,
+      ...(cadence.value === 'CRON' ? { cron: cronText.value.trim() } : {}),
+    })
+    selectedScheduleId.value = saved.id
+    message.success('已保存体检计划')
+    await loadSchedules()
+  } catch (err: unknown) {
+    message.error(err instanceof Error ? err.message : '没有保存计划')
+  } finally {
+    savingSchedule.value = false
+  }
+}
+
+function fillFromSchedule(row: Schedule) {
+  selectedScheduleId.value = row.id
+  brandName.value = row.brandName
+  siteUrl.value = row.siteUrl
+  industry.value = row.industry ?? ''
+  competitorsText.value = row.competitors.join('\n')
+  queriesText.value = row.userQueries.join('\n')
+  language.value = row.language
+  cadence.value = row.cadence
+  cronText.value = row.cron
+}
+
+async function toggleSchedule(row: Schedule, enabled: boolean) {
+  try {
+    await trpc.geoHealth.setScheduleEnabled.mutate({ id: row.id, enabled })
+    await loadSchedules()
+  } catch (err: unknown) {
+    message.error(err instanceof Error ? err.message : '没有改成')
+    await loadSchedules()
+  }
+}
+
+async function removeSchedule(id: string) {
+  try {
+    await trpc.geoHealth.removeSchedule.mutate({ id })
+    if (selectedScheduleId.value === id) selectedScheduleId.value = null
+    message.success('已删除计划，已有报告还在')
+    await loadSchedules()
+  } catch (err: unknown) {
+    message.error(err instanceof Error ? err.message : '没有删除')
   }
 }
 
@@ -223,6 +335,12 @@ const historyColumns: DataTableColumns<Summary> = [
     width: 90,
     render: (row) => row.score == null ? '—' : `${row.score} ${row.grade ?? ''}`,
   },
+  {
+    title: '来源',
+    key: 'trigger',
+    width: 80,
+    render: (row) => row.trigger === 'SCHEDULED' ? '定时' : '手动',
+  },
 ]
 
 function historyRowProps(row: Summary) {
@@ -250,7 +368,9 @@ onMounted(async () => {
     // 品牌和域名只是输入框的默认值
   }
   try {
-    await loadHistory()
+    await Promise.all([loadHistory(), loadSchedules(), loadTrend()])
+    const newest = history.value.find((row) => row.status === 'SUCCEEDED' || row.status === 'PARTIAL')
+    if (newest) await loadCheck(newest.id, false)
   } catch (err: unknown) {
     message.error(err instanceof Error ? err.message : '无法加载历史记录')
   }
@@ -290,7 +410,7 @@ onUnmounted(stopPolling)
         </NGridItem>
         <NGridItem span="2 m:1">
           <NText depth="3" style="font-size: 12px">竞品（可选，每行一个或用逗号分隔，最多 8 个）</NText>
-          <NInput v-model:value="competitorsText" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="Northstar" :disabled="starting" />
+          <NInput v-model:value="competitorsText" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="Northwind Ink" :disabled="starting" />
         </NGridItem>
         <NGridItem span="2 m:1">
           <NText depth="3" style="font-size: 12px">目标问题（可选。留空则自动生成 5–8 个起步问题）</NText>
@@ -301,6 +421,43 @@ onUnmounted(stopPolling)
         <NButton type="primary" :loading="starting" @click="startCheck">开始体检</NButton>
         <NText depth="3" style="font-size: 12px">后台分四步跑。某一步失败不会让整份报告作废。没配凭证的引擎会跳过并写进报告。</NText>
       </NSpace>
+    </NCard>
+
+    <NCard title="定时复跑" style="margin-bottom: 16px">
+      <NText depth="3" style="display: block; margin-bottom: 12px; font-size: 13px">
+        按上面的品牌和官网保存一份计划。每天、每周、每月，或一段至少间隔 1 小时的 cron。时区是 Asia/Shanghai，和监测一样。每次跑完都是历史里的一份新报告。正在跑的时候不会再开一份。用的是这个工作区自己的引擎凭证。
+      </NText>
+      <NSpace align="center" style="margin-bottom: 12px">
+        <NRadioGroup v-model:value="cadence">
+          <NRadioButton value="DAILY">每天</NRadioButton>
+          <NRadioButton value="WEEKLY">每周</NRadioButton>
+          <NRadioButton value="MONTHLY">每月</NRadioButton>
+          <NRadioButton value="CRON">Cron</NRadioButton>
+        </NRadioGroup>
+        <NInput v-if="cadence === 'CRON'" v-model:value="cronText" placeholder="0 4 * * 1" style="width: 180px" />
+        <NButton :loading="savingSchedule" @click="saveSchedule">保存计划</NButton>
+      </NSpace>
+      <div v-if="schedules.length === 0">
+        <NText depth="3">还没有计划。</NText>
+      </div>
+      <div v-for="row in schedules" :key="row.id" style="display: flex; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--divider-color); font-size: 13px">
+        <div style="flex: 1; cursor: pointer" @click="fillFromSchedule(row)">
+          <div>{{ row.brandName }} · {{ row.cadence === 'CRON' ? row.cron : CADENCE_LABEL[row.cadence] }}</div>
+          <NText depth="3" style="font-size: 12px">下次 {{ when(row.nextRunAt) }} · 上次 {{ when(row.lastRunAt) }} {{ row.lastStatus ? STATUS_LABEL[row.lastStatus] : '' }}</NText>
+        </div>
+        <NSwitch :value="row.enabled" @update:value="(value) => toggleSchedule(row, value)" />
+        <NPopconfirm @positive-click="removeSchedule(row.id)">
+          <template #trigger>
+            <NButton size="tiny" quaternary type="error">删除</NButton>
+          </template>
+          删除这份计划？已经生成的报告还在。
+        </NPopconfirm>
+      </div>
+    </NCard>
+
+    <NCard title="GEO 分数趋势" style="margin-bottom: 16px">
+      <NText depth="3" style="display: block; margin-bottom: 8px; font-size: 12px">一次体检一个点，含总分和四根支柱。</NText>
+      <GeoScoreChart :points="scorePoints" />
     </NCard>
 
     <NSpin :show="busy">
@@ -335,10 +492,38 @@ onUnmounted(stopPolling)
             <NSpace>
               <NButton @click="exportReport('markdown')">导出 Markdown</NButton>
               <NButton @click="exportReport('json')">导出 JSON</NButton>
+              <NButton @click="exportReport('pdf')">导出 PDF</NButton>
               <NButton type="primary" secondary :loading="saving" @click="saveQueries">保存问题到查询库</NButton>
             </NSpace>
           </NSpace>
           <NText depth="3" style="display: block; margin-top: 12px; font-size: 12px">{{ report.weighting.notes.zh }}</NText>
+        </NCard>
+
+        <NCard v-if="current?.diff" title="和上次相比" style="margin-bottom: 16px">
+          <NText>
+            {{ current.diff.previousScore }} {{ current.diff.previousGrade }}
+            → {{ current.diff.currentScore }} {{ current.diff.currentGrade }}
+            （{{ current.diff.scoreDelta > 0 ? '+' : '' }}{{ current.diff.scoreDelta }}）
+          </NText>
+          <NText depth="3" style="display: block; margin-top: 4px; font-size: 12px">上次是 {{ when(current.diff.previousAt) }}</NText>
+          <div v-for="item in current.diff.pillars" :key="item.pillar" style="display: flex; gap: 12px; padding: 4px 0; font-size: 13px">
+            <span style="flex: 1">{{ PILLAR_NAME[item.pillar] }}</span>
+            <span>{{ item.previous ?? '—' }} → {{ item.current ?? '—' }}</span>
+            <NTag v-if="item.delta != null && item.delta < 0" size="small" type="error" :bordered="false">退步 {{ item.delta }}</NTag>
+            <NTag v-else-if="item.delta != null && item.delta > 0" size="small" type="success" :bordered="false">+{{ item.delta }}</NTag>
+          </div>
+          <div v-if="current.diff.newActions.length" style="margin-top: 8px">
+            <NText strong style="font-size: 13px">新出现</NText>
+            <div v-for="item in current.diff.newActions" :key="item.id" style="font-size: 13px">{{ item.title.zh }}</div>
+          </div>
+          <div v-if="current.diff.resolvedActions.length" style="margin-top: 8px">
+            <NText strong style="font-size: 13px">上次有、这次没有</NText>
+            <div v-for="item in current.diff.resolvedActions" :key="item.id" style="font-size: 13px">{{ item.title.zh }}</div>
+          </div>
+          <div v-if="current.diff.regressedActions.length" style="margin-top: 8px">
+            <NText strong style="font-size: 13px">影响变高了</NText>
+            <div v-for="item in current.diff.regressedActions" :key="item.id" style="font-size: 13px">{{ item.title.zh }}</div>
+          </div>
         </NCard>
 
         <NGrid :cols="2" :x-gap="16" :y-gap="16" responsive="screen" item-responsive style="margin-bottom: 16px">

@@ -1,0 +1,8 @@
+Noto Sans SC Regular, subset OTF (Simplified Chinese).
+Upstream: https://github.com/notofonts/noto-cjk (Sans/SubsetOTF/SC/NotoSansSC-Regular.otf)
+License: SIL Open Font License 1.1, see OFL.txt in this directory.
+
+Bundled so a GEO health PDF can draw Chinese text inside the API image.
+The file is about 8 MB uncompressed. pdfkit subsets the glyphs actually used,
+so one report is typically well under 1 MB. The image does not install
+Chromium or a system CJK font package.

@@ -1,6 +1,6 @@
 # 给程序员的 GEO 开发指南（示例站点 acmedraw.example）
 
-示例品牌是虚构的 **Acme Draw**。站点 `https://acmedraw.example` 用的是保留顶级域 `.example`，不可能属于任何真实产品。下面的竞品（Northstar）同样是虚构的。
+示例品牌是虚构的 **Acme Draw**。站点 `https://acmedraw.example` 用的是保留顶级域 `.example`，不可能属于任何真实产品。下面的竞品（Northwind Ink、Lumen Sketch、Harbor Paint）同样是虚构的，站点分别是 `northwind.example`、`lumen.example`、`harbor.example`。
 
 既然你是程序员、有自己的产品域名、想自己开发 GEO 工具，那我给你一套**真正可落地的**技术路线，而不是营销话术。
 
@@ -181,7 +181,7 @@ CREATE INDEX ON citation_events USING ivfflat (embedding vector_cosine_ops);
 
 ## 常见问答
 - Q: Acme Draw 解决什么问题？A: ...
-- Q: 跟 Northstar 的差异？A: ...
+- Q: 跟 Northwind Ink 的差异？A: ...
 
 ## 更新频率
 - 文档：每周
@@ -238,8 +238,8 @@ def build_kg():
     g.add((EX.acme_draw, SCHEMA.name, Literal("Acme Draw")))
     g.add((EX.acme_draw, SCHEMA.featureList, EX.feature_knowledge_graph))
 
-    # 与虚构竞品建立关系（northstar.example，不是真实公司）
-    g.add((EX.acme_draw, SCHEMA competitor, EX.northstar))
+    # 与虚构竞品建立关系（northwind.example，不是真实公司）
+    g.add((EX.acme_draw, SCHEMA competitor, EX.northwind_ink))
     g.add((EX.acme_draw, SCHEMA.audience, EX.startup_founder))
 
 
@@ -263,7 +263,7 @@ def build_kg():
 # 实验：在 5 个 AI 平台问 50 个 query，记录引用情况
 queries = [
     "AI image tools with a canvas editor",
-    "alternative to Northstar",
+    "alternative to Northwind Ink",
     "what is Acme Draw",
     # ... 50 个
 ]

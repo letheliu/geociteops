@@ -23,6 +23,19 @@
 
 GeoCiteOps 是一套可自托管的**生成式引擎优化（Generative Engine Optimization，GEO）**平台。GEO 做的是让页面更容易被 AI 回答引擎引用，就像 SEO 做的是让页面出现在搜索结果里。
 
+## 在 Claude Code / Cursor 里使用
+
+GeoCiteOps 可以直接跑在编辑器里。`@geociteops/mcp` 是 Claude Code、Cursor 和 Claude Desktop 调用的 MCP 服务。不配 API Key 时，Agent 就绪、`llms.txt` 和 JSON-LD 在本机运行。体检、引用监测、改写和知识图谱使用工作区 Key。
+
+```bash
+claude mcp add --transport stdio geociteops \
+  --env GEOCITEOPS_API_URL=http://localhost:4000 \
+  --env GEOCITEOPS_API_KEY=<工作区 API Key> \
+  -- npx -y @geociteops/mcp
+```
+
+把 [integrations/cursor/mcp.json](./integrations/cursor/mcp.json) 拷进 Cursor 的 `.cursor/mcp.json`。从本仓库安装 Claude Code 技能包：`claude plugin marketplace add letheliu/geociteops`，然后 `claude plugin install geociteops@geociteops`。工具、提示词和其他客户端配置见 [docs/mcp.md](./docs/mcp.md)。
+
 ## 演示
 
 演示品牌是 **Acme Draw**，一个虚构的 AI 画图产品，站点是 `https://acmedraw.example`。`.example` 是保留顶级域，这个地址不可能属于任何真实产品。种子里没有真实抓取，也没有模型的真实回答。分数用的是正式运行的同一套公式（`buildReport`、`conclude`，以及 `src/modules/geo-health/weights.ts` 里的权重）。用 `pnpm demo:reset` 装进去。
@@ -52,7 +65,7 @@ GeoCiteOps 是一套可自托管的**生成式引擎优化（Generative Engine O
 pnpm demo:reset
 ```
 
-用 `demo-viewer` 登录（可用 `DEMO_USERNAME` 改名）。想自己定密码，就在第一次重置之前设 `DEMO_ACCOUNT_PASSWORD`。没设的话，脚本会把密码打印一次，库里不存明文。账号已经存在之后再设，不会改掉旧密码。进工作区之后：概览看声量，**GEO 体检**看报告，**Agent 就绪**看爬虫审计。
+用 `demo-viewer` 登录（可用 `DEMO_USERNAME` 改名）。想自己定密码，就在第一次重置之前设 `DEMO_ACCOUNT_PASSWORD`。没设的话，脚本会把密码打印一次，库里不存明文。账号已经存在之后再设，不会改掉旧密码。进工作区之后：概览看声量，**GEO 体检**看报告，**Agent 就绪**看爬虫审计。同一次重置另外放了虚构品牌 Acme Draw（`https://acmedraw.example`）的样本：四份体检、一份每周计划和一条分数趋势。声量图上的蓝菱形是这些 Acme Draw 快照。
 
 ## 它怎么工作
 
@@ -91,7 +104,7 @@ flowchart LR
 
 | 模块 | 你能做什么 |
 | --- | --- |
-| GEO 体检 | 一张表单。四根支柱：Agent 就绪、一轮引用快照、首页和少量站点地图页面的可引用性、Schema.org / `llms.txt`，外加最多十条行动。见 [docs/geo-health.md](./docs/geo-health.md)。 |
+| GEO 体检 | 一张表单。四根支柱、最多十条行动、一份带品牌的 PDF、按天/周/月复跑，以及分数趋势。引用快照会出现在声量趋势上，并标明来自体检。见 [docs/geo-health.md](./docs/geo-health.md)。 |
 | Agent 就绪 | 给一个公开 URL 打分：按爬虫看 robots.txt、`llms.txt`、站点地图、页面信号、Markdown，以及机器人 User-Agent 是否被拦。见 [docs/agent-readiness.md](./docs/agent-readiness.md)。 |
 | 引用监测 | `src/server.ts` 里挂上的适配器：DeepSeek、豆包、通义千问、文心一言、Perplexity、ChatGPT Search、Gemini。声量份额、提及率、引用率、排名，以及按运行画出的趋势。 |
 | 内容优化 | 把页面拆成原子、给可引用性打分、改写薄弱段落、生成 FAQ 风格答案，并做 E-E-A-T 检查。 |
@@ -103,6 +116,9 @@ flowchart LR
 
 ```text
 ┌──────────────────────────────────────────────────────┐
+│ 编辑器（Claude Code、Cursor、Claude Desktop）        │
+│ @geociteops/mcp — stdio，可选本地 HTTP               │
+├──────────────────────────────────────────────────────┤
 │ Web 控制台（Vue 3 + Naive UI + Vite）                │
 │ 仪表盘 · GEO 体检 · 查询库 · 引用报告 · 内容优化     │
 │ 知识图谱 · Agent 就绪                                │
@@ -406,6 +422,8 @@ src/
 ├── workers/              # 引用调度器、就绪审计、体检（pg-boss）
 └── router.ts             # 根 tRPC 路由
 sdk/                      # 类型化 tRPC 客户端（@geociteops/sdk）
+mcp/                      # 给编程助手用的 MCP 服务（@geociteops/mcp）
+integrations/claude-code/ # Claude Code 插件和技能
 web/                      # Vue 3 控制台（包名 geociteops-web）
 prisma/                   # schema.prisma
 ```
@@ -453,9 +471,10 @@ pnpm test:watch
 - [x] 内容原子化、评分与改写
 - [x] JSON-LD 与 `llms.txt` 生成
 - [x] Agent 就绪审计（robots、llms.txt、站点地图、页面信号、Markdown、爬虫可访问性）
-- [x] 一键 GEO 体检（就绪 + 引用 + 可引用性 + 结构化信号）
+- [x] 一键 GEO 体检（就绪 + 引用 + 可引用性 + 结构化信号，PDF、定时复跑、分数趋势）
 - [x] 知识图谱抽取与导出
 - [x] 容器化一键部署（Docker Compose 四服务）
+- [x] 给 Claude Code、Cursor 和其他客户端用的 MCP 服务（`@geociteops/mcp`）
 - [x] 闭环：监测发现薄弱点 → 改写建议 → 人工发布 → 下一次运行回填 Δ
 - [ ] 把尚未注册的适配器接上，以及更细的声量分析
 

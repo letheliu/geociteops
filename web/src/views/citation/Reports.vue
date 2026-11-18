@@ -248,6 +248,7 @@ const triggerLabel: Record<string, string> = {
   SCHEDULED: '定时',
   MANUAL: '手动',
   LEGACY: '历史',
+  HEALTH_CHECK: '体检',
 }
 
 const columns: DataTableColumns<any> = [
@@ -264,7 +265,7 @@ const columns: DataTableColumns<any> = [
     key: 'trigger',
     width: 90,
     render(row) {
-      return h(NTag, { size: 'small', type: 'default' }, { default: () => triggerLabel[row.trigger] ?? row.trigger })
+      return h(NTag, { size: 'small', type: row.trigger === 'HEALTH_CHECK' ? 'info' : 'default' }, { default: () => triggerLabel[row.trigger] ?? row.trigger })
     },
   },
   {
@@ -400,7 +401,7 @@ const columns: DataTableColumns<any> = [
             <NTag size="small" :type="(statusMeta[detail.status]?.type ?? 'default')">
               {{ statusMeta[detail.status]?.label ?? detail.status }}
             </NTag>
-            <NTag size="small" type="default">{{ triggerLabel[detail.trigger] ?? detail.trigger }}</NTag>
+            <NTag size="small" :type="detail.trigger === 'HEALTH_CHECK' ? 'info' : 'default'">{{ triggerLabel[detail.trigger] ?? detail.trigger }}</NTag>
             <span style="font-size: 12px; color: var(--text-color-3)">
               N={{ detail.sampleCount }} · 有效 {{ detail.validSamples }}
               <template v-if="detail.failedSamples > 0"> · 失败 {{ detail.failedSamples }}</template>
