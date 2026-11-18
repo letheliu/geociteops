@@ -9,10 +9,10 @@ describe('GeminiAdapter', () => {
         new Response(
           JSON.stringify({
             candidates: [{
-              content: { parts: [{ text: 'zoomer AI ' }, { text: '是设计工具' }] },
+              content: { parts: [{ text: 'Acme Draw ' }, { text: '是设计工具' }] },
               groundingMetadata: {
                 groundingChunks: [
-                  { web: { uri: 'https://zoomer.top', title: 'Zoomer AI 官网' } },
+                  { web: { uri: 'https://acmedraw.example', title: 'Acme Draw 官网' } },
                   { web: { uri: 'https://example.com', title: '设计工具' } },
                 ],
               },
@@ -28,10 +28,10 @@ describe('GeminiAdapter', () => {
   it('拼接答案并从 groundingChunks 提取引用', async () => {
     const adapter = new GeminiAdapter()
     const result = await adapter.query('AI工具', { GEMINI_API_KEY: 'gem-test' })
-    expect(result.answer).toBe('zoomer AI 是设计工具')
+    expect(result.answer).toBe('Acme Draw 是设计工具')
     expect(result.sourceCitations).toHaveLength(2)
-    expect(result.sourceCitations[0].url).toBe('https://zoomer.top')
-    expect(result.sourceCitations[0].title).toBe('Zoomer AI 官网')
+    expect(result.sourceCitations[0].url).toBe('https://acmedraw.example')
+    expect(result.sourceCitations[0].title).toBe('Acme Draw 官网')
     expect(result.sourceCitations[0].sourceType).toBe('grounding')
   })
 

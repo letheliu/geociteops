@@ -15,19 +15,19 @@ describe('ContentAtomizer', () => {
     const llmResponse = JSON.stringify({
       atoms: [
         {
-          text: 'zoomer AI 在 2024 年获得了 50 万用户',
-          subject: 'zoomer AI',
+          text: 'Acme Draw 在 2024 年获得了 50 万用户',
+          subject: 'Acme Draw',
           predicate: '获得了',
           object: '50 万用户',
           anchors: ['2024年', '50万'],
-          definition: 'zoomer AI 是一款 AI 设计工具',
+          definition: 'Acme Draw 是一款 AI 设计工具',
         },
       ],
     })
     const atomizer = createAtomizer(mockLlm(llmResponse))
     const atoms = await atomizer.atomize('原始内容')
     expect(atoms).toHaveLength(1)
-    expect(atoms[0].subject).toBe('zoomer AI')
+    expect(atoms[0].subject).toBe('Acme Draw')
     expect(atoms[0].anchors).toContain('2024年')
   })
 

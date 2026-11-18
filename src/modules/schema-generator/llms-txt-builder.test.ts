@@ -6,7 +6,7 @@ describe('LlmsTxtBuilder', () => {
 
   it('build 返回 content 和 warnings', () => {
     const result = builder.build({
-      brandName: 'zoomer AI',
+      brandName: 'Acme Draw',
       tagline: 'AI 设计工具',
       sections: [
         {
@@ -18,14 +18,14 @@ describe('LlmsTxtBuilder', () => {
       ],
     })
 
-    expect(result.content).toContain('# zoomer AI')
+    expect(result.content).toContain('# Acme Draw')
     expect(result.warnings).toHaveLength(1)
     expect(result.warnings[0]).toContain('No major AI search system')
   })
 
   it('buildRaw 输出标准 markdown 格式', () => {
     const md = builder.buildRaw({
-      brandName: 'zoomer AI',
+      brandName: 'Acme Draw',
       tagline: 'AI 设计工具',
       sections: [
         {
@@ -38,14 +38,14 @@ describe('LlmsTxtBuilder', () => {
         {
           title: '常见问答',
           items: [
-            { label: 'Q1: 什么是 zoomer AI?', url: '#', description: 'A: 是一款 AI 设计工具' },
+            { label: 'Q1: 什么是 Acme Draw?', url: '#', description: 'A: 是一款 AI 设计工具' },
           ],
         },
       ],
       updateFrequency: { docs: '每周', blog: '每周 2 篇' },
     })
 
-    expect(md).toContain('# zoomer AI')
+    expect(md).toContain('# Acme Draw')
     expect(md).toContain('> AI 设计工具')
     expect(md).toContain('## 核心产品')
     expect(md).toContain('- [白模生图](https://example.com/feature-1): 一键生成白模线稿')
@@ -57,7 +57,7 @@ describe('LlmsTxtBuilder', () => {
 
   it('buildRaw 不传 updateFrequency 时跳过该 section', () => {
     const md = builder.buildRaw({
-      brandName: 'zoomer AI',
+      brandName: 'Acme Draw',
       tagline: 'AI 设计工具',
       sections: [{ title: '核心产品', items: [] }],
     })
@@ -66,17 +66,17 @@ describe('LlmsTxtBuilder', () => {
 
   it('buildRaw 空 sections 时仍输出品牌行', () => {
     const md = builder.buildRaw({
-      brandName: 'zoomer',
+      brandName: 'acme',
       tagline: 't',
       sections: [],
     })
-    expect(md).toContain('# zoomer')
+    expect(md).toContain('# acme')
     expect(md).toContain('> t')
   })
 
   it('parseMarkdown 回读 buildRaw 结果', () => {
     const original = {
-      brandName: 'zoomer AI',
+      brandName: 'Acme Draw',
       tagline: 'AI 设计工具',
       sections: [
         {
@@ -88,7 +88,7 @@ describe('LlmsTxtBuilder', () => {
     const md = builder.buildRaw(original)
     const parsed = builder.parseMarkdown(md)
     expect(parsed).not.toBeNull()
-    expect(parsed!.brandName).toBe('zoomer AI')
+    expect(parsed!.brandName).toBe('Acme Draw')
     expect(parsed!.tagline).toBe('AI 设计工具')
     expect(parsed!.sections[0].items[0].url).toBe('https://x.com')
   })

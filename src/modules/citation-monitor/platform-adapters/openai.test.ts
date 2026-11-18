@@ -11,7 +11,7 @@ describe('OpenAiAdapter', () => {
             choices: [
               {
                 message: {
-                  content: '推荐 zoomer AI 和 Figma。详情见 https://zoomer.top',
+                  content: '推荐 Acme Draw 和 Figma。详情见 https://acmedraw.example',
                 },
               },
             ],
@@ -29,7 +29,7 @@ describe('OpenAiAdapter', () => {
       OPENAI_API_KEY: 'sk-test',
       OPENAI_BASE_URL: 'https://api.openai.com/v1',
     })
-    expect(result.answer).toContain('zoomer AI')
+    expect(result.answer).toContain('Acme Draw')
   })
 
   it('从答案提取 URL 作为 sourceCitations（answer_url 类型）', async () => {
@@ -37,7 +37,7 @@ describe('OpenAiAdapter', () => {
     const result = await adapter.query('AI设计工具', { OPENAI_API_KEY: 'sk-test' })
     expect(result.sourceCitations.length).toBeGreaterThan(0)
     expect(result.sourceCitations[0]).toMatchObject({
-      url: 'https://zoomer.top',
+      url: 'https://acmedraw.example',
       sourceType: 'answer_url',
     })
   })

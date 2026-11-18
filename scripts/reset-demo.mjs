@@ -4,7 +4,7 @@
 // 职责三条（缺一不可，别拆散到别处——这部分一度是 tribal knowledge）：
 //   ① 幂等确保演示企业 + 演示工作区 + 演示账号（ORG_VIEWER）存在。
 //      seed-demo.mjs 是 findFirst 复用已有 workspace 的脚本，它**不建**企业/账号；
-//      全新 compose 栈里没有 workspace，它会以「找不到 ZoomerAI workspace」直接退出，
+//      全新 compose 栈里没有 workspace，它会以「找不到 Acme Draw workspace」直接退出，
 //      所以「谁来创建演示租户」必须落在本脚本上。
 //   ② 清空演示企业数据后重跑 seed-demo.mjs（seed 自身不清脏数据，重置需先清再种）。
 //   ③ 为种子的 KG 实体向 zvec upsert 确定性伪向量（零 LLM 依赖），
@@ -29,11 +29,11 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
 
 // 演示租户标识。三者都做成常量而非散落字面量：seed-demo.mjs 按 defaultBrandName
-// 含 'ZoomerAI' 反查工作区，改了名字两端就对不上。
-const ORG_NAME = process.env.DEMO_ORG_NAME ?? 'ZoomerAI 演示企业'
-const WS_NAME = process.env.DEMO_WORKSPACE_NAME ?? 'ZoomerAI 演示工作区'
-const WS_BRAND = process.env.DEMO_BRAND_NAME ?? 'ZoomerAI'
-const WS_DOMAIN = process.env.DEMO_WORKSPACE_DOMAIN ?? 'zoomer.top'
+// 含 'Acme Draw' 反查工作区，改了名字两端就对不上。
+const ORG_NAME = process.env.DEMO_ORG_NAME ?? 'Acme Draw 演示企业'
+const WS_NAME = process.env.DEMO_WORKSPACE_NAME ?? 'Acme Draw 演示工作区'
+const WS_BRAND = process.env.DEMO_BRAND_NAME ?? 'Acme Draw'
+const WS_DOMAIN = process.env.DEMO_WORKSPACE_DOMAIN ?? 'acmedraw.example'
 const DEMO_USERNAME = process.env.DEMO_USERNAME ?? 'demo-viewer'
 
 const prisma = new PrismaClient()

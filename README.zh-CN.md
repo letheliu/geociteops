@@ -38,13 +38,13 @@ claude mcp add --transport stdio geociteops \
 
 ## 演示
 
-演示品牌是 **ZoomerAI**，一个虚构的 AI 画图产品，站点写的是 `zoomer.top`。种子里没有真实抓取，也没有模型的真实回答。分数用的是正式运行的同一套公式（`buildReport`、`conclude`，以及 `src/modules/geo-health/weights.ts` 里的权重）。用 `pnpm demo:reset` 装进去。
+演示品牌是 **Acme Draw**，一个虚构的 AI 画图产品，站点是 `https://acmedraw.example`。`.example` 是保留顶级域，这个地址不可能属于任何真实产品。种子里没有真实抓取，也没有模型的真实回答。分数用的是正式运行的同一套公式（`buildReport`、`conclude`，以及 `src/modules/geo-health/weights.ts` 里的权重）。用 `pnpm demo:reset` 装进去。
 
-<img src="./docs/assets/demo.gif" alt="GeoCiteOps 演示：虚构品牌 ZoomerAI 的声量份额、GEO 体检报告和 Agent 就绪审计" width="1100" />
+<img src="./docs/assets/demo.gif" alt="GeoCiteOps 演示：虚构品牌 Acme Draw 的声量份额、GEO 体检报告和 Agent 就绪审计" width="1100" />
 
 | 概览 | GEO 体检 | Agent 就绪 |
 | --- | --- | --- |
-| [![虚构工作区 ZoomerAI 的声量趋势](./docs/assets/dashboard.webp)](./docs/assets/dashboard.webp) | [![GEO 体检：总分、四根支柱和声量份额](./docs/assets/geo-health.webp)](./docs/assets/geo-health.webp) | [![Agent 就绪：分数、分类卡片和优先修复](./docs/assets/agent-readiness.webp)](./docs/assets/agent-readiness.webp) |
+| [![虚构工作区 Acme Draw 的声量趋势](./docs/assets/dashboard.webp)](./docs/assets/dashboard.webp) | [![GEO 体检：总分、四根支柱和声量份额](./docs/assets/geo-health.webp)](./docs/assets/geo-health.webp) | [![Agent 就绪：分数、分类卡片和优先修复](./docs/assets/agent-readiness.webp)](./docs/assets/agent-readiness.webp) |
 
 本仓库有一个只读部署：<https://geo.gsgroup.club>。自己部署见 [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)。
 

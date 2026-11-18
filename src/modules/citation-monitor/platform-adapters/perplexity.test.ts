@@ -8,10 +8,10 @@ describe('PerplexityAdapter', () => {
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
-            choices: [{ message: { content: 'zoomer AI 是一款设计工具 [1]' } }],
-            citations: ['https://zoomer.top'],
+            choices: [{ message: { content: 'Acme Draw 是一款设计工具 [1]' } }],
+            citations: ['https://acmedraw.example'],
             search_results: [
-              { title: 'Zoomer AI 官网', url: 'https://zoomer.top', date: '2026-01-01' },
+              { title: 'Acme Draw 官网', url: 'https://acmedraw.example', date: '2026-01-01' },
               { title: '设计工具对比', url: 'https://example.com/compare' },
             ],
           }),
@@ -25,10 +25,10 @@ describe('PerplexityAdapter', () => {
   it('返回答案并从 search_results 提取引用', async () => {
     const adapter = new PerplexityAdapter()
     const result = await adapter.query('AI工具', { PERPLEXITY_API_KEY: 'px-test' })
-    expect(result.answer).toContain('zoomer AI')
+    expect(result.answer).toContain('Acme Draw')
     expect(result.sourceCitations).toHaveLength(2)
-    expect(result.sourceCitations[0].url).toBe('https://zoomer.top')
-    expect(result.sourceCitations[0].title).toBe('Zoomer AI 官网')
+    expect(result.sourceCitations[0].url).toBe('https://acmedraw.example')
+    expect(result.sourceCitations[0].title).toBe('Acme Draw 官网')
     expect(result.sourceCitations[0].sourceType).toBe('api_citation')
   })
 

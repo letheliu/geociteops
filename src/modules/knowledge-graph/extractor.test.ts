@@ -13,7 +13,7 @@ function mockPrisma() {
         id: 'page-1',
         workspaceId: 'w1',
         url: 'https://x.com/landing',
-        currentContent: 'zoomer AI 是 AI 设计工具',
+        currentContent: 'Acme Draw 是 AI 设计工具',
       }),
     },
     optimizationTask: {
@@ -30,15 +30,15 @@ describe('KgExtractor', () => {
     const extractor: EntityExtractorService = {
       extract: vi.fn().mockResolvedValue({
         entities: [
-          { name: 'zoomer AI', rawType: 'AI 设计工具', properties: { url: 'https://x.com' } },
+          { name: 'Acme Draw', rawType: 'AI 设计工具', properties: { url: 'https://x.com' } },
           { name: 'Notion', rawType: '笔记软件', properties: {} },
         ],
-        relations: [{ fromName: 'zoomer AI', toName: 'Notion', relationType: 'competitor' }],
+        relations: [{ fromName: 'Acme Draw', toName: 'Notion', relationType: 'competitor' }],
       }),
     }
     const adapter: KgAdapterService = {
       adapt: vi.fn().mockReturnValue([
-        { name: 'zoomer AI', type: 'AI 设计工具', properties: { url: 'https://x.com' } },
+        { name: 'Acme Draw', type: 'AI 设计工具', properties: { url: 'https://x.com' } },
         { name: 'Notion', type: '笔记软件', properties: {} },
       ]),
     }

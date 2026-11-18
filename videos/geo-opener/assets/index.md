@@ -2,7 +2,7 @@
 
 | Role | Frozen path | Kind | Provenance | Treatment |
 | --- | --- | --- | --- | --- |
-| hero | `assets/geociteops-logo.svg` | logo | User-supplied from `D:/MyProjects/zoomer-geo/docs/assets/geociteops-logo.svg` | none — isolate mark/wordmark groups, drop the off-white card on the dark stage |
+| hero | `assets/geociteops-logo.svg` | logo | User-supplied from `docs/assets/geociteops-logo.svg` | none — isolate mark/wordmark groups, drop the off-white card on the dark stage |
 
 ## Fonts
 

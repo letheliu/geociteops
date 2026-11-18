@@ -38,13 +38,13 @@ Copy [integrations/cursor/mcp.json](./integrations/cursor/mcp.json) into Cursor'
 
 ## Demo
 
-The walkthrough brand is **ZoomerAI**, a fictional AI image product on `zoomer.top`. Nothing in the seed is a live crawl or a live model answer. The scores use the same formulas as a real run (`buildReport`, `conclude`, and the weights in `src/modules/geo-health/weights.ts`). Load it with `pnpm demo:reset`.
+The walkthrough brand is **Acme Draw**, a fictional AI image product at `https://acmedraw.example`. The `.example` TLD is reserved, so the site cannot belong to anyone. Nothing in the seed is a live crawl or a live model answer. The scores use the same formulas as a real run (`buildReport`, `conclude`, and the weights in `src/modules/geo-health/weights.ts`). Load it with `pnpm demo:reset`.
 
-<img src="./docs/assets/demo.gif" alt="GeoCiteOps demo: share of voice, a GEO health report, and an Agent Readiness audit for the fictional brand ZoomerAI" width="1100" />
+<img src="./docs/assets/demo.gif" alt="GeoCiteOps demo: share of voice, a GEO health report, and an Agent Readiness audit for the fictional brand Acme Draw" width="1100" />
 
 | Dashboard | GEO health report | Agent Readiness |
 | --- | --- | --- |
-| [![Share of voice trend for the fictional ZoomerAI workspace](./docs/assets/dashboard.webp)](./docs/assets/dashboard.webp) | [![GEO health report: score, four pillars, and share of voice](./docs/assets/geo-health.webp)](./docs/assets/geo-health.webp) | [![Agent Readiness audit: score, category cards, and prioritized fixes](./docs/assets/agent-readiness.webp)](./docs/assets/agent-readiness.webp) |
+| [![Share of voice trend for the fictional Acme Draw workspace](./docs/assets/dashboard.webp)](./docs/assets/dashboard.webp) | [![GEO health report: score, four pillars, and share of voice](./docs/assets/geo-health.webp)](./docs/assets/geo-health.webp) | [![Agent Readiness audit: score, category cards, and prioritized fixes](./docs/assets/agent-readiness.webp)](./docs/assets/agent-readiness.webp) |
 
 A read-only deployment of this project is at <https://geo.gsgroup.club>. Standing up your own is [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
 

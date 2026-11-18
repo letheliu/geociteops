@@ -9,7 +9,7 @@ describe('JsonLdBuilder', () => {
   it('build 注入 @context 和 @type', () => {
     const doc = builder.build({
       type: 'SoftwareApplication',
-      fields: { name: 'zoomer AI', applicationCategory: 'DesignApplication' },
+      fields: { name: 'Acme Draw', applicationCategory: 'DesignApplication' },
     })
     expect(doc['@context']).toBe('https://schema.org')
     expect(doc['@type']).toBe('SoftwareApplication')
@@ -19,13 +19,13 @@ describe('JsonLdBuilder', () => {
     const doc = builder.build({
       type: 'SoftwareApplication',
       fields: {
-        name: 'zoomer AI',
+        name: 'Acme Draw',
         applicationCategory: 'DesignApplication',
         description: 'AI 设计工具',
         operatingSystem: 'Web',
       },
     })
-    expect(doc['name']).toBe('zoomer AI')
+    expect(doc['name']).toBe('Acme Draw')
     expect(doc['applicationCategory']).toBe('DesignApplication')
     expect(doc['description']).toBe('AI 设计工具')
     expect(doc['operatingSystem']).toBe('Web')
@@ -35,7 +35,7 @@ describe('JsonLdBuilder', () => {
     const doc = builder.build({
       type: 'SoftwareApplication',
       fields: {
-        name: 'zoomer AI',
+        name: 'Acme Draw',
         applicationCategory: 'DesignApplication',
         unknownField: 'should be dropped',
       },
@@ -47,7 +47,7 @@ describe('JsonLdBuilder', () => {
     expect(() =>
       builder.build({
         type: 'SoftwareApplication',
-        fields: { name: 'zoomer AI' },
+        fields: { name: 'Acme Draw' },
       }),
     ).toThrow(/applicationCategory/)
   })

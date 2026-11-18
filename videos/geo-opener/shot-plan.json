@@ -26,9 +26,9 @@
     {
       "role": "hero",
       "kind": "logo",
-      "source": "D:/MyProjects/zoomer-geo/videos/geo-opener/assets/geociteops-logo.svg",
+      "source": "videos/geo-opener/assets/geociteops-logo.svg",
       "treatment": "none",
-      "provenance": "D:/MyProjects/zoomer-geo/docs/assets/geociteops-logo.svg",
+      "provenance": "docs/assets/geociteops-logo.svg",
       "usage": "Inline only the mark group: outer compass disc path, white needle path, accent pointer path, three citation-node circles and three connector strokes. Crop the SVG to viewBox 64 58 120 120. Drop the off-white card rect, the white rounded-square rect and the softShadow filter. Do not use the SVG text elements."
     }
   ],
@@ -314,7 +314,7 @@
         "Do not exceed grain 0.06 opacity or aura 0.55 peak."
       ]
     },
-    "logo": "D:/MyProjects/zoomer-geo/videos/geo-opener/assets/geociteops-logo.svg",
+    "logo": "videos/geo-opener/assets/geociteops-logo.svg",
     "wordmark": "GeoCiteOps",
     "tagline": "让 AI 答案，引用你的品牌",
     "tagline_en": "AI citation intelligence and optimization platform",

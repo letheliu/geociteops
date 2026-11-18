@@ -14,7 +14,7 @@
         "message": "GSAP tween on \"#wipe-edge\" uses motion that snaps to integer device pixels: left. Layout and text-reflow properties snap during browser layout; roundProps rounds the tween value. Slow motion or an ease-out tail then stutters under the seek-by-frame capture engine. Animate transforms (x/y/scale/opacity) instead.",
         "selector": "#wipe-edge",
         "dataAttributes": {},
-        "sourceFile": "D:\\MyProjects\\zoomer-geo\\videos\\geo-opener\\index.html",
+        "sourceFile": "videos/geo-opener/index.html",
         "bbox": {
           "x": 0,
           "y": 0,
@@ -30,7 +30,7 @@
         "message": "This HTML composition file has 609 lines. Smaller sub-compositions are easier to read, iterate on, and diff.",
         "selector": "[data-composition-id]",
         "dataAttributes": {},
-        "sourceFile": "D:\\MyProjects\\zoomer-geo\\videos\\geo-opener\\index.html",
+        "sourceFile": "videos/geo-opener/index.html",
         "bbox": {
           "x": 0,
           "y": 0,
@@ -46,7 +46,7 @@
         "message": "<section id=\"lockup-clip\"> is a timeline element that contains nested <div id=\"stage-bg\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
         "selector": "#lockup-clip",
         "dataAttributes": {},
-        "sourceFile": "D:\\MyProjects\\zoomer-geo\\videos\\geo-opener\\index.html",
+        "sourceFile": "videos/geo-opener/index.html",
         "bbox": {
           "x": 0,
           "y": 0,

@@ -33,8 +33,8 @@ class FakeAdapter implements PlatformAdapter {
   name = 'openai'
   async query(): Promise<PlatformResult> {
     return {
-      answer: '推荐 zoomer AI，它是一款设计工具。参考 https://zoomer.top',
-      sourceCitations: [{ url: 'https://zoomer.top', position: 1, sourceType: 'api_citation' }],
+      answer: '推荐 Acme Draw，它是一款设计工具。参考 https://acmedraw.example',
+      sourceCitations: [{ url: 'https://acmedraw.example', position: 1, sourceType: 'api_citation' }],
       groundingSources: [],
       answerMentions: [],
     }
@@ -84,7 +84,7 @@ describe('e2e: self-serve 试用全旅程', () => {
       username: `trialuser${Date.now().toString(36)}`,
       password: 'Zx9!qwerty',
       email: `trial${Date.now().toString(36)}@example.com`,
-      brandName: 'zoomer AI', // 对齐 FakeAdapter 答案叙事（提及率>0 断言的前提）
+      brandName: 'Acme Draw', // 对齐 FakeAdapter 答案叙事（提及率>0 断言的前提）
       ip: '203.0.113.9',
     })
     created = { organizationId: result.trial.organizationId, workspaceId: result.trial.workspaceId }

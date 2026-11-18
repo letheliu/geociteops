@@ -11,10 +11,10 @@ describe('Executor', () => {
       get: vi.fn().mockReturnValue({
         name: 'deepseek',
         query: vi.fn().mockResolvedValue({
-          answer: 'Zoomer is a GEO platform.',
-          sourceCitations: [{ url: 'https://zoomer.ai', position: 1 }],
+          answer: 'Acme Draw is a GEO platform.',
+          sourceCitations: [{ url: 'https://acmedraw.example', position: 1 }],
           groundingSources: [],
-          answerMentions: [{ brand: 'Zoomer', mentioned: true, firstIndex: 0, count: 1 }],
+          answerMentions: [{ brand: 'Acme Draw', mentioned: true, firstIndex: 0, count: 1 }],
         }),
       }),
     }
@@ -35,8 +35,8 @@ describe('Executor', () => {
       runId: 'run-1',
       workspaceId: 'ws-1',
       platform: 'deepseek',
-      queryText: 'what is Zoomer?',
-      brandSnapshot: { brandName: 'Zoomer', brandAliases: [], brandDomain: 'zoomer.ai' },
+      queryText: 'what is Acme Draw?',
+      brandSnapshot: { brandName: 'Acme Draw', brandAliases: [], brandDomain: 'acmedraw.example' },
       competitorSnapshot: [],
     })
 

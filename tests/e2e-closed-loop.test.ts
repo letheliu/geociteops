@@ -28,11 +28,11 @@ class ToggleAdapter implements PlatformAdapter {
 
   async query(): Promise<PlatformResult> {
     const answer = this.mentionBrand
-      ? '强烈推荐 zoomer AI，它是一款优秀的设计工具。参考 https://zoomer.top'
+      ? '强烈推荐 Acme Draw，它是一款优秀的设计工具。参考 https://acmedraw.example'
       : '推荐 Figma，它是一款设计工具。参考 https://figma.com'
     return {
       answer,
-      sourceCitations: [{ url: 'https://zoomer.top', position: 1, sourceType: 'api_citation' }],
+      sourceCitations: [{ url: 'https://acmedraw.example', position: 1, sourceType: 'api_citation' }],
       groundingSources: [],
       answerMentions: [],
     }
@@ -60,7 +60,7 @@ describe('e2e: 闭环全旅程（M2 §3.3）', () => {
     const workspace = await prisma.workspace.create({
       data: {
         name: 'closed-loop',
-        defaultBrandName: 'zoomer AI',
+        defaultBrandName: 'Acme Draw',
         organizationId: org.id,
         monitorSampleCount: 1,
       },
@@ -70,7 +70,7 @@ describe('e2e: 闭环全旅程（M2 §3.3）', () => {
     const page = await prisma.contentPage.create({
       data: {
         workspaceId,
-        url: 'https://zoomer.top/best-tools',
+        url: 'https://acmedraw.example/best-tools',
         pageType: 'landing',
         currentContent: '这是我们页面的原始正文，讲了一些很泛的内容，没有具体数据。',
         optimizedContent: '{"legacy":true}',
@@ -94,14 +94,14 @@ describe('e2e: 闭环全旅程（M2 §3.3）', () => {
       chat: vi.fn(async (messages: any[]) => {
         const userPrompt = messages.map((m) => m.content).join('\n')
         if (userPrompt.includes('整页')) {
-          return { text: 'zoomer AI 是一款 AI 设计工具，2026 年服务 50 万设计师，支持 Figma 全流程对接。' }
+          return { text: 'Acme Draw 是一款 AI 设计工具，2026 年服务 50 万设计师，支持 Figma 全流程对接。' }
         }
         return {
           text: JSON.stringify({
             atoms: [
               {
-                text: userPrompt.includes('zoomer AI 是一款') ? 'zoomer AI 是一款 AI 设计工具，2026 年服务 50 万设计师。' : '这是我们页面的原始正文，讲了一些很泛的内容。',
-                subject: 'zoomer AI',
+                text: userPrompt.includes('Acme Draw 是一款') ? 'Acme Draw 是一款 AI 设计工具，2026 年服务 50 万设计师。' : '这是我们页面的原始正文，讲了一些很泛的内容。',
+                subject: 'Acme Draw',
                 predicate: '是',
                 object: 'AI 设计工具',
                 anchors: ['2026', '50 万'],
@@ -170,9 +170,9 @@ describe('e2e: 闭环全旅程（M2 §3.3）', () => {
     const created = await closedLoop.optimizeFromWeakPoint({
       workspaceId,
       queryId,
-      brand: 'zoomer AI',
+      brand: 'Acme Draw',
     })
-    expect(created.suggestion).toContain('zoomer AI 是一款 AI 设计工具')
+    expect(created.suggestion).toContain('Acme Draw 是一款 AI 设计工具')
     expect(created.task.status).toBe('PENDING')
     const taskId = created.task.id
 

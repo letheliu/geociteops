@@ -14,14 +14,14 @@ describe('EntityExtractor', () => {
   it('解析 LLM 返回的合法 JSON', async () => {
     const llmResponse = JSON.stringify({
       entities: [
-        { name: 'zoomer AI', rawType: 'AI 设计工具', properties: { url: 'https://x.com' } },
+        { name: 'Acme Draw', rawType: 'AI 设计工具', properties: { url: 'https://x.com' } },
       ],
-      relations: [{ fromName: 'zoomer AI', toName: 'Notion', relationType: 'competitor' }],
+      relations: [{ fromName: 'Acme Draw', toName: 'Notion', relationType: 'competitor' }],
     })
     const extractor = createEntityExtractor(mockLlm(llmResponse))
-    const result = await extractor.extract('zoomer AI 是 AI 设计工具')
+    const result = await extractor.extract('Acme Draw 是 AI 设计工具')
     expect(result.entities).toHaveLength(1)
-    expect(result.entities[0].name).toBe('zoomer AI')
+    expect(result.entities[0].name).toBe('Acme Draw')
     expect(result.relations[0].relationType).toBe('competitor')
   })
 

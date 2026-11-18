@@ -21,12 +21,12 @@ function mockPrisma(queryResult: any[] = []) {
 
 const sampleAtoms: Atom[] = [
   {
-    text: 'zoomer AI 是一款 AI 设计工具',
-    subject: 'zoomer AI',
+    text: 'Acme Draw 是一款 AI 设计工具',
+    subject: 'Acme Draw',
     predicate: '是',
     object: 'AI 设计工具',
-    anchors: ['zoomer AI'],
-    definition: 'zoomer AI 是一款 AI 设计工具',
+    anchors: ['Acme Draw'],
+    definition: 'Acme Draw 是一款 AI 设计工具',
   },
 ]
 
@@ -34,12 +34,12 @@ describe('FaqGenerator', () => {
   it('有 CitationQuery 库时，基于真实 query 生成 FAQ', async () => {
     const queries = [
       { id: 'q1', queryText: 'AI设计工具哪个好' },
-      { id: 'q2', queryText: 'zoomer AI 怎么样' },
+      { id: 'q2', queryText: 'Acme Draw 怎么样' },
     ]
     const faqJson = JSON.stringify({
       faqs: [
-        { question: 'AI设计工具哪个好？', answer: 'zoomer AI 是一款优秀的 AI 设计工具', matchedQueryId: 'q1' },
-        { question: 'zoomer AI 怎么样？', answer: 'zoomer AI 功能强大', matchedQueryId: 'q2' },
+        { question: 'AI设计工具哪个好？', answer: 'Acme Draw 是一款优秀的 AI 设计工具', matchedQueryId: 'q1' },
+        { question: 'Acme Draw 怎么样？', answer: 'Acme Draw 功能强大', matchedQueryId: 'q2' },
       ],
     })
     const llm = mockLlm(faqJson)
@@ -57,10 +57,10 @@ describe('FaqGenerator', () => {
   })
 
   it('传入 queries 参数时直接使用，不查数据库', async () => {
-    const queries = [{ id: 'q1', queryText: '什么是 zoomer AI' }]
+    const queries = [{ id: 'q1', queryText: '什么是 Acme Draw' }]
     const faqJson = JSON.stringify({
       faqs: [
-        { question: '什么是 zoomer AI？', answer: 'zoomer AI 是设计工具', matchedQueryId: 'q1' },
+        { question: '什么是 Acme Draw？', answer: 'Acme Draw 是设计工具', matchedQueryId: 'q1' },
       ],
     })
     const llm = mockLlm(faqJson)
@@ -76,8 +76,8 @@ describe('FaqGenerator', () => {
   it('无 query 库时，LLM 独立生成 5W1H 问题', async () => {
     const faqJson = JSON.stringify({
       faqs: [
-        { question: '什么是 zoomer AI？', answer: 'zoomer AI 是一款 AI 设计工具' },
-        { question: '谁适合使用 zoomer AI？', answer: '设计师' },
+        { question: '什么是 Acme Draw？', answer: 'Acme Draw 是一款 AI 设计工具' },
+        { question: '谁适合使用 Acme Draw？', answer: '设计师' },
       ],
     })
     const llm = mockLlm(faqJson)

@@ -6,12 +6,12 @@ describe('ScoringEngine', () => {
   const scoring = createScoringEngine()
 
   const fullAtom: Atom = {
-    text: 'zoomer AI 在 2024 年获得了 50 万用户',
-    subject: 'zoomer AI',
+    text: 'Acme Draw 在 2024 年获得了 50 万用户',
+    subject: 'Acme Draw',
     predicate: '获得了',
     object: '50 万用户',
-    anchors: ['2024年', '50万', 'zoomer AI'],
-    definition: 'zoomer AI 是一款 AI 设计工具',
+    anchors: ['2024年', '50万', 'Acme Draw'],
+    definition: 'Acme Draw 是一款 AI 设计工具',
   }
 
   it('满分 atom（4 维度全命中 → 100 分）', () => {
@@ -55,11 +55,11 @@ describe('ScoringEngine', () => {
 
   it('数字 + 实体锚点 + 自解释（85 分，达标）', () => {
     const atom: Atom = {
-      text: 'zoomer AI 在 2024 年获得了用户',
-      subject: 'zoomer AI',
+      text: 'Acme Draw 在 2024 年获得了用户',
+      subject: 'Acme Draw',
       predicate: '获得了',
       object: '用户',
-      anchors: ['2024年', 'zoomer AI'],
+      anchors: ['2024年', 'Acme Draw'],
     }
     const [scored] = scoring.scoreAtoms([atom])
     expect(scored.score.total).toBe(85)
@@ -67,12 +67,12 @@ describe('ScoringEngine', () => {
 
   it('最接近阈值边界：75 分达标', () => {
     const atom: Atom = {
-      text: 'zoomer AI 是工具，2024 年发布',
-      subject: 'zoomer AI',
+      text: 'Acme Draw 是工具，2024 年发布',
+      subject: 'Acme Draw',
       predicate: '发布',
       object: '工具',
       anchors: ['2024'],
-      definition: 'zoomer AI 是一款工具',
+      definition: 'Acme Draw 是一款工具',
     }
     // 数字 35 + 自解释 25 + 定义 15 = 75，无实体锚点
     const [scored] = scoring.scoreAtoms([atom])
@@ -82,8 +82,8 @@ describe('ScoringEngine', () => {
 
   it('最接近阈值边界：60 分不达标', () => {
     const atom: Atom = {
-      text: 'zoomer AI 有 100 用户',
-      subject: 'zoomer AI',
+      text: 'Acme Draw 有 100 用户',
+      subject: 'Acme Draw',
       predicate: '有',
       object: '用户',
       anchors: ['100'],
@@ -95,7 +95,7 @@ describe('ScoringEngine', () => {
 
   it('scorePage 计算所有 atom 的平均分', () => {
     const atoms: Atom[] = [
-      { ...fullAtom, anchors: ['2024', 'zoomer AI'], definition: 'def' },
+      { ...fullAtom, anchors: ['2024', 'Acme Draw'], definition: 'def' },
       { text: 'x', subject: '', predicate: '', object: '', anchors: [] },
     ]
     const scored = scoring.scoreAtoms(atoms)

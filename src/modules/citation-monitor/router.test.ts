@@ -141,7 +141,7 @@ describe('citation router', () => {
       deleteQuery: vi.fn(),
     }
     ctx = {
-      workspace: { id: 'w1', defaultBrandName: 'zoomer AI', status: 'ACTIVE' },
+      workspace: { id: 'w1', defaultBrandName: 'Acme Draw', status: 'ACTIVE' },
       actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
       requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
       services: { monitor: mockMonitor, queryLibrary: mockQueryLibrary, prisma: db },
@@ -534,7 +534,7 @@ describe('citation 模块 × 试用到期两态（只读保留）', () => {
     })
     const monitor = { createManualRun: vi.fn(), runOnce: vi.fn() }
     const stateCtx: any = {
-      workspace: { id: 'w1', organizationId: 'org-1', defaultBrandName: 'zoomer AI', status: opts.workspaceStatus },
+      workspace: { id: 'w1', organizationId: 'org-1', defaultBrandName: 'Acme Draw', status: opts.workspaceStatus },
       actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
       requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
       services: {
@@ -604,7 +604,7 @@ describe('citation.runs.create × monitorSampleCountMax 硬检查', () => {
       }),
     }
     const quotaCtx: any = {
-      workspace: { id: 'w1', organizationId: 'org-1', defaultBrandName: 'zoomer AI', status: 'ACTIVE' },
+      workspace: { id: 'w1', organizationId: 'org-1', defaultBrandName: 'Acme Draw', status: 'ACTIVE' },
       actor: { kind: 'apiKey', credential: { id: 'cred-1', workspaceId: 'w1' } },
       requestMeta: { ip: '127.0.0.1', requestId: 'req-1', headers: { 'x-geo-csrf': 'test' } },
       services: { monitor, billing: { guard }, prisma: makeDb(), queryLibrary: {} },
@@ -981,7 +981,7 @@ describe('citation router · coverage', () => {
       ],
     })
     const ctx: any = {
-      workspace: { id: 'w1', defaultBrandName: 'zoomer AI', status: 'ACTIVE' },
+      workspace: { id: 'w1', defaultBrandName: 'Acme Draw', status: 'ACTIVE' },
       services: { prisma: db, monitor: {}, queryLibrary: {} },
     }
 
@@ -1004,7 +1004,7 @@ describe('citation router · coverage', () => {
   it('以 ctx.workspace.id 限定(事件读取强制 okEventsWhere)', async () => {
     const db = makeDb()
     const ctx: any = {
-      workspace: { id: 'w1', defaultBrandName: 'zoomer AI', status: 'ACTIVE' },
+      workspace: { id: 'w1', defaultBrandName: 'Acme Draw', status: 'ACTIVE' },
       services: { prisma: db, monitor: {}, queryLibrary: {} },
     }
     await createCaller(ctx).coverage({ dateRange: { start: '2026-10-01', end: '2026-10-31' } })

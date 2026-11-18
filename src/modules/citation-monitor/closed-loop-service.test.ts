@@ -134,7 +134,7 @@ describe('closedLoop.optimizeFromWeakPoint（M2 §3.3）', () => {
     const { deps, taskService, rewriter } = makeDeps({ prisma })
     const svc = createClosedLoopService(deps)
 
-    const result = await svc.optimizeFromWeakPoint({ workspaceId: 'w1', queryId: 'q1', brand: 'zoomer AI' })
+    const result = await svc.optimizeFromWeakPoint({ workspaceId: 'w1', queryId: 'q1', brand: 'Acme Draw' })
 
     expect(taskService.create).toHaveBeenCalledWith({
       workspaceId: 'w1',
@@ -142,7 +142,7 @@ describe('closedLoop.optimizeFromWeakPoint（M2 §3.3）', () => {
       pageId: 'page-1',
       queryId: 'q1',
     })
-    expect(rewriter.rewriteForQuery).toHaveBeenCalledWith('原始页面正文', 'AI 设计工具哪个好', 'zoomer AI')
+    expect(rewriter.rewriteForQuery).toHaveBeenCalledWith('原始页面正文', 'AI 设计工具哪个好', 'Acme Draw')
     expect(result.suggestion).toBe('改写后的建议稿正文')
 
     const update = prisma.optimizationTask.update.mock.calls[0][0]
