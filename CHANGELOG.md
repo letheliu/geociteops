@@ -179,7 +179,7 @@ runnable and credible for a stranger: clone it, run it, understand it.
 - **Containerized one-command deployment** — four-service Docker Compose stack (`db` / `migrate` / `app` / `web`), multi-stage `Dockerfile` on `node:20-slim`, and `web/Dockerfile` building the Vue console into nginx. Three named volumes persist PostgreSQL, the zvec vector store (`zvec-data`), and uploaded files (`uploads`).
 - **Demo environment reset** (`pnpm demo:reset`) — idempotently provisions the demo organization, workspace, and a read-only `ORG_VIEWER` account, truncates demo data, re-runs the seed, and upserts deterministic pseudo-embeddings for seeded knowledge-graph entities into zvec. Zero LLM dependency, so the demo dataset can be verified offline.
 - **Deterministic vector generator** (`scripts/lib/deterministic-vector.ts`) — SHA-256 derived, L2-normalized unit vectors at `ZVEC_DIM`; determinism, dimension, and unit-norm are covered by 10 tests.
-- **CI** — GitHub Actions with a typecheck gate (backend `tsc`, web `vue-tsc`) and a test job backed by a dedicated `pgvector` service and throwaway `zoomer_test` database that is migrated before the suite runs.
+- **CI** — GitHub Actions with a typecheck gate (backend `tsc`, web `vue-tsc`) and a test job backed by a dedicated `pgvector` service and throwaway `geociteops_test` database that is migrated before the suite runs.
 - **Image publishing** — `docker.yml` builds and pushes `linux/amd64` images to ghcr.io, tagged to match releases.
 - **Community templates** — bug report and feature request forms, a PR template with a test-evidence checklist, and a `CONTRIBUTING.md` covering branches, commit style, and the `prisma generate`-before-`tsc` ordering rule.
 

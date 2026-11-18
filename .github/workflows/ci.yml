@@ -60,8 +60,8 @@ jobs:
         run: pnpm exec tsc -p tsconfig.build.json --noEmit
 
       # 前端类型回归：没有这一步，web 的类型错误要等 docker 构建阶段才炸。
-      # 用路径过滤而非包名：包名改名（zoomer-geo→geociteops 时 geo-web 已失配）会让
-      # pnpm --filter 静默匹配零个项目并以 0 退出——闸门空转。路径在则必命中。
+      # 用路径过滤而非包名：包名一旦和目录对不上，pnpm --filter 会静默匹配零个
+      # 项目并以 0 退出——闸门空转。路径在则必命中。
       - name: Web typecheck (vue-tsc)
         run: pnpm --filter ./web exec vue-tsc -b
 
