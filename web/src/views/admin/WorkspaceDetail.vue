@@ -13,6 +13,9 @@ import PlatformCredentials from '../../components/admin/PlatformCredentials.vue'
 import { trpc } from '../../composables/useTrpc'
 import { useSessionStore } from '../../stores/session'
 import { enterWorkspace } from '../../utils/enter-workspace'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 const route = useRoute()
 const message = useMessage()
@@ -74,7 +77,7 @@ async function loadOperators() {
       workspaceId: workspaceId.value,
     })
   } catch (e: any) {
-    message.error(e?.message || '顾问列表加载失败')
+    message.error(e?.message || t("顾问列表加载失败"))
   }
 }
 
@@ -92,7 +95,7 @@ async function load() {
     await loadOperators()
   } catch (e: any) {
     detail.value = null
-    message.error(e?.message || '加载失败')
+    message.error(e?.message || t("加载失败"))
   } finally {
     loading.value = false
   }
@@ -111,7 +114,7 @@ const canManageAssignment = computed(() => sessionStore.me?.platformRole === 'SU
 async function handleSaveBasic() {
   const f = form.value
   if (!f.name.trim() || !f.defaultBrandName.trim()) {
-    message.warning('名称与默认品牌名必填')
+    message.warning(t("名称与默认品牌名必填"))
     return
   }
   savingBasic.value = true
@@ -124,10 +127,10 @@ async function handleSaveBasic() {
       ...(f.domain.trim() ? { domain: f.domain.trim() } : {}),
       ...(f.llmsTxtUrl.trim() ? { llmsTxtUrl: f.llmsTxtUrl.trim() } : {}),
     })
-    message.success('已保存')
+    message.success(t("已保存"))
     await load()
   } catch (e: any) {
-    message.error(e?.message || '保存失败')
+    message.error(e?.message || t("保存失败"))
   } finally {
     savingBasic.value = false
   }
@@ -136,30 +139,30 @@ async function handleSaveBasic() {
 async function handleSuspend() {
   try {
     await trpc.admin.workspace.suspend.mutate({ workspaceId: workspaceId.value })
-    message.success('已暂停')
+    message.success(t("已暂停"))
     await load()
   } catch (e: any) {
-    message.error(e?.message || '操作失败')
+    message.error(e?.message || t("操作失败"))
   }
 }
 
 async function handleResume() {
   try {
     await trpc.admin.workspace.resume.mutate({ workspaceId: workspaceId.value })
-    message.success('已恢复')
+    message.success(t("已恢复"))
     await load()
   } catch (e: any) {
-    message.error(e?.message || '操作失败')
+    message.error(e?.message || t("操作失败"))
   }
 }
 
 async function handleArchive() {
   try {
     await trpc.admin.workspace.archive.mutate({ workspaceId: workspaceId.value })
-    message.success('已归档')
+    message.success(t("已归档"))
     await load()
   } catch (e: any) {
-    message.error(e?.message || '操作失败')
+    message.error(e?.message || t("操作失败"))
   }
 }
 
@@ -167,7 +170,7 @@ async function handleEnter() {
   try {
     await enterWorkspace(workspaceId.value)
   } catch (e: any) {
-    message.error(e?.message || '进入失败')
+    message.error(e?.message || t("进入失败"))
   }
 }
 
@@ -179,10 +182,10 @@ async function handleSaveCompetitors() {
       workspaceId: workspaceId.value,
       competitors: list,
     })
-    message.success('竞品已保存')
+    message.success(t("竞品已保存"))
     await load()
   } catch (e: any) {
-    message.error(e?.message || '保存失败')
+    message.error(e?.message || t("保存失败"))
   } finally {
     savingCompetitors.value = false
   }
@@ -192,7 +195,7 @@ async function handleSaveCompetitors() {
 async function handleAssignOperator() {
   const username = assignUsername.value.trim()
   if (!username) {
-    message.warning('请输入顾问用户名')
+    message.warning(t("请输入顾问用户名"))
     return
   }
   assigning.value = true
@@ -202,12 +205,12 @@ async function handleAssignOperator() {
       userId: username,
       isPrimary: assignIsPrimary.value,
     })
-    message.success('已分配')
+    message.success(t("已分配"))
     assignUsername.value = ''
     assignIsPrimary.value = false
     await loadOperators()
   } catch (e: any) {
-    message.error(e?.message || '分配失败')
+    message.error(e?.message || t("分配失败"))
   } finally {
     assigning.value = false
   }
@@ -219,130 +222,111 @@ async function handleUnassignOperator(userId: string) {
       workspaceId: workspaceId.value,
       userId,
     })
-    message.success('已移除')
+    message.success(t("已移除"))
     await loadOperators()
   } catch (e: any) {
-    message.error(e?.message || '移除失败')
+    message.error(e?.message || t("移除失败"))
   }
 }
 </script>
 
 <template>
   <div>
-    <PageHeader title="Workspace 详情" :subtitle="detail ? detail.workspace.name : ''" />
+    <PageHeader :title="t('Workspace 详情')" :subtitle="detail ? detail.workspace.name : ''" />
 
     <NSpin :show="loading">
       <NEmpty
         v-if="!loading && !detail"
-        description="无法加载 Workspace（不存在或无权限）"
+        :description="t('无法加载 Workspace（不存在或无权限）')"
         style="padding: 48px 0"
       />
       <NSpace v-else-if="detail" vertical :size="16">
-        <NCard title="状态与操作">
+        <NCard :title="t('状态与操作')">
           <NSpace align="center" :size="12" :wrap="true">
             <NTag :type="statusTag.type" :bordered="false" size="large" style="font-weight: 600">
               {{ statusTag.label }}
             </NTag>
-            <NText depth="3" style="font-size: 13px">
-              所属企业：{{ detail.workspace.organization?.name ?? '—' }}
+            <NText depth="3" style="font-size: 13px"> {{ t('所属企业：') }}{{ detail.workspace.organization?.name ?? '—' }}
             </NText>
-            <NButton size="small" type="primary" :disabled="detail.workspace.status !== 'ACTIVE'" @click="handleEnter">
-              进入 Workspace
-            </NButton>
+            <NButton size="small" type="primary" :disabled="detail.workspace.status !== 'ACTIVE'" @click="handleEnter"> {{ t('进入 Workspace') }} </NButton>
             <NPopconfirm v-if="detail.workspace.status === 'ACTIVE'" @positive-click="handleSuspend">
               <template #trigger>
-                <NButton size="small" type="warning">暂停</NButton>
-              </template>
-              确认暂停？暂停后客户侧不可用。
-            </NPopconfirm>
-            <NButton v-if="detail.workspace.status === 'SUSPENDED'" size="small" type="success" @click="handleResume">
-              恢复
-            </NButton>
+                <NButton size="small" type="warning">{{ t('暂停') }}</NButton>
+              </template> {{ t('确认暂停？暂停后客户侧不可用。') }} </NPopconfirm>
+            <NButton v-if="detail.workspace.status === 'SUSPENDED'" size="small" type="success" @click="handleResume"> {{ t('恢复') }} </NButton>
             <NPopconfirm v-if="detail.workspace.status !== 'ARCHIVED'" @positive-click="handleArchive">
               <template #trigger>
-                <NButton size="small" type="error">归档</NButton>
-              </template>
-              确认归档？归档后不可恢复。
-            </NPopconfirm>
+                <NButton size="small" type="error">{{ t('归档') }}</NButton>
+              </template> {{ t('确认归档？归档后不可恢复。') }} </NPopconfirm>
           </NSpace>
         </NCard>
 
-        <NCard title="基本信息">
+        <NCard :title="t('基本信息')">
           <NForm label-placement="left" label-width="110" style="max-width: 560px">
-            <NFormItem label="名称">
+            <NFormItem :label="t('名称')">
               <NInput v-model:value="form.name" />
             </NFormItem>
-            <NFormItem label="默认品牌名">
+            <NFormItem :label="t('默认品牌名')">
               <NInput v-model:value="form.defaultBrandName" />
             </NFormItem>
-            <NFormItem label="域名">
-              <NInput v-model:value="form.domain" placeholder="example.com（留空则保持不变）" />
+            <NFormItem :label="t('域名')">
+              <NInput v-model:value="form.domain" :placeholder="t('example.com（留空则保持不变）')" />
             </NFormItem>
             <NFormItem label="llms.txt URL">
-              <NInput v-model:value="form.llmsTxtUrl" placeholder="https://…（留空则保持不变）" />
+              <NInput v-model:value="form.llmsTxtUrl" :placeholder="t('https://…（留空则保持不变）')" />
             </NFormItem>
           </NForm>
           <NSpace justify="start">
-            <NButton type="primary" :loading="savingBasic" @click="handleSaveBasic">保存基本信息</NButton>
+            <NButton type="primary" :loading="savingBasic" @click="handleSaveBasic">{{ t('保存基本信息') }}</NButton>
           </NSpace>
         </NCard>
 
-        <NCard title="顾问分配">
-          <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 12px">
-            平台顾问（OPERATOR）被分配后才能经 x-workspace-id 进入该 Workspace；负责顾问在同一 Workspace 内唯一。
-            <template v-if="!canManageAssignment">分配与移除操作仅超级管理员（SUPER_ADMIN）可执行。</template>
+        <NCard :title="t('顾问分配')">
+          <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 12px"> {{ t('平台顾问（OPERATOR）被分配后才能经 x-workspace-id 进入该 Workspace；负责顾问在同一 Workspace 内唯一。') }} <template v-if="!canManageAssignment">{{ t('分配与移除操作仅超级管理员（SUPER_ADMIN）可执行。') }}</template>
           </div>
           <NSpace vertical :size="8">
             <NSpace v-for="op in operators" :key="op.user.id" align="center" :size="8">
-              <NTag v-if="op.isPrimary" type="info" size="small" :bordered="false">负责顾问</NTag>
+              <NTag v-if="op.isPrimary" type="info" size="small" :bordered="false">{{ t('负责顾问') }}</NTag>
               <NText>{{ op.user.displayName }}</NText>
               <NText depth="3" style="font-size: 12px">@{{ op.user.username }}</NText>
               <NPopconfirm v-if="canManageAssignment" @positive-click="handleUnassignOperator(op.user.id)">
                 <template #trigger>
-                  <NButton size="tiny" type="error" quaternary>移除</NButton>
-                </template>
-                确认移除该顾问的分配？移除后其将无法进入此 Workspace。
-              </NPopconfirm>
+                  <NButton size="tiny" type="error" quaternary>{{ t('移除') }}</NButton>
+                </template> {{ t('确认移除该顾问的分配？移除后其将无法进入此 Workspace。') }} </NPopconfirm>
             </NSpace>
-            <NText v-if="operators.length === 0" depth="3" style="font-size: 13px">
-              尚未分配顾问
-            </NText>
+            <NText v-if="operators.length === 0" depth="3" style="font-size: 13px"> {{ t('尚未分配顾问') }} </NText>
           </NSpace>
           <NSpace v-if="canManageAssignment" align="center" :size="12" style="margin-top: 16px" :wrap="true">
             <NInput
               v-model:value="assignUsername"
-              placeholder="顾问用户名"
+              :placeholder="t('顾问用户名')"
               style="width: 220px"
               @keydown.enter="handleAssignOperator"
             />
             <NSwitch v-model:value="assignIsPrimary" size="small" />
-            <NText depth="3" style="font-size: 13px">设为负责顾问</NText>
-            <NButton type="primary" size="small" :loading="assigning" @click="handleAssignOperator">
-              分配
-            </NButton>
+            <NText depth="3" style="font-size: 13px">{{ t('设为负责顾问') }}</NText>
+            <NButton type="primary" size="small" :loading="assigning" @click="handleAssignOperator"> {{ t('分配') }} </NButton>
           </NSpace>
         </NCard>
 
-        <NCard title="竞品配置">
+        <NCard :title="t('竞品配置')">
           <NSelect
             v-model:value="competitors"
             multiple
             filterable
             tag
             clearable
-            placeholder="输入域名后回车添加，如 competitor.com"
+            :placeholder="t('输入域名后回车添加，如 competitor.com')"
             :options="competitors.map((c) => ({ label: c, value: c }))"
             style="max-width: 560px"
           />
           <NSpace justify="start" style="margin-top: 12px">
-            <NButton type="primary" :loading="savingCompetitors" @click="handleSaveCompetitors">保存竞品</NButton>
+            <NButton type="primary" :loading="savingCompetitors" @click="handleSaveCompetitors">{{ t('保存竞品') }}</NButton>
           </NSpace>
         </NCard>
 
-        <NCard title="AI 平台凭证">
-          <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 12px">
-            凭证明文不入库也不回显；重新配置为整体覆盖写密文，hint 仅显示 key 末 4 位。
-          </div>
+        <NCard :title="t('AI 平台凭证')">
+          <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 12px"> {{ t('凭证明文不入库也不回显；重新配置为整体覆盖写密文，hint 仅显示 key 末 4 位。') }} </div>
           <PlatformCredentials
             :workspace-id="workspaceId"
             :platform-summary="detail.platformSummary.platforms"

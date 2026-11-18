@@ -6,6 +6,9 @@ import {
 import type { DataTableColumns } from 'naive-ui'
 import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
+import { useI18n } from '@/i18n'
+const { t, locale: appLocale } = useI18n()
+
 
 const message = useMessage()
 const loading = ref(true)
@@ -13,7 +16,7 @@ const data = ref<any[]>([])
 
 const typeFilter = ref<string | null>(null)
 const typeOptions = [
-  { label: '全部', value: '' },
+  { label: t("全部"), value: '' },
   { label: 'SoftwareApplication', value: 'SoftwareApplication' },
   { label: 'Organization', value: 'Organization' },
   { label: 'Product', value: 'Product' },
@@ -43,7 +46,7 @@ async function loadData() {
       typeFilter.value ? { schemaType: typeFilter.value } : undefined,
     )
   } catch (e: any) {
-    message.error(e?.message || '加载失败')
+    message.error(e?.message || t("加载失败"))
   } finally {
     loading.value = false
   }
@@ -58,27 +61,27 @@ function showRow(row: any) {
 
 const columns: DataTableColumns<any> = [
   {
-    title: '类型',
+    title: t("类型"),
     key: 'schemaType',
     width: 160,
     render(row) {
       return h(NTag, { size: 'small', type: (typeColors[row.schemaType] || 'default') as any }, { default: () => row.schemaType })
     },
   },
-  { title: '页面 URL', key: 'pageUrl', ellipsis: { tooltip: true } },
-  { title: '版本', key: 'version', width: 80, render(row) { return `v${row.version}` } },
+  { title: t("页面 URL"), key: 'pageUrl', ellipsis: { tooltip: true } },
+  { title: t("版本"), key: 'version', width: 80, render(row) { return `v${row.version}` } },
   {
-    title: '时间',
+    title: t("时间"),
     key: 'createdAt',
     width: 160,
-    render(row) { return new Date(row.createdAt).toLocaleString('zh-CN') },
+    render(row) { return new Date(row.createdAt).toLocaleString(appLocale.value) },
   },
   {
     title: '',
     key: 'actions',
     width: 80,
     render(row) {
-      return h(NButton, { size: 'small', quaternary: true, onClick: () => showRow(row) }, { default: () => '查看' })
+      return h(NButton, { size: 'small', quaternary: true, onClick: () => showRow(row) }, { default: () => t("查看") })
     },
   },
 ]
@@ -86,7 +89,7 @@ const columns: DataTableColumns<any> = [
 
 <template>
   <div>
-    <PageHeader title="Schema 记录" subtitle="JSON-LD 与 llms.txt 生成历史" />
+    <PageHeader :title="t('Schema 记录')" :subtitle="t('JSON-LD 与 llms.txt 生成历史')" />
 
     <NSpace style="margin-bottom: 16px">
       <NSelect

@@ -11,6 +11,10 @@ import { RouterView, useRouter, useRoute } from 'vue-router'
 import { useAppStore } from '../stores/app'
 import { useSessionStore } from '../stores/session'
 import headerLogo from '../assets/geociteops-header.svg'
+import { useI18n } from '@/i18n'
+import LanguageSwitcher from '@/components/common/LanguageSwitcher.vue'
+const { t } = useI18n()
+
 
 const appStore = useAppStore()
 const sessionStore = useSessionStore()
@@ -23,10 +27,10 @@ function renderIcon(emoji: string) {
 
 // key = 路由名；detail 页归并高亮到列表项
 const baseMenuOptions: MenuOption[] = [
-  { label: '概览', key: 'admin-overview', icon: renderIcon('🛠️') } as MenuOption,
-  { label: 'Workspace 管理', key: 'admin-workspaces', icon: renderIcon('🗂️') } as MenuOption,
-  { label: '员工账号', key: 'admin-users', icon: renderIcon('👥') } as MenuOption,
-  { label: '审计日志', key: 'admin-audit-log', icon: renderIcon('📜') } as MenuOption,
+  { label: t("概览"), key: 'admin-overview', icon: renderIcon('🛠️') } as MenuOption,
+  { label: t("Workspace 管理"), key: 'admin-workspaces', icon: renderIcon('🗂️') } as MenuOption,
+  { label: t("员工账号"), key: 'admin-users', icon: renderIcon('👥') } as MenuOption,
+  { label: t("审计日志"), key: 'admin-audit-log', icon: renderIcon('📜') } as MenuOption,
 ]
 
 /**
@@ -46,11 +50,11 @@ const MENU_VISIBILITY: Record<string, PlatformRoleValue[]> = {
 }
 
 const commerceMenuOptions: MenuOption[] = [
-  { label: '订单中心', key: 'admin-orders', icon: renderIcon('📦') } as MenuOption,
-  { label: '收款确认', key: 'admin-payments', icon: renderIcon('💰') } as MenuOption,
-  { label: '退款管理', key: 'admin-refunds', icon: renderIcon('↩️') } as MenuOption,
-  { label: '发票管理', key: 'admin-invoices', icon: renderIcon('🧾') } as MenuOption,
-  { label: '服务目录', key: 'admin-catalog', icon: renderIcon('🛍️') } as MenuOption,
+  { label: t("订单中心"), key: 'admin-orders', icon: renderIcon('📦') } as MenuOption,
+  { label: t("收款确认"), key: 'admin-payments', icon: renderIcon('💰') } as MenuOption,
+  { label: t("退款管理"), key: 'admin-refunds', icon: renderIcon('↩️') } as MenuOption,
+  { label: t("发票管理"), key: 'admin-invoices', icon: renderIcon('🧾') } as MenuOption,
+  { label: t("服务目录"), key: 'admin-catalog', icon: renderIcon('🛍️') } as MenuOption,
 ]
 
 const platformRole = computed<PlatformRoleValue | null>(() => sessionStore.me?.platformRole ?? null)
@@ -80,8 +84,8 @@ function handleMenuUpdate(key: string) {
 }
 
 const userOptions = [
-  { label: '修改密码', key: 'change-password' },
-  { label: '退出登录', key: 'logout' },
+  { label: t("修改密码"), key: 'change-password' },
+  { label: t("退出登录"), key: 'logout' },
 ]
 
 function handleUserAction(key: string) {
@@ -131,17 +135,18 @@ function handleUserAction(key: string) {
     <NLayout>
       <NLayoutHeader bordered style="height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; gap: 12px">
         <NSpace align="center" :size="6">
-          <span style="font-size: 13px; color: var(--text-color-3)">平台管理</span>
+          <span style="font-size: 13px; color: var(--text-color-3)">{{ t('平台管理') }}</span>
         </NSpace>
         <NSpace align="center" :wrap="false">
+          <LanguageSwitcher />
           <NDropdown :options="userOptions" @select="handleUserAction">
             <NButton size="small" quaternary>
-              {{ sessionStore.me ? (sessionStore.me.displayName || sessionStore.me.username) : '未登录' }}
+              {{ sessionStore.me ? (sessionStore.me.displayName || sessionStore.me.username) : t('未登录') }}
             </NButton>
           </NDropdown>
           <NSwitch :value="appStore.darkMode" size="small" @update:value="appStore.toggleDarkMode">
-            <template #checked>暗色</template>
-            <template #unchecked>亮色</template>
+            <template #checked>{{ t('暗色') }}</template>
+            <template #unchecked>{{ t('亮色') }}</template>
           </NSwitch>
         </NSpace>
       </NLayoutHeader>

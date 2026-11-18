@@ -6,6 +6,9 @@ import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart } from 'echarts/charts'
 import { TooltipComponent, GridComponent, LegendComponent } from 'echarts/components'
 import { NEmpty } from 'naive-ui'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 use([CanvasRenderer, LineChart, TooltipComponent, GridComponent, LegendComponent])
 
@@ -28,11 +31,11 @@ export interface GeoScorePoint {
 const props = withDefaults(defineProps<{ points: GeoScorePoint[]; height?: string }>(), { height: '320px' })
 
 const SERIES = [
-  { key: 'score' as const, name: '总分', color: '#17323a' },
-  { key: 'agentReadiness' as const, name: 'Agent 就绪', color: '#0f766e' },
-  { key: 'citations' as const, name: 'AI 引用快照', color: '#2080f0' },
-  { key: 'citability' as const, name: '内容可引用性', color: '#f0a020' },
-  { key: 'structuredSignals' as const, name: '结构化信号', color: '#8a63d2' },
+  { key: 'score' as const, name: t("总分"), color: '#17323a' },
+  { key: 'agentReadiness' as const, name: t("Agent 就绪"), color: '#0f766e' },
+  { key: 'citations' as const, name: t("AI 引用快照"), color: '#2080f0' },
+  { key: 'citability' as const, name: t("内容可引用性"), color: '#f0a020' },
+  { key: 'structuredSignals' as const, name: t("结构化信号"), color: '#8a63d2' },
 ]
 
 function valueOf(point: GeoScorePoint, key: (typeof SERIES)[number]['key']): number | null {
@@ -49,7 +52,7 @@ const option = computed(() => {
         const list = Array.isArray(params) ? params : [params]
         const point = points[list[0]?.dataIndex ?? -1]
         if (!point) return ''
-        const when = point.trigger === 'SCHEDULED' ? '定时复跑' : '手动'
+        const when = point.trigger === 'SCHEDULED' ? t("定时复跑") : t("手动")
         const rows = [`<div style="font-weight:600">${point.date} · ${point.brandName}</div>`, `${when} · ${point.grade}`]
         for (const item of list) {
           if (item.value == null) continue
@@ -78,6 +81,6 @@ const option = computed(() => {
 </script>
 
 <template>
-  <NEmpty v-if="points.length === 0" description="还没有完成的体检，跑完一次之后这里会画出总分和四根支柱。" style="padding: 32px 0" />
+  <NEmpty v-if="points.length === 0" :description="t('还没有完成的体检，跑完一次之后这里会画出总分和四根支柱。')" style="padding: 32px 0" />
   <VChart v-else :option="option" :style="{ height }" autoresize />
 </template>

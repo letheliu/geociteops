@@ -17,6 +17,9 @@ import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
 import { useSessionStore } from '../../stores/session'
 import { formatCents } from '../../utils/money'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 type ProductKindValue = 'SUBSCRIPTION' | 'SERVICE' | 'ADDON'
 type BillingPeriodValue = 'MONTH' | 'YEAR'
@@ -51,18 +54,18 @@ const loading = ref(false)
 const products = ref<AdminProduct[]>([])
 
 const KIND_LABEL: Record<string, string> = {
-  SUBSCRIPTION: '套餐订阅',
-  SERVICE: '单项服务',
-  ADDON: '加购包',
+  SUBSCRIPTION: t("套餐订阅"),
+  SERVICE: t("单项服务"),
+  ADDON: t("加购包"),
 }
 
 const PERIOD_LABEL: Record<string, string> = {
-  MONTH: '/ 月',
-  YEAR: '/ 年',
+  MONTH: t("/ 月"),
+  YEAR: t("/ 年"),
 }
 
 function periodLabel(period: BillingPeriodValue | null): string {
-  return period ? (PERIOD_LABEL[period] ?? period) : '一次性'
+  return period ? (PERIOD_LABEL[period] ?? period) : t("一次性")
 }
 
 /** entitlements JSON 摘要（表格列展示，完整内容在编辑 Modal 内） */
@@ -78,7 +81,7 @@ async function load() {
     const result = await trpc.admin.catalog.product.list.query()
     products.value = result.items as unknown as AdminProduct[]
   } catch (e: any) {
-    message.error(e?.message || '目录加载失败')
+    message.error(e?.message || t("目录加载失败"))
   } finally {
     loading.value = false
   }
@@ -138,11 +141,11 @@ function openProductEdit(row: AdminProduct) {
 async function handleProductSubmit() {
   const f = productForm.value
   if (!f.name.trim()) {
-    message.warning('请填写商品名称')
+    message.warning(t("请填写商品名称"))
     return
   }
   if (!productEditing.value && !f.code.trim()) {
-    message.warning('请填写商品 code（创建后不可修改）')
+    message.warning(t("请填写商品 code（创建后不可修改）"))
     return
   }
   productSaving.value = true
@@ -154,7 +157,7 @@ async function handleProductSubmit() {
         description: f.description,
       })) as unknown as AdminProduct
       mergeProduct(view)
-      message.success('商品已更新')
+      message.success(t("商品已更新"))
     } else {
       const view = (await trpc.admin.catalog.product.create.mutate({
         code: f.code.trim(),
@@ -163,11 +166,11 @@ async function handleProductSubmit() {
         description: f.description,
       })) as unknown as AdminProduct
       mergeProduct(view)
-      message.success('商品已创建，请继续添加套餐')
+      message.success(t("商品已创建，请继续添加套餐"))
     }
     showProductModal.value = false
   } catch (e: any) {
-    message.error(e?.message || '保存失败')
+    message.error(e?.message || t("保存失败"))
   } finally {
     productSaving.value = false
   }
@@ -180,9 +183,9 @@ async function handleProductToggle(row: AdminProduct, active: boolean) {
       active,
     })) as unknown as AdminProduct
     mergeProduct(view)
-    message.success(active ? '商品已上架' : '商品已下架（商城不再展示，存量订单不受影响）')
+    message.success(active ? t("商品已上架") : t("商品已下架（商城不再展示，存量订单不受影响）"))
   } catch (e: any) {
-    message.error(e?.message || '操作失败')
+    message.error(e?.message || t("操作失败"))
   }
 }
 
@@ -199,9 +202,9 @@ const planForm = ref({
 })
 
 const periodOptions: SelectOption[] = [
-  { label: '一次性（无周期）', value: '' },
-  { label: '按月', value: 'MONTH' },
-  { label: '按年', value: 'YEAR' },
+  { label: t("一次性（无周期）"), value: '' },
+  { label: t("按月"), value: 'MONTH' },
+  { label: t("按年"), value: 'YEAR' },
 ]
 
 /** NSelect 空串占位一次性；提交时 null → 不传（创建）/ 显式 null（更新=清除） */
@@ -244,17 +247,17 @@ async function handlePlanSubmit() {
   if (!product) return
   const f = planForm.value
   if (!f.name.trim()) {
-    message.warning('请填写套餐名称')
+    message.warning(t("请填写套餐名称"))
     return
   }
   const priceCents = Math.round((f.priceYuan ?? -1) * 100)
   if (!Number.isFinite(priceCents) || priceCents < 0) {
-    message.warning('价格须为非负金额（元）')
+    message.warning(t("价格须为非负金额（元）"))
     return
   }
   const entitlements = parseEntitlements()
   if (!entitlements) {
-    message.warning('entitlements 须为合法 JSON 对象（如 {"maxQueries": 100}，空为 {}）')
+    message.warning(t("entitlements 须为合法 JSON 对象（如 {\"maxQueries\": 100}，空为 {}）"))
     return
   }
   planSaving.value = true
@@ -269,7 +272,7 @@ async function handlePlanSubmit() {
         entitlements,
       })) as unknown as AdminPlan
       mergePlan(product.id, view)
-      message.success('套餐已更新')
+      message.success(t("套餐已更新"))
     } else {
       const view = (await trpc.admin.catalog.plan.create.mutate({
         productId: product.id,
@@ -279,11 +282,11 @@ async function handlePlanSubmit() {
         entitlements,
       })) as unknown as AdminPlan
       mergePlan(product.id, view)
-      message.success('套餐已创建')
+      message.success(t("套餐已创建"))
     }
     showPlanModal.value = false
   } catch (e: any) {
-    message.error(e?.message || '保存失败')
+    message.error(e?.message || t("保存失败"))
   } finally {
     planSaving.value = false
   }
@@ -296,22 +299,22 @@ async function handlePlanToggle(product: AdminProduct, plan: AdminPlan, active: 
       active,
     })) as unknown as AdminPlan
     mergePlan(product.id, view)
-    message.success(active ? '套餐已上架' : '套餐已下架（商城不再展示，存量订单不受影响）')
+    message.success(active ? t("套餐已上架") : t("套餐已下架（商城不再展示，存量订单不受影响）"))
   } catch (e: any) {
-    message.error(e?.message || '操作失败')
+    message.error(e?.message || t("操作失败"))
   }
 }
 
 // ===== 套餐表格（产品行展开内嵌） =====
 const planColumns: DataTableColumns<AdminPlan> = [
-  { title: '套餐', key: 'name', minWidth: 140 },
+  { title: t("套餐"), key: 'name', minWidth: 140 },
   {
-    title: '价格',
+    title: t("价格"),
     key: 'priceCents',
     width: 130,
     render: (row) => `¥${formatCents(row.priceCents)}${row.billingPeriod ? PERIOD_LABEL[row.billingPeriod] ?? '' : ''}`,
   },
-  { title: '计费周期', key: 'billingPeriod', width: 100, render: (row) => periodLabel(row.billingPeriod) },
+  { title: t("计费周期"), key: 'billingPeriod', width: 100, render: (row) => periodLabel(row.billingPeriod) },
   {
     title: 'entitlements',
     key: 'entitlements',
@@ -320,31 +323,31 @@ const planColumns: DataTableColumns<AdminPlan> = [
     render: (row) => entitlementsSummary(row.entitlements),
   },
   {
-    title: '状态',
+    title: t("状态"),
     key: 'active',
     width: 90,
     render: (row) =>
       h(NTag, { size: 'small', bordered: false, type: row.active ? 'success' : 'default' }, {
-        default: () => (row.active ? '在售' : '已下架'),
+        default: () => (row.active ? t("在售") : t("已下架")),
       }),
   },
   {
-    title: '操作',
+    title: t("操作"),
     key: 'actions',
     width: 180,
     render: (row) =>
       h(NSpace, { size: 'small' }, {
         default: () => [
           h(NButton, { size: 'tiny', onClick: () => openPlanEdit(productOf(row), row) }, {
-            default: () => '编辑',
+            default: () => t("编辑"),
           }),
           row.active
             ? h(NPopconfirm, { onPositiveClick: () => handlePlanToggle(productOf(row), row, false) }, {
-                trigger: () => h(NButton, { size: 'tiny', type: 'warning' }, { default: () => '下架' }),
-                default: () => '确认下架该套餐？商城将不再展示。',
+                trigger: () => h(NButton, { size: 'tiny', type: 'warning' }, { default: () => t("下架") }),
+                default: () => t("确认下架该套餐？商城将不再展示。"),
               })
             : h(NButton, { size: 'tiny', type: 'success', onClick: () => handlePlanToggle(productOf(row), row, true) }, {
-                default: () => '上架',
+                default: () => t("上架"),
               }),
         ],
       }),
@@ -374,10 +377,10 @@ const productColumns: DataTableColumns<AdminProduct> = [
         h(NSpace, { justify: 'space-between', align: 'center', style: { 'margin-bottom': '8px' } }, {
           default: () => [
             h(NText, { depth: '3', style: 'font-size: 12px' }, {
-              default: () => `套餐（${row.plans.length}）——价格 / 周期 / entitlements 配额声明`,
+              default: () => `${t("套餐（")}${row.plans.length}${t("）——价格 / 周期 / entitlements 配额声明")}`,
             }),
             h(NButton, { size: 'tiny', type: 'primary', onClick: () => openPlanCreate(row) }, {
-              default: () => '+ 新建套餐',
+              default: () => t("+ 新建套餐"),
             }),
           ],
         }),
@@ -392,45 +395,45 @@ const productColumns: DataTableColumns<AdminProduct> = [
       ]),
   },
   { title: 'code', key: 'code', width: 140 },
-  { title: '商品', key: 'name', minWidth: 140 },
+  { title: t("商品"), key: 'name', minWidth: 140 },
   {
-    title: '类型',
+    title: t("类型"),
     key: 'kind',
     width: 110,
     render: (row) =>
       h(NTag, { size: 'small', bordered: false, type: 'info' }, { default: () => KIND_LABEL[row.kind] ?? row.kind }),
   },
   {
-    title: '描述',
+    title: t("描述"),
     key: 'description',
     minWidth: 200,
     ellipsis: { tooltip: true },
     render: (row) => row.description || '—',
   },
   {
-    title: '状态',
+    title: t("状态"),
     key: 'active',
     width: 90,
     render: (row) =>
       h(NTag, { size: 'small', bordered: false, type: row.active ? 'success' : 'default' }, {
-        default: () => (row.active ? '在售' : '已下架'),
+        default: () => (row.active ? t("在售") : t("已下架")),
       }),
   },
   {
-    title: '操作',
+    title: t("操作"),
     key: 'actions',
     width: 180,
     render: (row) =>
       h(NSpace, { size: 'small' }, {
         default: () => [
-          h(NButton, { size: 'tiny', onClick: () => openProductEdit(row) }, { default: () => '编辑' }),
+          h(NButton, { size: 'tiny', onClick: () => openProductEdit(row) }, { default: () => t("编辑") }),
           row.active
             ? h(NPopconfirm, { onPositiveClick: () => handleProductToggle(row, false) }, {
-                trigger: () => h(NButton, { size: 'tiny', type: 'warning' }, { default: () => '下架' }),
-                default: () => '确认下架该商品？商城将不再展示其全部套餐。',
+                trigger: () => h(NButton, { size: 'tiny', type: 'warning' }, { default: () => t("下架") }),
+                default: () => t("确认下架该商品？商城将不再展示其全部套餐。"),
               })
             : h(NButton, { size: 'tiny', type: 'success', onClick: () => handleProductToggle(row, true) }, {
-                default: () => '上架',
+                default: () => t("上架"),
               }),
         ],
       }),
@@ -440,18 +443,14 @@ const productColumns: DataTableColumns<AdminProduct> = [
 
 <template>
   <div>
-    <PageHeader title="服务目录" subtitle="商品与套餐管理、上下架控制（仅超级管理员）" />
+    <PageHeader :title="t('服务目录')" :subtitle="t('商品与套餐管理、上下架控制（仅超级管理员）')" />
 
-    <NAlert v-if="!isSuperAdmin" type="error" :bordered="false" :closable="false">
-      服务目录管理仅超级管理员（SUPER_ADMIN）可访问（catalog.manage 权限点）。
-    </NAlert>
+    <NAlert v-if="!isSuperAdmin" type="error" :bordered="false" :closable="false"> {{ t('服务目录管理仅超级管理员（SUPER_ADMIN）可访问（catalog.manage 权限点）。') }} </NAlert>
 
     <template v-else>
       <NSpace justify="space-between" align="center" style="margin-bottom: 16px">
-        <NText depth="3" style="font-size: 12px">
-          全量目录（含已下架条目）：下架后商城不再展示，可随时重新上架；code/kind 创建后不可修改。
-        </NText>
-        <NButton type="primary" @click="openProductCreate">+ 新建商品</NButton>
+        <NText depth="3" style="font-size: 12px"> {{ t('全量目录（含已下架条目）：下架后商城不再展示，可随时重新上架；code/kind 创建后不可修改。') }} </NText>
+        <NButton type="primary" @click="openProductCreate">{{ t('+ 新建商品') }}</NButton>
       </NSpace>
 
       <NCard>
@@ -470,7 +469,7 @@ const productColumns: DataTableColumns<AdminProduct> = [
     <NModal
       v-model:show="showProductModal"
       preset="card"
-      :title="productEditing ? '编辑商品' : '新建商品'"
+      :title="productEditing ? t('编辑商品') : t('新建商品')"
       style="width: 520px"
       :mask-closable="false"
     >
@@ -479,29 +478,29 @@ const productColumns: DataTableColumns<AdminProduct> = [
           <NInput
             v-model:value="productForm.code"
             :disabled="!!productEditing"
-            placeholder="对外业务键，创建后不可修改（如 geo-pro）"
+            :placeholder="t('对外业务键，创建后不可修改（如 geo-pro）')"
           />
         </NFormItem>
-        <NFormItem label="名称">
-          <NInput v-model:value="productForm.name" placeholder="商品名称" />
+        <NFormItem :label="t('名称')">
+          <NInput v-model:value="productForm.name" :placeholder="t('商品名称')" />
         </NFormItem>
-        <NFormItem label="类型">
+        <NFormItem :label="t('类型')">
           <NSelect v-model:value="productForm.kind" :options="kindOptions" :disabled="!!productEditing" />
         </NFormItem>
-        <NFormItem label="描述">
+        <NFormItem :label="t('描述')">
           <NInput
             v-model:value="productForm.description"
             type="textarea"
-            placeholder="商城展示用描述（可空）"
+            :placeholder="t('商城展示用描述（可空）')"
             :maxlength="2000"
           />
         </NFormItem>
       </NForm>
       <template #footer>
         <NSpace justify="end">
-          <NButton @click="showProductModal = false">取消</NButton>
+          <NButton @click="showProductModal = false">{{ t('取消') }}</NButton>
           <NButton type="primary" :loading="productSaving" @click="handleProductSubmit">
-            {{ productEditing ? '保存' : '创建' }}
+            {{ productEditing ? t('保存') : t('创建') }}
           </NButton>
         </NSpace>
       </template>
@@ -511,23 +510,23 @@ const productColumns: DataTableColumns<AdminProduct> = [
     <NModal
       v-model:show="showPlanModal"
       preset="card"
-      :title="planEditing ? '编辑套餐' : '新建套餐'"
+      :title="planEditing ? t('编辑套餐') : t('新建套餐')"
       style="width: 560px"
       :mask-closable="false"
     >
       <NForm label-placement="left" label-width="110">
-        <NFormItem label="所属商品">
+        <NFormItem :label="t('所属商品')">
           <NText>{{ planProduct?.name }}（{{ planProduct?.code }}）</NText>
         </NFormItem>
-        <NFormItem label="套餐名称">
-          <NInput v-model:value="planForm.name" placeholder="如 专业版 / 诊断加购包" />
+        <NFormItem :label="t('套餐名称')">
+          <NInput v-model:value="planForm.name" :placeholder="t('如 专业版 / 诊断加购包')" />
         </NFormItem>
-        <NFormItem label="价格">
+        <NFormItem :label="t('价格')">
           <NInputNumber v-model:value="planForm.priceYuan" :min="0" :precision="2" style="width: 200px">
-            <template #suffix>元</template>
+            <template #suffix>{{ t('元') }}</template>
           </NInputNumber>
         </NFormItem>
-        <NFormItem label="计费周期">
+        <NFormItem :label="t('计费周期')">
           <NSelect
             :value="planForm.billingPeriod ?? ''"
             :options="periodOptions"
@@ -540,18 +539,16 @@ const productColumns: DataTableColumns<AdminProduct> = [
             v-model:value="planForm.entitlementsText"
             type="textarea"
             :rows="5"
-            placeholder='配额声明 JSON 对象，如 {"maxWorkspaces": 3, "maxQueries": 1000}'
+            :placeholder="t('配额声明 JSON 对象，如 {&quot;maxWorkspaces&quot;: 3, &quot;maxQueries&quot;: 1000}')"
           />
         </NFormItem>
       </NForm>
-      <div style="font-size: 12px; color: var(--text-color-3)">
-        entitlements 须为 JSON 对象（商城配额展示与配额扣减的依据）；提交前会做 JSON.parse 校验。
-      </div>
+      <div style="font-size: 12px; color: var(--text-color-3)"> {{ t('entitlements 须为 JSON 对象（商城配额展示与配额扣减的依据）；提交前会做 JSON.parse 校验。') }} </div>
       <template #footer>
         <NSpace justify="end">
-          <NButton @click="showPlanModal = false">取消</NButton>
+          <NButton @click="showPlanModal = false">{{ t('取消') }}</NButton>
           <NButton type="primary" :loading="planSaving" @click="handlePlanSubmit">
-            {{ planEditing ? '保存' : '创建' }}
+            {{ planEditing ? t('保存') : t('创建') }}
           </NButton>
         </NSpace>
       </template>

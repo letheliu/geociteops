@@ -15,6 +15,9 @@ import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
 import { enterWorkspace } from '../../utils/enter-workspace'
 import { router } from '../../router'
+import { useI18n } from '@/i18n'
+const { t, locale: appLocale } = useI18n()
+
 
 const message = useMessage()
 
@@ -54,7 +57,7 @@ async function load() {
     items.value = result.items
     total.value = result.total
   } catch (e: any) {
-    message.error(e?.message || '加载失败')
+    message.error(e?.message || t("加载失败"))
   } finally {
     loading.value = false
   }
@@ -89,43 +92,43 @@ async function handleEnter(row: WorkspaceRow) {
   try {
     await enterWorkspace(row.id)
   } catch (e: any) {
-    message.error(e?.message || '进入失败')
+    message.error(e?.message || t("进入失败"))
   }
 }
 
 async function handleSuspend(row: WorkspaceRow) {
   try {
     await trpc.admin.workspace.suspend.mutate({ workspaceId: row.id })
-    message.success('已暂停')
+    message.success(t("已暂停"))
     await load()
   } catch (e: any) {
-    message.error(e?.message || '操作失败')
+    message.error(e?.message || t("操作失败"))
   }
 }
 
 async function handleResume(row: WorkspaceRow) {
   try {
     await trpc.admin.workspace.resume.mutate({ workspaceId: row.id })
-    message.success('已恢复')
+    message.success(t("已恢复"))
     await load()
   } catch (e: any) {
-    message.error(e?.message || '操作失败')
+    message.error(e?.message || t("操作失败"))
   }
 }
 
 async function handleArchive(row: WorkspaceRow) {
   try {
     await trpc.admin.workspace.archive.mutate({ workspaceId: row.id })
-    message.success('已归档')
+    message.success(t("已归档"))
     await load()
   } catch (e: any) {
-    message.error(e?.message || '操作失败')
+    message.error(e?.message || t("操作失败"))
   }
 }
 
 const columns: DataTableColumns<WorkspaceRow> = [
   {
-    title: '名称',
+    title: t("名称"),
     key: 'name',
     minWidth: 180,
     render(row) {
@@ -137,7 +140,7 @@ const columns: DataTableColumns<WorkspaceRow> = [
     },
   },
   {
-    title: '状态',
+    title: t("状态"),
     key: 'status',
     width: 120,
     render(row) {
@@ -145,16 +148,16 @@ const columns: DataTableColumns<WorkspaceRow> = [
       return h(NTag, { size: 'small', type: meta.type, bordered: false }, { default: () => meta.label })
     },
   },
-  { title: '所属企业', key: 'organization', minWidth: 140, render: (row) => row.organization?.name ?? '—' },
-  { title: '域名', key: 'domain', minWidth: 160, ellipsis: { tooltip: true }, render: (row) => row.domain || '—' },
+  { title: t("所属企业"), key: 'organization', minWidth: 140, render: (row) => row.organization?.name ?? '—' },
+  { title: t("域名"), key: 'domain', minWidth: 160, ellipsis: { tooltip: true }, render: (row) => row.domain || '—' },
   {
-    title: '创建时间',
+    title: t("创建时间"),
     key: 'createdAt',
     width: 170,
-    render: (row) => new Date(row.createdAt).toLocaleString('zh-CN'),
+    render: (row) => new Date(row.createdAt).toLocaleString(appLocale.value),
   },
   {
-    title: '操作',
+    title: t("操作"),
     key: 'actions',
     width: 300,
     render(row) {
@@ -162,32 +165,32 @@ const columns: DataTableColumns<WorkspaceRow> = [
         h(
           NButton,
           { size: 'tiny', type: 'primary', disabled: row.status !== 'ACTIVE', onClick: () => handleEnter(row) },
-          { default: () => '进入' },
+          { default: () => t("进入") },
         ),
         h(
           NButton,
           { size: 'tiny', onClick: () => router.push({ name: 'admin-workspace-detail', params: { id: row.id } }) },
-          { default: () => '详情' },
+          { default: () => t("详情") },
         ),
       ]
       if (row.status === 'ACTIVE') {
         buttons.push(
           h(NPopconfirm, { onPositiveClick: () => handleSuspend(row) }, {
-            trigger: () => h(NButton, { size: 'tiny', type: 'warning' }, { default: () => '暂停' }),
-            default: () => '确认暂停该 Workspace？暂停后客户侧不可用。',
+            trigger: () => h(NButton, { size: 'tiny', type: 'warning' }, { default: () => t("暂停") }),
+            default: () => t("确认暂停该 Workspace？暂停后客户侧不可用。"),
           }),
         )
       }
       if (row.status === 'SUSPENDED') {
         buttons.push(
-          h(NButton, { size: 'tiny', type: 'success', onClick: () => handleResume(row) }, { default: () => '恢复' }),
+          h(NButton, { size: 'tiny', type: 'success', onClick: () => handleResume(row) }, { default: () => t("恢复") }),
         )
       }
       if (row.status !== 'ARCHIVED') {
         buttons.push(
           h(NPopconfirm, { onPositiveClick: () => handleArchive(row) }, {
-            trigger: () => h(NButton, { size: 'tiny', type: 'error' }, { default: () => '归档' }),
-            default: () => '确认归档？归档后不可恢复。',
+            trigger: () => h(NButton, { size: 'tiny', type: 'error' }, { default: () => t("归档") }),
+            default: () => t("确认归档？归档后不可恢复。"),
           }),
         )
       }
@@ -220,16 +223,16 @@ function openCreate() {
 async function handleCreate() {
   const f = createForm.value
   if (!f.name.trim() || !f.defaultBrandName.trim()) {
-    message.warning('请填写名称与默认品牌名')
+    message.warning(t("请填写名称与默认品牌名"))
     return
   }
   if (createNewOrg.value) {
     if (!f.newOrganizationName.trim()) {
-      message.warning('请填写新企业名称')
+      message.warning(t("请填写新企业名称"))
       return
     }
   } else if (!f.organizationId) {
-    message.warning('请选择所属企业')
+    message.warning(t("请选择所属企业"))
     return
   }
   creating.value = true
@@ -243,10 +246,10 @@ async function handleCreate() {
         : { organizationId: f.organizationId! }),
     })
     issuedKey.value = result.apiKey
-    message.success('Workspace 已创建')
+    message.success(t("Workspace 已创建"))
     await load()
   } catch (e: any) {
-    message.error(e?.message || '创建失败')
+    message.error(e?.message || t("创建失败"))
   } finally {
     creating.value = false
   }
@@ -261,16 +264,16 @@ function handleCloseCreate() {
 async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text)
-    message.success('已复制')
+    message.success(t("已复制"))
   } catch {
-    message.error('复制失败，请手动选择复制')
+    message.error(t("复制失败，请手动选择复制"))
   }
 }
 </script>
 
 <template>
   <div>
-    <PageHeader title="Workspace 管理" subtitle="客户工作区的开通、状态与凭证管理" />
+    <PageHeader :title="t('Workspace 管理')" :subtitle="t('客户工作区的开通、状态与凭证管理')" />
 
     <NSpace justify="space-between" style="margin-bottom: 16px">
       <NSpace>
@@ -278,21 +281,21 @@ async function copyText(text: string) {
           v-model:value="statusFilter"
           :options="statusOptions"
           clearable
-          placeholder="状态"
+          :placeholder="t('状态')"
           style="width: 150px"
           @update:value="handleSearch"
         />
         <NInput
           v-model:value="keyword"
           clearable
-          placeholder="名称 / 域名关键字"
+          :placeholder="t('名称 / 域名关键字')"
           style="width: 220px"
           @keyup.enter="handleSearch"
           @clear="handleSearch"
         />
-        <NButton @click="handleSearch">查询</NButton>
+        <NButton @click="handleSearch">{{ t('搜索') }}</NButton>
       </NSpace>
-      <NButton type="primary" @click="openCreate">+ 新建 Workspace</NButton>
+      <NButton type="primary" @click="openCreate">{{ t('+ 新建 Workspace') }}</NButton>
     </NSpace>
 
     <NCard>
@@ -318,61 +321,59 @@ async function copyText(text: string) {
     <NModal
       :show="showModal"
       preset="card"
-      :title="issuedKey ? 'Workspace 已创建' : '新建 Workspace'"
+      :title="issuedKey ? t('Workspace 已创建') : t('新建 Workspace')"
       style="width: 560px"
       :mask-closable="false"
       @update:show="(v: boolean) => { if (!v) handleCloseCreate() }"
     >
       <!-- 成功态：一次性 API Key -->
       <NSpace v-if="issuedKey" vertical :size="12">
-        <NText type="warning" style="font-size: 13px">
-          初始 API Key 仅此一次展示，关闭后不可再查看，请立即复制并妥善保管。
-        </NText>
+        <NText type="warning" style="font-size: 13px"> {{ t('初始 API Key 仅此一次展示，关闭后不可再查看，请立即复制并妥善保管。') }} </NText>
         <NInputGroup>
           <NInput :value="issuedKey" readonly />
-          <NButton type="primary" @click="copyText(issuedKey)">复制</NButton>
+          <NButton type="primary" @click="copyText(issuedKey)">{{ t('复制') }}</NButton>
         </NInputGroup>
       </NSpace>
 
       <!-- 表单态 -->
       <NForm v-else label-placement="left" label-width="110">
-        <NFormItem label="新建企业">
+        <NFormItem :label="t('新建企业')">
           <NSpace align="center" :size="8">
             <NSwitch v-model:value="createNewOrg" size="small" />
             <NText depth="3" style="font-size: 12px">
-              {{ createNewOrg ? '输入新企业名称' : '从已有企业中选择' }}
+              {{ createNewOrg ? t('输入新企业名称') : t('从已有企业中选择') }}
             </NText>
           </NSpace>
         </NFormItem>
-        <NFormItem v-if="createNewOrg" label="企业名称">
-          <NInput v-model:value="createForm.newOrganizationName" placeholder="新企业全称" />
+        <NFormItem v-if="createNewOrg" :label="t('企业名称')">
+          <NInput v-model:value="createForm.newOrganizationName" :placeholder="t('新企业全称')" />
         </NFormItem>
-        <NFormItem v-else label="所属企业">
+        <NFormItem v-else :label="t('所属企业')">
           <NSelect
             v-model:value="createForm.organizationId"
             :options="orgOptions"
             filterable
-            placeholder="搜索选择企业（仅列出当前列表中出现的组织）"
+            :placeholder="t('搜索选择企业（仅列出当前列表中出现的组织）')"
           />
         </NFormItem>
-        <NFormItem label="名称">
-          <NInput v-model:value="createForm.name" placeholder="Workspace 名称" />
+        <NFormItem :label="t('名称')">
+          <NInput v-model:value="createForm.name" :placeholder="t('Workspace 名称')" />
         </NFormItem>
-        <NFormItem label="默认品牌名">
-          <NInput v-model:value="createForm.defaultBrandName" placeholder="引用归属展示用的品牌名" />
+        <NFormItem :label="t('默认品牌名')">
+          <NInput v-model:value="createForm.defaultBrandName" :placeholder="t('引用归属展示用的品牌名')" />
         </NFormItem>
-        <NFormItem label="域名（可选）">
+        <NFormItem :label="t('域名（可选）')">
           <NInput v-model:value="createForm.domain" placeholder="example.com" />
         </NFormItem>
       </NForm>
       <template #footer>
         <NSpace justify="end">
           <template v-if="issuedKey">
-            <NButton type="primary" @click="handleCloseCreate">我已保存，关闭</NButton>
+            <NButton type="primary" @click="handleCloseCreate">{{ t('我已保存，关闭') }}</NButton>
           </template>
           <template v-else>
-            <NButton @click="handleCloseCreate">取消</NButton>
-            <NButton type="primary" :loading="creating" @click="handleCreate">创建</NButton>
+            <NButton @click="handleCloseCreate">{{ t('取消') }}</NButton>
+            <NButton type="primary" :loading="creating" @click="handleCreate">{{ t('创建') }}</NButton>
           </template>
         </NSpace>
       </template>

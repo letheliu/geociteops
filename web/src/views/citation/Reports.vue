@@ -8,6 +8,9 @@ import {
 import type { DataTableColumns } from 'naive-ui'
 import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
+import { useI18n } from '@/i18n'
+const { t, locale: appLocale } = useI18n()
+
 
 /**
  * 引用报告（Run 维度，规格 §5/§8）：
@@ -55,7 +58,7 @@ async function loadWeakPoints() {
     weakPoints.value = result.weakPoints as any[]
     optimizationsAllowed.value = result.optimizationsAllowed
   } catch (e: any) {
-    message.error(e?.message || '加载薄弱查询失败')
+    message.error(e?.message || t("加载薄弱查询失败"))
   } finally {
     weakLoading.value = false
   }
@@ -66,11 +69,11 @@ async function handleOptimize(row: any) {
   optimizingId.value = row.queryId
   try {
     await trpc.citation.optimizeFromWeakPoint.mutate({ queryId: row.queryId })
-    message.success('已生成改写建议，去「优化任务」审核并发布')
+    message.success(t("已生成改写建议，去「优化任务」审核并发布"))
   } catch (e: any) {
-    const msg = e?.message || '生成失败'
-    if (msg.includes('映射页面') || msg.includes('尚未关联')) {
-      message.warning(`${msg}：请到「查询库」为该查询关联内容页`)
+    const msg = e?.message || t("生成失败")
+    if (msg.includes(t("映射页面")) || msg.includes(t("尚未关联"))) {
+      message.warning(`${msg}${t("：请到「查询库」为该查询关联内容页")}`)
     } else {
       message.error(msg)
     }
@@ -82,7 +85,7 @@ async function handleOptimize(row: any) {
 
 const weakColumns: DataTableColumns<any> = [
   {
-    title: '薄弱查询',
+    title: t("薄弱查询"),
     key: 'queryText',
     ellipsis: { tooltip: true },
     render(row) {
@@ -91,13 +94,13 @@ const weakColumns: DataTableColumns<any> = [
           h('span', {}, { default: () => row.queryText }),
           row.mappedPageUrl
             ? null
-            : h(NTag, { size: 'tiny', type: 'warning' }, { default: () => '未映射页面' }),
+            : h(NTag, { size: 'tiny', type: 'warning' }, { default: () => t("未映射页面") }),
         ],
       })
     },
   },
   {
-    title: '品牌提及率',
+    title: t("品牌提及率"),
     key: 'brandMentionRate',
     width: 110,
     render(row) {
@@ -107,7 +110,7 @@ const weakColumns: DataTableColumns<any> = [
     },
   },
   {
-    title: '主要竞品',
+    title: t("主要竞品"),
     key: 'topCompetitor',
     width: 150,
     render(row) {
@@ -117,7 +120,7 @@ const weakColumns: DataTableColumns<any> = [
     },
   },
   {
-    title: '样本',
+    title: t("样本"),
     key: 'validSamples',
     width: 80,
     render(row) {
@@ -126,7 +129,7 @@ const weakColumns: DataTableColumns<any> = [
         {},
         {
           trigger: () => h('span', {}, { default: () => row.validSamples }),
-          default: () => '有效样本数（OK 且有 SOV 分数）。样本越少指标越不稳定。',
+          default: () => t("有效样本数（OK 且有 SOV 分数）。样本越少指标越不稳定。"),
         },
       )
     },
@@ -150,9 +153,9 @@ const weakColumns: DataTableColumns<any> = [
                 loading: optimizingId.value === row.queryId,
                 onClick: () => handleOptimize(row),
               },
-              { default: () => '一键优化' },
+              { default: () => t("一键优化") },
             ),
-          default: () => '当前套餐不含内容优化，请联系开通',
+          default: () => t("当前套餐不含内容优化，请联系开通"),
         },
       )
     },
@@ -161,9 +164,9 @@ const weakColumns: DataTableColumns<any> = [
 
 const platformCheckbox = [
   { label: 'DeepSeek', value: 'deepseek' },
-  { label: '豆包', value: 'doubao' },
-  { label: '通义千问', value: 'qwen' },
-  { label: '文心一言', value: 'ernie' },
+  { label: t("豆包"), value: 'doubao' },
+  { label: t("通义千问"), value: 'qwen' },
+  { label: t("文心一言"), value: 'ernie' },
 ]
 
 async function loadData() {
@@ -177,7 +180,7 @@ async function loadData() {
     })
     runs.value = result.runs || []
   } catch (e: any) {
-    message.error(e?.message || '加载失败')
+    message.error(e?.message || t("加载失败"))
   } finally {
     loading.value = false
   }
@@ -191,11 +194,11 @@ onMounted(() => {
 
 async function handleTrack() {
   if (trackPlatforms.value.length === 0) {
-    message.warning('请选择至少一个平台')
+    message.warning(t("请选择至少一个平台"))
     return
   }
   if (trackSampleCount.value !== null && (trackSampleCount.value < 1 || trackSampleCount.value > 10)) {
-    message.warning('采样次数需在 1..10 之间')
+    message.warning(t("采样次数需在 1..10 之间"))
     return
   }
   trackLoading.value = true
@@ -205,14 +208,14 @@ async function handleTrack() {
       sampleCount: trackSampleCount.value ?? undefined,
     })
     if (!result.runId) {
-      message.warning('没有可监测的查询，请先在查询库中添加')
+      message.warning(t("没有可监测的查询，请先在查询库中添加"))
       return
     }
-    message.success('监测已触发，正在采样…')
+    message.success(t("监测已触发，正在采样…"))
     showTrackModal.value = false
     await loadData()
   } catch (e: any) {
-    message.error(e?.message || '触发失败')
+    message.error(e?.message || t("触发失败"))
   } finally {
     trackLoading.value = false
   }
@@ -231,37 +234,37 @@ async function showRunDetail(row: any) {
     detail.value = { ...row, ...result.run }
     detailSamples.value = result.events || []
   } catch (e: any) {
-    message.error(e?.message || '加载采样明细失败')
+    message.error(e?.message || t("加载采样明细失败"))
   } finally {
     detailLoading.value = false
   }
 }
 
 const statusMeta: Record<string, { label: string; type: 'success' | 'warning' | 'error' | 'default' | 'info' }> = {
-  COMPLETED: { label: '全部成功', type: 'success' },
-  PARTIAL: { label: '部分失败', type: 'warning' },
-  FAILED: { label: '全部失败', type: 'error' },
-  RUNNING: { label: '运行中', type: 'info' },
+  COMPLETED: { label: t("全部成功"), type: 'success' },
+  PARTIAL: { label: t("部分失败"), type: 'warning' },
+  FAILED: { label: t("全部失败"), type: 'error' },
+  RUNNING: { label: t("运行中"), type: 'info' },
 }
 
 const triggerLabel: Record<string, string> = {
-  SCHEDULED: '定时',
-  MANUAL: '手动',
-  LEGACY: '历史',
-  HEALTH_CHECK: '体检',
+  SCHEDULED: t("定时"),
+  MANUAL: t("手动"),
+  LEGACY: t("历史"),
+  HEALTH_CHECK: t("体检"),
 }
 
 const columns: DataTableColumns<any> = [
   {
-    title: '时间',
+    title: t("时间"),
     key: 'startedAt',
     width: 170,
     render(row) {
-      return new Date(row.startedAt).toLocaleString('zh-CN')
+      return new Date(row.startedAt).toLocaleString(appLocale.value)
     },
   },
   {
-    title: '来源',
+    title: t("来源"),
     key: 'trigger',
     width: 90,
     render(row) {
@@ -277,7 +280,7 @@ const columns: DataTableColumns<any> = [
     },
   },
   {
-    title: '有效 / 失败',
+    title: t("有效 / 失败"),
     key: 'validSamples',
     width: 120,
     render(row) {
@@ -293,7 +296,7 @@ const columns: DataTableColumns<any> = [
                   { trigger: 'hover' },
                   {
                     default: () => h(NTag, { size: 'small', type: 'warning' }, { default: () => String(row.failedSamples) }),
-                    trigger: () => '本次失败或缺失的采样数',
+                    trigger: () => t("本次失败或缺失的采样数"),
                   },
                 )
               : h('span', { style: 'color: var(--text-color-3)' }, { default: () => '0' }),
@@ -303,7 +306,7 @@ const columns: DataTableColumns<any> = [
     },
   },
   {
-    title: '状态',
+    title: t("状态"),
     key: 'status',
     width: 110,
     render(row) {
@@ -312,11 +315,11 @@ const columns: DataTableColumns<any> = [
     },
   },
   {
-    title: '备注',
+    title: t("备注"),
     key: 'failureReason',
     ellipsis: { tooltip: true },
     render(row) {
-      return row.legacy ? '历史事件级聚合口径' : (row.failureReason ?? '')
+      return row.legacy ? t("历史事件级聚合口径") : (row.failureReason ?? '')
     },
   },
   {
@@ -327,7 +330,7 @@ const columns: DataTableColumns<any> = [
       return h(
         NButton,
         { size: 'small', quaternary: true, onClick: () => showRunDetail(row) },
-        { default: () => '明细' },
+        { default: () => t("明细") },
       )
     },
   },
@@ -336,19 +339,19 @@ const columns: DataTableColumns<any> = [
 
 <template>
   <div>
-    <PageHeader title="引用报告" subtitle="按运行查看跨平台采样结果" />
+    <PageHeader :title="t('引用报告')" :subtitle="t('按运行查看跨平台采样结果')" />
 
     <NSpace justify="space-between" style="margin-bottom: 16px">
       <NSpace>
         <NDatePicker v-model:value="dateRange" type="daterange" clearable @update:value="loadData" />
       </NSpace>
-      <NButton type="primary" @click="showTrackModal = true">📡 触发监测</NButton>
+      <NButton type="primary" @click="showTrackModal = true">{{ t('📡 触发监测') }}</NButton>
     </NSpace>
 
-    <NCard title="薄弱查询" style="margin-bottom: 16px">
+    <NCard :title="t('薄弱查询')" style="margin-bottom: 16px">
       <template #header-extra>
         <NSpace>
-          <NButton size="small" @click="loadWeakPoints">刷新</NButton>
+          <NButton size="small" @click="loadWeakPoints">{{ t('刷新') }}</NButton>
         </NSpace>
       </template>
       <NDataTable
@@ -372,14 +375,14 @@ const columns: DataTableColumns<any> = [
     </NCard>
 
     <!-- Trigger Monitor Modal -->
-    <NModal v-model:show="showTrackModal" preset="card" title="触发监测" style="width: 480px">
+    <NModal v-model:show="showTrackModal" preset="card" :title="t('触发监测')" style="width: 480px">
       <NSpace vertical :size="16">
         <div>
-          <label style="font-size: 13px; margin-bottom: 6px; display: block">采样次数 N（留空用工作区配置）</label>
+          <label style="font-size: 13px; margin-bottom: 6px; display: block">{{ t('采样次数 N（留空用工作区配置）') }}</label>
           <NInputNumber v-model:value="trackSampleCount" :min="1" :max="10" placeholder="1..10" style="width: 160px" />
         </div>
         <div>
-          <label style="font-size: 13px; margin-bottom: 6px; display: block">监测平台</label>
+          <label style="font-size: 13px; margin-bottom: 6px; display: block">{{ t('监测平台') }}</label>
           <NCheckboxGroup v-model:value="trackPlatforms">
             <NSpace>
               <NCheckbox v-for="p in platformCheckbox" :key="p.value" :value="p.value" :label="p.label" />
@@ -387,15 +390,15 @@ const columns: DataTableColumns<any> = [
           </NCheckboxGroup>
         </div>
         <NSpace justify="end">
-          <NButton @click="showTrackModal = false">取消</NButton>
-          <NButton type="primary" :loading="trackLoading" @click="handleTrack">触发</NButton>
+          <NButton @click="showTrackModal = false">{{ t('取消') }}</NButton>
+          <NButton type="primary" :loading="trackLoading" @click="handleTrack">{{ t('触发') }}</NButton>
         </NSpace>
       </NSpace>
     </NModal>
 
     <!-- Run Detail Drawer -->
     <NDrawer v-model:show="showDetail" :width="640" placement="right">
-      <NDrawerContent :title="detail?.legacy ? `历史日桶 ${detail.date}` : '运行明细'" closable>
+      <NDrawerContent :title="detail?.legacy ? `${t('历史日桶 ')}${detail.date}` : t('运行明细')" closable>
         <NSpace v-if="detail" vertical :size="12">
           <NSpace align="center" :size="8">
             <NTag size="small" :type="(statusMeta[detail.status]?.type ?? 'default')">
@@ -403,49 +406,44 @@ const columns: DataTableColumns<any> = [
             </NTag>
             <NTag size="small" :type="detail.trigger === 'HEALTH_CHECK' ? 'info' : 'default'">{{ triggerLabel[detail.trigger] ?? detail.trigger }}</NTag>
             <span style="font-size: 12px; color: var(--text-color-3)">
-              N={{ detail.sampleCount }} · 有效 {{ detail.validSamples }}
-              <template v-if="detail.failedSamples > 0"> · 失败 {{ detail.failedSamples }}</template>
+              N={{ detail.sampleCount }} {{ t('· 有效') }} {{ detail.validSamples }}
+              <template v-if="detail.failedSamples > 0"> {{ t('· 失败') }} {{ detail.failedSamples }}</template>
             </span>
           </NSpace>
 
           <div v-if="detail.failureReason" style="font-size: 12px; color: var(--warning-color)">
             {{ detail.failureReason }}
           </div>
-          <div v-if="detail.slotKey" style="font-size: 12px; color: var(--text-color-3)">
-            槽位：{{ detail.slotKey }}（同槽位每日只会有一次运行）
-          </div>
+          <div v-if="detail.slotKey" style="font-size: 12px; color: var(--text-color-3)"> {{ t('槽位：') }}{{ detail.slotKey }}{{ t('（同槽位每日只会有一次运行）') }} </div>
 
           <NCollapse v-model:expanded="expanded">
             <NCollapseItem
               v-for="ev in detailSamples"
               :key="ev.id"
-              :title="`${ev.platform} · ${ev.sampleIndex ?? 1} · ${ev.status === 'OK' ? (ev.brandMentioned ? '✅ 提及' : '❌ 未提及') : '⚠️ 采样失败'}`"
+              :title="`${ev.platform} · ${ev.sampleIndex ?? 1} · ${ev.status === 'OK' ? (ev.brandMentioned ? t('✅ 提及') : t('❌ 未提及')) : t('⚠️ 采样失败')}`"
             >
               <NSpace vertical :size="8">
                 <div style="font-size: 12px; color: var(--text-color-3)">
                   {{ ev.query?.queryText || ev.queryId }}
-                  <template v-if="ev.rankInAnswer"> · 排名 #{{ ev.rankInAnswer }}</template>
+                  <template v-if="ev.rankInAnswer"> {{ t('· 排名 #') }}{{ ev.rankInAnswer }}</template>
                   <template v-if="ev.sovScore !== null && ev.sovScore !== undefined">
                     · SOV {{ (ev.sovScore * 100).toFixed(1) }}%
                   </template>
                 </div>
-                <div v-if="ev.status === 'FAILED'" style="font-size: 12px; color: var(--error-color)">
-                  失败原因：{{ ev.failureReason || '未知' }}
+                <div v-if="ev.status === 'FAILED'" style="font-size: 12px; color: var(--error-color)"> {{ t('失败原因：') }}{{ ev.failureReason || t('未知') }}
                 </div>
                 <div v-if="ev.rawAnswer" style="background: var(--code-color); padding: 12px; border-radius: 6px; font-size: 13px; max-height: 300px; overflow: auto; white-space: pre-wrap">
                   {{ ev.rawAnswer }}
                 </div>
                 <div>
-                  <div style="font-weight: 600; margin-bottom: 6px">引用 URL</div>
+                  <div style="font-weight: 600; margin-bottom: 6px">{{ t('引用 URL') }}</div>
                   <NCode :code="JSON.stringify(ev.citedUrls, null, 2)" language="json" />
                 </div>
               </NSpace>
             </NCollapseItem>
           </NCollapse>
 
-          <div v-if="!detailLoading && detailSamples.length === 0" style="color: var(--text-color-3)">
-            没有采样明细
-          </div>
+          <div v-if="!detailLoading && detailSamples.length === 0" style="color: var(--text-color-3)"> {{ t('没有采样明细') }} </div>
         </NSpace>
       </NDrawerContent>
     </NDrawer>

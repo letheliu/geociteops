@@ -14,6 +14,9 @@ import type { DataTableColumns, SelectOption } from 'naive-ui'
 import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
 import { useSessionStore } from '../../stores/session'
+import { useI18n } from '@/i18n'
+const { t, locale: appLocale } = useI18n()
+
 
 const message = useMessage()
 const sessionStore = useSessionStore()
@@ -45,7 +48,7 @@ async function loadWorkspaces() {
     const result = await trpc.org.workspaces.list.query({ page: 1, pageSize: 100 })
     workspaceOptions.value = result.items.map((w: WorkspaceRow) => ({ label: w.name, value: w.id }))
   } catch (e: any) {
-    message.error(e?.message || '工作区列表加载失败')
+    message.error(e?.message || t("工作区列表加载失败"))
   }
 }
 
@@ -62,7 +65,7 @@ async function loadCredentials() {
   try {
     items.value = await trpc.org.credentials.list.query({ workspaceId: selectedWorkspaceId.value })
   } catch (e: any) {
-    message.error(e?.message || '加载失败')
+    message.error(e?.message || t("加载失败"))
   } finally {
     loading.value = false
   }
@@ -92,12 +95,12 @@ function openCreate() {
 async function handleCreate() {
   const workspaceId = selectedWorkspaceId.value
   if (!workspaceId) {
-    message.warning('请先选择 Workspace')
+    message.warning(t("请先选择 Workspace"))
     return
   }
   const name = createName.value.trim()
   if (!name) {
-    message.warning('请填写凭证名称')
+    message.warning(t("请填写凭证名称"))
     return
   }
   creating.value = true
@@ -106,10 +109,10 @@ async function handleCreate() {
     showCreate.value = false
     secretText.value = result.plaintext
     secretModal.value = true
-    message.success('凭证已创建')
+    message.success(t("凭证已创建"))
     await loadCredentials()
   } catch (e: any) {
-    message.error(e?.message || '创建失败')
+    message.error(e?.message || t("创建失败"))
   } finally {
     creating.value = false
   }
@@ -124,9 +127,9 @@ function closeSecret() {
 async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text)
-    message.success('已复制')
+    message.success(t("已复制"))
   } catch {
-    message.error('复制失败，请手动选择复制')
+    message.error(t("复制失败，请手动选择复制"))
   }
 }
 
@@ -134,45 +137,45 @@ async function copyText(text: string) {
 async function handleRevoke(row: CredentialRow) {
   try {
     await trpc.org.credentials.revoke.mutate({ credentialId: row.id })
-    message.success('已吊销')
+    message.success(t("已吊销"))
     await loadCredentials()
   } catch (e: any) {
-    message.error(e?.message || '吊销失败')
+    message.error(e?.message || t("吊销失败"))
   }
 }
 
 const columns: DataTableColumns<CredentialRow> = [
-  { title: '名称', key: 'name', minWidth: 160 },
+  { title: t("名称"), key: 'name', minWidth: 160 },
   {
-    title: 'Key 前缀',
+    title: t("Key 前缀"),
     key: 'keyPrefix',
     width: 140,
     render: (row) => (row.keyPrefix ? `${row.keyPrefix}••••` : '—'),
   },
   {
-    title: '最近使用',
+    title: t("最近使用"),
     key: 'lastUsedAt',
     width: 170,
-    render: (row) => (row.lastUsedAt ? new Date(row.lastUsedAt).toLocaleString('zh-CN') : '从未使用'),
+    render: (row) => (row.lastUsedAt ? new Date(row.lastUsedAt).toLocaleString(appLocale.value) : t("从未使用")),
   },
   {
-    title: '状态',
+    title: t("状态"),
     key: 'revokedAt',
     width: 100,
     render: (row) =>
       row.revokedAt
-        ? h(NTag, { size: 'small', bordered: false, type: 'default' }, { default: () => '已吊销' })
-        : h(NTag, { size: 'small', bordered: false, type: 'success' }, { default: () => '有效' }),
+        ? h(NTag, { size: 'small', bordered: false, type: 'default' }, { default: () => t("已吊销") })
+        : h(NTag, { size: 'small', bordered: false, type: 'success' }, { default: () => t("有效") }),
   },
   {
-    title: '操作',
+    title: t("操作"),
     key: 'actions',
     width: 120,
     render(row) {
       if (row.revokedAt || !isOwner.value) return '—'
       return h(NPopconfirm, { onPositiveClick: () => handleRevoke(row) }, {
-        trigger: () => h(NButton, { size: 'tiny', type: 'error' }, { default: () => '吊销' }),
-        default: () => '确认吊销该凭证？吊销后使用该 Key 的调用立即失效，不可恢复。',
+        trigger: () => h(NButton, { size: 'tiny', type: 'error' }, { default: () => t("吊销") }),
+        default: () => t("确认吊销该凭证？吊销后使用该 Key 的调用立即失效，不可恢复。"),
       })
     },
   },
@@ -182,15 +185,13 @@ const columns: DataTableColumns<CredentialRow> = [
 <template>
   <div style="max-width: 1000px; margin: 0 auto; padding: 24px">
     <NSpace justify="space-between" align="center" style="margin-bottom: 16px">
-      <PageHeader title="API 凭证" subtitle="工作区 SDK Key 的签发与吊销（服务端接入用）" />
+      <PageHeader :title="t('API 凭证')" :subtitle="t('工作区 SDK Key 的签发与吊销（服务端接入用）')" />
       <NButton
         v-if="isOwner"
         type="primary"
         :disabled="!selectedWorkspaceId"
         @click="openCreate"
-      >
-        + 创建凭证
-      </NButton>
+      > {{ t('+ 创建凭证') }} </NButton>
     </NSpace>
 
     <NAlert
@@ -199,16 +200,14 @@ const columns: DataTableColumns<CredentialRow> = [
       :bordered="false"
       :closable="false"
       style="margin-bottom: 16px"
-    >
-      当前为只读视图：凭证的创建与吊销仅企业管理员（ORG_OWNER）可操作。
-    </NAlert>
+    > {{ t('当前为只读视图：凭证的创建与吊销仅企业管理员（ORG_OWNER）可操作。') }} </NAlert>
 
     <NSpace vertical :size="16">
       <NSelect
         :value="selectedWorkspaceId"
         :options="workspaceOptions"
         filterable
-        placeholder="选择 Workspace 查看其凭证"
+        :placeholder="t('选择 Workspace 查看其凭证')"
         @update:value="handleWorkspaceChange"
       />
       <NCard>
@@ -221,9 +220,7 @@ const columns: DataTableColumns<CredentialRow> = [
           :row-key="(row: CredentialRow) => row.id"
           :pagination="false"
         />
-        <NText v-else depth="3" style="font-size: 13px">
-          请先选择 Workspace——API 凭证按工作区隔离，创建后在一次性弹窗展示完整 Key。
-        </NText>
+        <NText v-else depth="3" style="font-size: 13px"> {{ t('请先选择 Workspace——API 凭证按工作区隔离，创建后在一次性弹窗展示完整 Key。') }} </NText>
       </NCard>
     </NSpace>
 
@@ -231,22 +228,20 @@ const columns: DataTableColumns<CredentialRow> = [
     <NModal
       v-model:show="showCreate"
       preset="card"
-      title="创建 API 凭证"
+      :title="t('创建 API 凭证')"
       style="width: 480px"
       :mask-closable="false"
     >
       <NForm label-placement="left" label-width="90">
-        <NFormItem label="名称">
-          <NInput v-model:value="createName" placeholder="凭证用途备注（1-100 字符）" />
+        <NFormItem :label="t('名称')">
+          <NInput v-model:value="createName" :placeholder="t('凭证用途备注（1-100 字符）')" />
         </NFormItem>
       </NForm>
-      <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 8px">
-        完整 Key 仅在创建成功后展示一次（服务端只存哈希），请立即复制并妥善保管。
-      </div>
+      <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 8px"> {{ t('完整 Key 仅在创建成功后展示一次（服务端只存哈希），请立即复制并妥善保管。') }} </div>
       <template #footer>
         <NSpace justify="end">
-          <NButton @click="showCreate = false">取消</NButton>
-          <NButton type="primary" :loading="creating" @click="handleCreate">创建</NButton>
+          <NButton @click="showCreate = false">{{ t('取消') }}</NButton>
+          <NButton type="primary" :loading="creating" @click="handleCreate">{{ t('创建') }}</NButton>
         </NSpace>
       </template>
     </NModal>
@@ -255,23 +250,21 @@ const columns: DataTableColumns<CredentialRow> = [
     <NModal
       :show="secretModal"
       preset="card"
-      title="API Key 已创建"
+      :title="t('API Key 已创建')"
       style="width: 560px"
       :mask-closable="false"
       @update:show="(v: boolean) => { if (!v) closeSecret() }"
     >
       <NSpace vertical :size="12">
-        <NText type="warning" style="font-size: 13px">
-          完整 API Key 仅此一次展示，关闭后不可再查看，请立即复制并妥善保管。
-        </NText>
+        <NText type="warning" style="font-size: 13px"> {{ t('完整 API Key 仅此一次展示，关闭后不可再查看，请立即复制并妥善保管。') }} </NText>
         <NInputGroup>
           <NInput :value="secretText" readonly />
-          <NButton type="primary" @click="copyText(secretText)">复制</NButton>
+          <NButton type="primary" @click="copyText(secretText)">{{ t('复制') }}</NButton>
         </NInputGroup>
       </NSpace>
       <template #footer>
         <NSpace justify="end">
-          <NButton type="primary" @click="closeSecret">我已保存，关闭</NButton>
+          <NButton type="primary" @click="closeSecret">{{ t('我已保存，关闭') }}</NButton>
         </NSpace>
       </template>
     </NModal>

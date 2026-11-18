@@ -19,6 +19,9 @@ import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
 import { useSessionStore } from '../../stores/session'
 import { formatCents } from '../../utils/money'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 const router = useRouter()
 const message = useMessage()
@@ -50,24 +53,24 @@ const loading = ref(false)
 const items = ref<ProductRow[]>([])
 
 const KIND_GROUP: { kind: ProductRow['kind']; title: string; hint: string }[] = [
-  { kind: 'SUBSCRIPTION', title: '套餐订阅', hint: '按月/年订阅，配额按套餐合并计算' },
-  { kind: 'SERVICE', title: '单项服务', hint: '一次性专业服务，交付里程碑跟踪' },
-  { kind: 'ADDON', title: '加购包', hint: '在订阅基础上叠加容量配额' },
+  { kind: 'SUBSCRIPTION', title: t("套餐订阅"), hint: t("按月/年订阅，配额按套餐合并计算") },
+  { kind: 'SERVICE', title: t("单项服务"), hint: t("一次性专业服务，交付里程碑跟踪") },
+  { kind: 'ADDON', title: t("加购包"), hint: t("在订阅基础上叠加容量配额") },
 ]
 
 const PERIOD_LABEL: Record<string, string> = {
-  MONTH: ' / 月',
-  YEAR: ' / 年',
+  MONTH: t(" / 月"),
+  YEAR: t(" / 年"),
 }
 
 /** 配额键 → 中文标签（与后端 CAPACITY_FIELDS 同键集） */
 const QUOTA_LABEL: Record<string, string> = {
-  maxWorkspaces: 'Workspace 数',
-  maxQueries: '查询数 / 月',
-  maxPages: '页面数',
-  diagnosticRunsPerMonth: '诊断次数 / 月',
-  samplesPerRun: '单次样本数',
-  optimizationsPerMonth: '优化次数 / 月',
+  maxWorkspaces: t("Workspace 数"),
+  maxQueries: t("查询数 / 月"),
+  maxPages: t("页面数"),
+  diagnosticRunsPerMonth: t("诊断次数 / 月"),
+  samplesPerRun: t("单次样本数"),
+  optimizationsPerMonth: t("优化次数 / 月"),
 }
 
 /** 配额摘要：已知键映射中文标签，allowedPlatforms 单列，未知键原样展示 */
@@ -83,7 +86,7 @@ function quotaSummary(entitlements: unknown): string[] {
   }
   const platforms = record.allowedPlatforms
   if (Array.isArray(platforms) && platforms.length > 0) {
-    parts.push(`平台 ${platforms.join(' / ')}`)
+    parts.push(`${t("平台 ")}${platforms.join(' / ')}`)
   }
   return parts
 }
@@ -99,7 +102,7 @@ async function load() {
     const result = await trpc.catalog.list.query()
     items.value = result.items
   } catch (e: any) {
-    message.error(e?.message || '商城目录加载失败')
+    message.error(e?.message || t("商城目录加载失败"))
   } finally {
     loading.value = false
   }
@@ -152,9 +155,9 @@ function openOrder(product: ProductRow, plan: PlanRow) {
 async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text)
-    message.success('已复制')
+    message.success(t("已复制"))
   } catch {
-    message.error('复制失败，请手动选择复制')
+    message.error(t("复制失败，请手动选择复制"))
   }
 }
 
@@ -183,19 +186,19 @@ async function handleSubmit() {
         payOrderNo.value = result.order.orderNo
         showPayUrl.value = true
       } catch (e: any) {
-        message.error(e?.message || '发起支付失败，可稍后在订单详情重试')
+        message.error(e?.message || t("发起支付失败，可稍后在订单详情重试"))
         router.push({ name: 'console-order-detail', params: { id: orderId } })
       }
       return
     }
     if (d.paymentMethod === 'CONTRACT_CREDIT') {
-      message.info('合同账期需联系运营开通后生效；订单已创建，可先在订单详情查看。')
+      message.info(t("合同账期需联系运营开通后生效；订单已创建，可先在订单详情查看。"))
     } else {
-      message.success('订单已创建，请通过对公转账付款并上传回单。')
+      message.success(t("订单已创建，请通过对公转账付款并上传回单。"))
     }
     router.push({ name: 'console-order-detail', params: { id: orderId } })
   } catch (e: any) {
-    message.error(e?.message || '下单失败')
+    message.error(e?.message || t("下单失败"))
   } finally {
     creating.value = false
   }
@@ -218,10 +221,8 @@ function closePayUrl() {
 <template>
   <div style="max-width: 1200px; margin: 0 auto; padding: 24px">
     <NSpace justify="space-between" align="center" style="margin-bottom: 16px">
-      <PageHeader title="服务商城" subtitle="订阅套餐、专业服务与容量加购" />
-      <NButton tertiary size="small" @click="router.push({ name: 'console-orders' })">
-        我的订单
-      </NButton>
+      <PageHeader :title="t('服务商城')" :subtitle="t('订阅套餐、专业服务与容量加购')" />
+      <NButton tertiary size="small" @click="router.push({ name: 'console-orders' })"> {{ t('我的订单') }} </NButton>
     </NSpace>
 
     <NAlert
@@ -230,17 +231,15 @@ function closePayUrl() {
       :bordered="false"
       :closable="false"
       style="margin-bottom: 16px"
-    >
-      浏览目录全员可用；下单仅企业管理员（ORG_OWNER）可操作，请联系管理员完成购买。
-    </NAlert>
+    > {{ t('浏览目录全员可用；下单仅企业管理员（ORG_OWNER）可操作，请联系管理员完成购买。') }} </NAlert>
 
     <NSpace v-if="loading" justify="center" style="margin-top: 96px">
-      <NText depth="3">加载中…</NText>
+      <NText depth="3">{{ t('加载中…') }}</NText>
     </NSpace>
 
     <NEmpty
       v-else-if="items.length === 0"
-      description="商城暂无在售商品，请联系商务上架。"
+      :description="t('商城暂无在售商品，请联系商务上架。')"
       style="margin-top: 96px"
     />
 
@@ -253,7 +252,7 @@ function closePayUrl() {
 
         <NEmpty
           v-if="groupItems(group.kind).length === 0"
-          :description="`暂无在售${group.title}`"
+          :description="`${t('暂无在售')}${group.title}`"
           size="small"
         />
 
@@ -282,19 +281,16 @@ function closePayUrl() {
                     <NSpace vertical :size="4">
                       <NText strong style="font-size: 14px">{{ plan.name }}</NText>
                       <NText depth="3" style="font-size: 12px">
-                        {{ quotaSummary(plan.entitlements).join(' · ') || '以商务方案为准' }}
+                        {{ quotaSummary(plan.entitlements).join(' · ') || t('以商务方案为准') }}
                         <template v-if="group.kind === 'SERVICE' && deliverableCount(plan.deliverables)">
-                          · {{ deliverableCount(plan.deliverables) }} 个交付里程碑
-                        </template>
+                          · {{ deliverableCount(plan.deliverables) }} {{ t('个交付里程碑') }} </template>
                       </NText>
                     </NSpace>
                     <NSpace vertical :size="4" align="end">
                       <NText strong style="font-size: 16px; color: var(--primary-color)">
                         ¥{{ formatCents(plan.priceCents) }}{{ PERIOD_LABEL[plan.billingPeriod ?? ''] ?? '' }}
                       </NText>
-                      <NButton v-if="canOrder" size="tiny" type="primary" secondary>
-                        立即购买
-                      </NButton>
+                      <NButton v-if="canOrder" size="tiny" type="primary" secondary> {{ t('立即购买') }} </NButton>
                     </NSpace>
                   </NSpace>
                 </NCard>
@@ -309,21 +305,21 @@ function closePayUrl() {
     <NModal
       v-model:show="showModal"
       preset="card"
-      title="确认下单"
+      :title="t('确认下单')"
       style="width: 560px"
       :mask-closable="false"
     >
       <NForm label-placement="left" label-width="100">
-        <NFormItem label="套餐">
+        <NFormItem :label="t('套餐')">
           <NSpace vertical :size="2">
             <NText strong>{{ draft.plan?.name }}</NText>
             <NText depth="3" style="font-size: 12px">
               {{ draft.product?.name }} · ¥{{ formatCents(draft.plan?.priceCents ?? null)
-              }}{{ PERIOD_LABEL[draft.plan?.billingPeriod ?? ''] ?? ' / 次' }}
+              }}{{ PERIOD_LABEL[draft.plan?.billingPeriod ?? ''] ?? t(' / 次') }}
             </NText>
           </NSpace>
         </NFormItem>
-        <NFormItem label="数量">
+        <NFormItem :label="t('数量')">
           <NInputNumber
             v-if="draft.product?.kind === 'ADDON'"
             v-model:value="draft.quantity"
@@ -331,41 +327,38 @@ function closePayUrl() {
             :precision="0"
             style="width: 160px"
           />
-          <NText v-else depth="3">1（{{ draft.product?.kind === 'SUBSCRIPTION' ? '订阅' : '服务' }}类商品单笔一件）</NText>
+          <NText v-else depth="3">1（{{ draft.product?.kind === 'SUBSCRIPTION' ? t('订阅') : t('服务') }}{{ t('类商品单笔一件）') }}</NText>
         </NFormItem>
         <NFormItem
           v-if="draft.product?.kind === 'ADDON' || draft.product?.kind === 'SERVICE'"
-          label="目标 Workspace"
+          :label="t('目标 Workspace')"
         >
           <NSelect
             v-model:value="draft.workspaceId"
             :options="workspaceOptions"
             clearable
             filterable
-            placeholder="可选——加购配额作用 / 服务交付的目标工作区"
+            :placeholder="t('可选——加购配额作用 / 服务交付的目标工作区')"
           />
         </NFormItem>
-        <NFormItem label="支付方式">
+        <NFormItem :label="t('支付方式')">
           <NSpace vertical :size="8" style="width: 100%">
             <NRadioGroup v-model:value="draft.paymentMethod">
               <NSpace vertical :size="6">
-                <NRadio value="BANK_TRANSFER">对公转账（上传回单确认）</NRadio>
-                <NRadio value="CONTRACT_CREDIT">合同账期</NRadio>
-                <NRadio value="WECHAT">微信支付</NRadio>
-                <NRadio value="ALIPAY">支付宝</NRadio>
+                <NRadio value="BANK_TRANSFER">{{ t('对公转账（上传回单确认）') }}</NRadio>
+                <NRadio value="CONTRACT_CREDIT">{{ t('合同账期') }}</NRadio>
+                <NRadio value="WECHAT">{{ t('微信支付') }}</NRadio>
+                <NRadio value="ALIPAY">{{ t('支付宝') }}</NRadio>
               </NSpace>
             </NRadioGroup>
-            <NText depth="3" style="font-size: 12px">
-              合同账期需联系运营开通；微信/支付宝为 mock 渠道（演示扫码流程）。
-            </NText>
+            <NText depth="3" style="font-size: 12px"> {{ t('合同账期需联系运营开通；微信/支付宝为 mock 渠道（演示扫码流程）。') }} </NText>
           </NSpace>
         </NFormItem>
       </NForm>
       <template #footer>
         <NSpace justify="end">
-          <NButton @click="showModal = false">取消</NButton>
-          <NButton type="primary" :loading="creating" @click="handleSubmit">
-            提交订单（¥{{ formatCents((draft.plan?.priceCents ?? 0) * draft.quantity) }}）
+          <NButton @click="showModal = false">{{ t('取消') }}</NButton>
+          <NButton type="primary" :loading="creating" @click="handleSubmit"> {{ t('提交订单（¥') }}{{ formatCents((draft.plan?.priceCents ?? 0) * draft.quantity) }}）
           </NButton>
         </NSpace>
       </template>
@@ -375,26 +368,22 @@ function closePayUrl() {
     <NModal
       :show="showPayUrl"
       preset="card"
-      title="扫码支付（mock 渠道）"
+      :title="t('扫码支付（mock 渠道）')"
       style="width: 560px"
       :mask-closable="false"
       @update:show="(v: boolean) => { if (!v) closePayUrl() }"
     >
       <NSpace vertical :size="12">
-        <NText style="font-size: 13px">
-          订单 <NText code>{{ payOrderNo }}</NText> 已创建，使用手机扫码或复制链接完成支付（演示环境为 mock 链接）。
-        </NText>
+        <NText style="font-size: 13px"> {{ t('订单') }} <NText code>{{ payOrderNo }}</NText> {{ t('已创建，使用手机扫码或复制链接完成支付（演示环境为 mock 链接）。') }} </NText>
         <NInputGroup>
           <NInput :value="payUrl" readonly />
-          <NButton type="primary" @click="copyText(payUrl)">复制链接</NButton>
+          <NButton type="primary" @click="copyText(payUrl)">{{ t('复制链接') }}</NButton>
         </NInputGroup>
-        <NText depth="3" style="font-size: 12px">
-          渠道单号 {{ channelOrderNo }}；支付完成后由渠道回调自动确认，也可稍后在"我的订单"查看状态。
-        </NText>
+        <NText depth="3" style="font-size: 12px"> {{ t('渠道单号') }} {{ channelOrderNo }}{{ t('；支付完成后由渠道回调自动确认，也可稍后在"我的订单"查看状态。') }} </NText>
       </NSpace>
       <template #footer>
         <NSpace justify="end">
-          <NButton type="primary" @click="closePayUrl">完成</NButton>
+          <NButton type="primary" @click="closePayUrl">{{ t('完成') }}</NButton>
         </NSpace>
       </template>
     </NModal>

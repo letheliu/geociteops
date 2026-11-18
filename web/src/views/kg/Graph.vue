@@ -4,6 +4,9 @@ import { NCard, NButton, NSpace, NSelect, NEmpty, NSpin, NTag, useMessage } from
 import { Network, type Node, type Edge, type Options } from 'vis-network'
 import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 const message = useMessage()
 const loading = ref(true)
@@ -59,7 +62,7 @@ async function loadData() {
       network = new Network(containerRef.value, { nodes, edges }, options)
     }
   } catch (e: any) {
-    message.error(e?.message || '加载失败')
+    message.error(e?.message || t("加载失败"))
   } finally {
     loading.value = false
   }
@@ -76,7 +79,7 @@ async function handleExport() {
       exportData.value = String(result)
     }
   } catch (e: any) {
-    message.error(e?.message || '导出失败')
+    message.error(e?.message || t("导出失败"))
   }
 }
 
@@ -94,7 +97,7 @@ function downloadExport() {
 
 <template>
   <div>
-    <PageHeader title="图谱可视化" subtitle="力导向网络图 + 导出" />
+    <PageHeader :title="t('图谱可视化')" :subtitle="t('力导向网络图 + 导出')" />
 
     <NSpace justify="space-between" style="margin-bottom: 16px">
       <NSpace>
@@ -104,8 +107,8 @@ function downloadExport() {
       </NSpace>
       <NSpace>
         <NSelect v-model:value="selectedFormat" :options="formatOptions" style="width: 120px" />
-        <NButton @click="handleExport">导出</NButton>
-        <NButton v-if="exportData" quaternary @click="downloadExport">下载文件</NButton>
+        <NButton @click="handleExport">{{ t('导出') }}</NButton>
+        <NButton v-if="exportData" quaternary @click="downloadExport">{{ t('下载文件') }}</NButton>
       </NSpace>
     </NSpace>
 
@@ -115,7 +118,7 @@ function downloadExport() {
       </NSpin>
     </NCard>
 
-    <NCard v-if="exportData" title="导出结果" style="margin-top: 16px">
+    <NCard v-if="exportData" :title="t('导出结果')" style="margin-top: 16px">
       <pre style="background: var(--code-color); padding: 12px; border-radius: 6px; overflow: auto; font-size: 12px; max-height: 400px; margin: 0">{{ exportData }}</pre>
     </NCard>
   </div>

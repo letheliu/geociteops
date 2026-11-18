@@ -5,6 +5,9 @@ import { useRouter } from 'vue-router'
 import { trpc } from '../composables/useTrpc'
 import TrendChart, { type TrendPoint } from '../components/TrendChart.vue'
 import GeoScoreChart, { type GeoScorePoint } from '../components/GeoScoreChart.vue'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 const router = useRouter()
 const loading = ref(true)
@@ -64,72 +67,66 @@ onMounted(() => loadData(7))
     <NSpace vertical :size="24">
       <NSpace justify="space-between" align="center" style="margin-bottom: 16px">
         <NRadioGroup v-model:value="rangeDays" @update:value="loadData">
-          <NRadioButton :value="7">近 7 天</NRadioButton>
-          <NRadioButton :value="30">近 30 天</NRadioButton>
-          <NRadioButton :value="90">近 90 天</NRadioButton>
+          <NRadioButton :value="7">{{ t('近 7 天') }}</NRadioButton>
+          <NRadioButton :value="30">{{ t('近 30 天') }}</NRadioButton>
+          <NRadioButton :value="90">{{ t('近 90 天') }}</NRadioButton>
         </NRadioGroup>
         <NSpace>
-          <NButton type="primary" secondary @click="router.push({ name: 'geo-health' })">GEO 体检</NButton>
-          <NButton quaternary @click="loadData()">🔄 刷新</NButton>
+          <NButton type="primary" secondary @click="router.push({ name: 'geo-health' })">{{ t('GEO 体检') }}</NButton>
+          <NButton quaternary @click="loadData()">{{ t('🔄 刷新') }}</NButton>
         </NSpace>
       </NSpace>
-      <NCard v-if="!loading && queryCount === 0 && validSamples === 0" title="先做一次 GEO 体检" style="margin-bottom: 8px">
-        <NText depth="3" style="display: block; margin-bottom: 12px">
-          新工作区不用先把监测配齐。填品牌名和官网，几分钟内得到总分、引用快照和一份按影响排序的行动清单。没配凭证的引擎会跳过，并写在报告里。
-        </NText>
-        <NButton type="primary" @click="router.push({ name: 'geo-health' })">开始体检</NButton>
+      <NCard v-if="!loading && queryCount === 0 && validSamples === 0" :title="t('先做一次 GEO 体检')" style="margin-bottom: 8px">
+        <NText depth="3" style="display: block; margin-bottom: 12px"> {{ t('新工作区不用先把监测配齐。填品牌名和官网，几分钟内得到总分、引用快照和一份按影响排序的行动清单。没配凭证的引擎会跳过，并写在报告里。') }} </NText>
+        <NButton type="primary" @click="router.push({ name: 'geo-health' })">{{ t('开始体检') }}</NButton>
       </NCard>
       <NGrid :cols="4" :x-gap="16" :y-gap="16" responsive="screen" item-responsive>
         <NGridItem span="4 m:2 l:1">
           <NCard>
-            <NStatistic :label="`SOV 份额（近 ${rangeDays} 天）`" :value="sovScore">
+            <NStatistic :label="`${t('SOV 份额（近 ')}${rangeDays}${t(' 天）')}`" :value="sovScore">
               <template #suffix>%</template>
             </NStatistic>
           </NCard>
         </NGridItem>
         <NGridItem span="4 m:2 l:1">
           <NCard>
-            <NStatistic label="监测覆盖" :value="queryCount">
+            <NStatistic :label="t('监测覆盖')" :value="queryCount">
               <template #suffix>queries</template>
             </NStatistic>
           </NCard>
         </NGridItem>
         <NGridItem span="4 m:2 l:1">
           <NCard>
-            <NStatistic :label="`有效采样 / 运行次数`" :value="validSamples">
+            <NStatistic :label="t('有效采样 / 运行次数')" :value="validSamples">
               <template #suffix>
-                · {{ runCount }} 次运行{{ failedSamples > 0 ? `（失败 ${failedSamples}）` : '' }}
+                · {{ runCount }} {{ t('次运行') }}{{ failedSamples > 0 ? `${t('（失败 ')}${failedSamples}）` : '' }}
               </template>
             </NStatistic>
           </NCard>
         </NGridItem>
         <NGridItem span="4 m:2 l:1">
           <NCard>
-            <NStatistic label="待审任务" :value="pendingTasks" />
+            <NStatistic :label="t('待审任务')" :value="pendingTasks" />
           </NCard>
         </NGridItem>
       </NGrid>
 
-      <NCard v-if="scorePoints.length > 0" title="GEO 分数趋势">
+      <NCard v-if="scorePoints.length > 0" :title="t('GEO 分数趋势')">
         <NSpace vertical :size="4">
-          <span style="font-size: 12px; color: var(--text-color-3)">
-            一次体检一个点。引用快照同时出现在下面的监测趋势里，蓝菱形标成「体检」。
-          </span>
+          <span style="font-size: 12px; color: var(--text-color-3)"> {{ t('一次体检一个点。引用快照同时出现在下面的监测趋势里，蓝菱形标成「体检」。') }} </span>
           <GeoScoreChart :points="scorePoints" height="280px" />
         </NSpace>
       </NCard>
 
-      <NCard title="监测趋势">
+      <NCard :title="t('监测趋势')">
         <NSpace vertical :size="4">
-          <span style="font-size: 12px; color: var(--text-color-3)">
-            一个点 = 一次运行（N 次采样的聚合）。阴影带为组内离散度，非置信区间。
-          </span>
+          <span style="font-size: 12px; color: var(--text-color-3)"> {{ t('一个点 = 一次运行（N 次采样的聚合）。阴影带为组内离散度，非置信区间。') }} </span>
           <TrendChart :series="trendPoints" />
         </NSpace>
       </NCard>
 
-      <NCard title="最近引用事件">
-        <NEmpty v-if="recentEvents.length === 0 && !loading" description="暂无数据" />
+      <NCard :title="t('最近引用事件')">
+        <NEmpty v-if="recentEvents.length === 0 && !loading" :description="t('暂无数据')" />
         <NSpace v-else vertical :size="8">
           <div
             v-for="ev in recentEvents"
@@ -137,14 +134,13 @@ onMounted(() => loadData(7))
             style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--divider-color)"
           >
             <NTag :type="ev.brandMentioned ? 'success' : 'default'" size="small">
-              {{ ev.brandMentioned ? '✅ 提及' : '❌ 未提及' }}
+              {{ ev.brandMentioned ? t('✅ 提及') : t('❌ 未提及') }}
             </NTag>
             <span style="flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
               {{ ev.query?.queryText || ev.queryId }}
             </span>
             <NTag size="small" type="info">{{ ev.platform }}</NTag>
-            <span v-if="ev.rankInAnswer" style="font-size: 12px; color: var(--text-color-3)">
-              排名 #{{ ev.rankInAnswer }}
+            <span v-if="ev.rankInAnswer" style="font-size: 12px; color: var(--text-color-3)"> {{ t('排名 #') }}{{ ev.rankInAnswer }}
             </span>
             <span style="font-size: 12px; color: var(--text-color-3)">
               SOV {{ ev.sovScore ? (ev.sovScore * 100).toFixed(0) + '%' : '-' }}

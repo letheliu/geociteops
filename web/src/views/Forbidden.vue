@@ -6,6 +6,9 @@ import { NResult, NButton } from 'naive-ui'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSessionStore } from '../stores/session'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 const router = useRouter()
 const sessionStore = useSessionStore()
@@ -17,11 +20,11 @@ const homePath = computed(() => (sessionStore.isCustomer ? '/console' : '/admin'
   <div style="height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--body-color)">
     <NResult
       status="403"
-      title="无权访问"
-      description="当前账号没有访问该页面的权限。"
+      :title="t('无权访问')"
+      :description="t('当前账号没有访问该页面的权限。')"
     >
       <template #footer>
-        <NButton @click="router.push(homePath)">返回</NButton>
+        <NButton @click="router.push(homePath)">{{ t('返回') }}</NButton>
       </template>
     </NResult>
   </div>

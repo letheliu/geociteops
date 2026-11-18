@@ -5,6 +5,9 @@ import { NButton, NCard, NForm, NFormItem, NInput, NSpace, NText, useMessage } f
 import { trpc } from '../composables/useTrpc'
 import { useSessionStore } from '../stores/session'
 import { postLoginTarget } from '../utils/post-login'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 const router = useRouter()
 const route = useRoute()
@@ -28,7 +31,7 @@ onMounted(async () => {
 async function handleLogin() {
   const username = form.value.username.trim()
   if (!username || !form.value.password) {
-    message.warning('请输入用户名和密码')
+    message.warning(t("请输入用户名和密码"))
     return
   }
   loading.value = true
@@ -38,7 +41,7 @@ async function handleLogin() {
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
     router.push(postLoginTarget(sessionStore.me, redirect))
   } catch (e: any) {
-    message.error(e?.message || '登录失败')
+    message.error(e?.message || t("登录失败"))
   } finally {
     loading.value = false
   }
@@ -49,26 +52,26 @@ async function handleLogin() {
   <div style="height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--body-color)">
     <NCard style="width: 420px; max-width: 90vw" title="GEO Console" size="medium">
       <NForm @submit.prevent="handleLogin">
-        <NFormItem label="用户名">
+        <NFormItem :label="t('用户名')">
           <NInput
             v-model:value="form.username"
-            placeholder="用户名"
+            :placeholder="t('用户名')"
             :input-props="{ autocomplete: 'username' }"
           />
         </NFormItem>
-        <NFormItem label="密码">
+        <NFormItem :label="t('密码')">
           <NInput
             v-model:value="form.password"
             type="password"
             show-password-on="click"
-            placeholder="密码"
+            :placeholder="t('密码')"
             :input-props="{ autocomplete: 'current-password' }"
           />
         </NFormItem>
-        <NButton type="primary" block :loading="loading" @click="handleLogin">登录</NButton>
+        <NButton type="primary" block :loading="loading" @click="handleLogin">{{ t('登录') }}</NButton>
         <NSpace v-if="registrationEnabled" justify="center" align="center" :size="6">
-          <NText depth="3" style="font-size: 13px">还没有账号？</NText>
-          <NButton text type="primary" @click="router.push({ name: 'register' })">注册试用</NButton>
+          <NText depth="3" style="font-size: 13px">{{ t('还没有账号？') }}</NText>
+          <NButton text type="primary" @click="router.push({ name: 'register' })">{{ t('注册试用') }}</NButton>
         </NSpace>
       </NForm>
     </NCard>

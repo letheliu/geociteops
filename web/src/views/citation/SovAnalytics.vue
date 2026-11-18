@@ -12,6 +12,9 @@ import {
 import PageHeader from '../../components/common/PageHeader.vue'
 import TrendChart, { type TrendPoint } from '../../components/TrendChart.vue'
 import { trpc } from '../../composables/useTrpc'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 use([CanvasRenderer, LineChart, BarChart, PieChart, TitleComponent, TooltipComponent, GridComponent, LegendComponent, DataZoomComponent])
 
@@ -52,7 +55,7 @@ const mentionOption = computed(() => {
   const notMentioned = events.value.length - mentioned
   return {
     tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: ['已提及', '未提及'] },
+    xAxis: { type: 'category', data: [t("已提及"), t("未提及")] },
     yAxis: { type: 'value' },
     series: [{
       type: 'bar',
@@ -107,36 +110,32 @@ watch(queryId, loadData)
 
 <template>
   <div>
-    <PageHeader title="SOV 分析" subtitle="Share of Voice 趋势与竞品对比" />
+    <PageHeader :title="t('SOV 分析')" :subtitle="t('Share of Voice 趋势与竞品对比')" />
 
     <NSpace style="margin-bottom: 16px">
       <NDatePicker v-model:value="dateRange" type="daterange" clearable />
-      <NTag v-if="queryId" closable size="small" type="info" @close="clearQueryFilter">
-        已聚焦单个查询（闭环看板跳转）
-      </NTag>
+      <NTag v-if="queryId" closable size="small" type="info" @close="clearQueryFilter"> {{ t('已聚焦单个查询（闭环看板跳转）') }} </NTag>
     </NSpace>
 
     <NSpin :show="loading">
-      <NEmpty v-if="events.length === 0 && trendPoints.length === 0 && !loading" description="暂无数据，请先触发监测" />
+      <NEmpty v-if="events.length === 0 && trendPoints.length === 0 && !loading" :description="t('暂无数据，请先触发监测')" />
 
       <NSpace v-else vertical :size="16">
-        <NCard title="监测趋势">
+        <NCard :title="t('监测趋势')">
           <NSpace vertical :size="4">
-            <span style="font-size: 12px; color: var(--text-color-3)">
-              一个点 = 一次运行（N 次采样的聚合）。阴影带为组内离散度，非置信区间。
-            </span>
+            <span style="font-size: 12px; color: var(--text-color-3)"> {{ t('一个点 = 一次运行（N 次采样的聚合）。阴影带为组内离散度，非置信区间。') }} </span>
             <TrendChart :series="trendPoints" />
           </NSpace>
         </NCard>
 
         <NGrid :cols="2" :x-gap="16">
           <NGridItem>
-            <NCard title="平台分布">
+            <NCard :title="t('平台分布')">
               <VChart :option="platformOption" style="height: 300px" autoresize />
             </NCard>
           </NGridItem>
           <NGridItem>
-            <NCard title="提及统计">
+            <NCard :title="t('提及统计')">
               <VChart :option="mentionOption" style="height: 300px" autoresize />
             </NCard>
           </NGridItem>

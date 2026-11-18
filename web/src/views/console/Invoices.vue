@@ -15,6 +15,9 @@ import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
 import { useSessionStore } from '../../stores/session'
 import { formatCents } from '../../utils/money'
+import { useI18n } from '@/i18n'
+const { t, locale: appLocale } = useI18n()
+
 
 const message = useMessage()
 const sessionStore = useSessionStore()
@@ -62,9 +65,9 @@ const page = ref(1)
 const pageSize = ref(20)
 
 const INVOICE_STATUS_META: Record<string, { type: 'warning' | 'success' | 'error'; label: string }> = {
-  PENDING: { type: 'warning', label: '待开具' },
-  ISSUED: { type: 'success', label: '已开具' },
-  REJECTED: { type: 'error', label: '已驳回' },
+  PENDING: { type: 'warning', label: t("待开具") },
+  ISSUED: { type: 'success', label: t("已开具") },
+  REJECTED: { type: 'error', label: t("已驳回") },
 }
 
 function statusMeta(status: string) {
@@ -78,7 +81,7 @@ async function load() {
     items.value = result.items
     total.value = result.total
   } catch (e: any) {
-    message.error(e?.message || '发票列表加载失败')
+    message.error(e?.message || t("发票列表加载失败"))
   } finally {
     loading.value = false
   }
@@ -87,7 +90,7 @@ async function load() {
 onMounted(load)
 
 function fmtDate(value: string | null): string {
-  return value ? new Date(value).toLocaleString('zh-CN') : '—'
+  return value ? new Date(value).toLocaleString(appLocale.value) : '—'
 }
 
 /** orderIds（Json 通道）安全转 string[] */
@@ -98,7 +101,7 @@ function orderIdList(row: InvoiceRow): string[] {
 
 const columns: DataTableColumns<InvoiceRow> = [
   {
-    title: '状态',
+    title: t("状态"),
     key: 'status',
     width: 100,
     render: (row) => {
@@ -107,40 +110,40 @@ const columns: DataTableColumns<InvoiceRow> = [
     },
   },
   {
-    title: '金额',
+    title: t("金额"),
     key: 'amountCents',
     width: 110,
     render: (row) => `¥${formatCents(row.amountCents)}`,
   },
   {
-    title: '关联订单',
+    title: t("关联订单"),
     key: 'orderIds',
     minWidth: 200,
     render: (row) => {
       const ids = orderIdList(row)
-      return ids.length > 0 ? `${ids.length} 笔（合并开票）` : '—'
+      return ids.length > 0 ? `${ids.length}${t(" 笔（合并开票）")}` : '—'
     },
   },
   {
-    title: '发票号',
+    title: t("发票号"),
     key: 'invoiceNo',
     width: 170,
     render: (row) => row.invoiceNo ?? '—',
   },
   {
-    title: '备注',
+    title: t("备注"),
     key: 'remark',
     minWidth: 160,
     render: (row) => row.remark ?? '—',
   },
   {
-    title: '申请时间',
+    title: t("申请时间"),
     key: 'createdAt',
     width: 170,
     render: (row) => fmtDate(row.createdAt),
   },
   {
-    title: '操作',
+    title: t("操作"),
     key: 'actions',
     width: 90,
     render: (row) =>
@@ -148,7 +151,7 @@ const columns: DataTableColumns<InvoiceRow> = [
         ? h(
             NButton,
             { size: 'tiny', tag: 'a', href: `/files/${row.fileKey}`, target: '_blank', tertiary: true },
-            { default: () => '下载' },
+            { default: () => t("下载") },
           )
         : '—',
   },
@@ -178,7 +181,7 @@ async function openRequest() {
     const result = await trpc.orders.list.query({ page: 1, pageSize: 100 })
     paidOrders.value = result.items.filter((row) => row.paidAt !== null)
   } catch (e: any) {
-    message.error(e?.message || '订单加载失败')
+    message.error(e?.message || t("订单加载失败"))
   } finally {
     ordersLoading.value = false
   }
@@ -186,17 +189,17 @@ async function openRequest() {
 
 async function handleRequest() {
   if (selectedOrderIds.value.length === 0) {
-    message.warning('请至少勾选一笔已支付订单')
+    message.warning(t("请至少勾选一笔已支付订单"))
     return
   }
   requesting.value = true
   try {
     await trpc.org.invoices.request.mutate({ orderIds: selectedOrderIds.value })
-    message.success('开票申请已提交，等待财务开具')
+    message.success(t("开票申请已提交，等待财务开具"))
     showRequest.value = false
     await load()
   } catch (e: any) {
-    message.error(e?.message || '开票申请失败')
+    message.error(e?.message || t("开票申请失败"))
   } finally {
     requesting.value = false
   }
@@ -206,9 +209,9 @@ async function handleRequest() {
 <template>
   <div style="max-width: 1200px; margin: 0 auto; padding: 24px">
     <NSpace justify="space-between" align="center" style="margin-bottom: 16px">
-      <PageHeader title="发票管理" subtitle="已支付订单的开票申请与发票下载" />
+      <PageHeader :title="t('发票管理')" :subtitle="t('已支付订单的开票申请与发票下载')" />
       <!-- 遗留 E7：VIEWER 无 order.view，申请入口隐藏（列表/下载仍可见） -->
-      <NButton v-if="canRequestInvoice" type="primary" @click="openRequest">+ 申请开票</NButton>
+      <NButton v-if="canRequestInvoice" type="primary" @click="openRequest">{{ t('+ 申请开票') }}</NButton>
     </NSpace>
 
     <NCard>
@@ -232,7 +235,7 @@ async function handleRequest() {
     <NModal
       v-model:show="showRequest"
       preset="card"
-      title="申请开票"
+      :title="t('申请开票')"
       style="width: 560px"
       :mask-closable="false"
     >
@@ -245,13 +248,9 @@ async function handleRequest() {
         type="info"
         :bordered="false"
         :closable="false"
-      >
-        暂无可开票的已支付订单——完成支付后即可在此申请。
-      </NAlert>
+      > {{ t('暂无可开票的已支付订单——完成支付后即可在此申请。') }} </NAlert>
       <template v-else>
-        <NText depth="3" style="font-size: 13px; display: block; margin-bottom: 12px">
-          勾选需合并开票的已支付订单（1-50 笔），发票将按企业抬头开具。
-        </NText>
+        <NText depth="3" style="font-size: 13px; display: block; margin-bottom: 12px"> {{ t('勾选需合并开票的已支付订单（1-50 笔），发票将按企业抬头开具。') }} </NText>
         <NCheckboxGroup v-model:value="selectedOrderIds">
           <NSpace vertical :size="8">
             <NCheckbox v-for="order in paidOrders" :key="order.id" :value="order.id">
@@ -262,15 +261,13 @@ async function handleRequest() {
       </template>
       <template #footer>
         <NSpace justify="end">
-          <NButton @click="showRequest = false">取消</NButton>
+          <NButton @click="showRequest = false">{{ t('取消') }}</NButton>
           <NButton
             type="primary"
             :loading="requesting"
             :disabled="selectedOrderIds.length === 0"
             @click="handleRequest"
-          >
-            提交申请（{{ selectedOrderIds.length }} 笔）
-          </NButton>
+          > {{ t('提交申请（') }}{{ selectedOrderIds.length }} {{ t('笔）') }} </NButton>
         </NSpace>
       </template>
     </NModal>

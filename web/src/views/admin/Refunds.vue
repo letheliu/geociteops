@@ -17,6 +17,9 @@ import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
 import { formatCents } from '../../utils/money'
 import { paymentMethodLabel, refundStatusMeta } from '../../utils/order'
+import { useI18n } from '@/i18n'
+const { t, locale: appLocale } = useI18n()
+
 
 const router = useRouter()
 const message = useMessage()
@@ -33,10 +36,10 @@ const pageSize = ref(20)
 const statusFilter = ref<string | null>('PENDING')
 
 const statusOptions: SelectOption[] = [
-  { label: '待审批（默认）', value: 'PENDING' },
-  { label: '已执行', value: 'EXECUTED' },
-  { label: '已驳回', value: 'REJECTED' },
-  { label: '全部状态', value: '' },
+  { label: t("待审批（默认）"), value: 'PENDING' },
+  { label: t("已执行"), value: 'EXECUTED' },
+  { label: t("已驳回"), value: 'REJECTED' },
+  { label: t("全部状态"), value: '' },
 ]
 
 async function load() {
@@ -50,7 +53,7 @@ async function load() {
     items.value = result.items
     total.value = result.total
   } catch (e: any) {
-    message.error(e?.message || '退款列表加载失败')
+    message.error(e?.message || t("退款列表加载失败"))
   } finally {
     loading.value = false
   }
@@ -79,7 +82,7 @@ function goOrder(row: RefundRow) {
 }
 
 function fmtDate(value: string | null): string {
-  return value ? new Date(value).toLocaleString('zh-CN') : '—'
+  return value ? new Date(value).toLocaleString(appLocale.value) : '—'
 }
 
 /** 通道性质：线上（微信/支付宝，走渠道退款）/ 线下（转账/账期，打款后登记） */
@@ -104,12 +107,12 @@ async function handleApprove() {
   if (!row) return
   const executeCents = Math.round((executeYuan.value ?? 0) * 100)
   if (!Number.isFinite(executeCents) || executeCents < 1) {
-    message.warning('执行金额须为正数（元）')
+    message.warning(t("执行金额须为正数（元）"))
     return
   }
   // 前端校验 ≤ 建议额（后端 RefundAmountExceededError 兜底）
   if (executeCents > row.suggestedAmountCents) {
-    message.warning(`执行金额不能超过系统建议额 ¥${formatCents(row.suggestedAmountCents)}`)
+    message.warning(`${t("执行金额不能超过系统建议额 ¥")}${formatCents(row.suggestedAmountCents)}`)
     return
   }
   approving.value = true
@@ -119,11 +122,11 @@ async function handleApprove() {
       executeAmountCents: executeCents,
     })
     // 全额/部分口径由后端判定（executeAmountCents 与 refundable 比较），前端只报执行金额
-    message.success(`退款已执行：¥${formatCents(executeCents)}（配额回收与服务回退由系统处理）`)
+    message.success(`${t("退款已执行：¥")}${formatCents(executeCents)}${t("（配额回收与服务回退由系统处理）")}`)
     showApproveModal.value = false
     await load()
   } catch (e: any) {
-    message.error(e?.message || '审批失败')
+    message.error(e?.message || t("审批失败"))
   } finally {
     approving.value = false
   }
@@ -146,17 +149,17 @@ async function handleReject() {
   if (!row) return
   const reason = rejectReason.value.trim()
   if (!reason) {
-    message.warning('请填写驳回原因')
+    message.warning(t("请填写驳回原因"))
     return
   }
   rejecting.value = true
   try {
     await trpc.admin.refunds.reject.mutate({ refundId: row.id, reason })
-    message.success('退款申请已驳回，订单回退申请前状态')
+    message.success(t("退款申请已驳回，订单回退申请前状态"))
     showRejectModal.value = false
     await load()
   } catch (e: any) {
-    message.error(e?.message || '驳回失败')
+    message.error(e?.message || t("驳回失败"))
   } finally {
     rejecting.value = false
   }
@@ -164,13 +167,13 @@ async function handleReject() {
 
 const columns: DataTableColumns<RefundRow> = [
   {
-    title: '申请时间',
+    title: t("申请时间"),
     key: 'createdAt',
     width: 170,
     render: (row) => fmtDate(row.createdAt),
   },
   {
-    title: '订单号',
+    title: t("订单号"),
     key: 'orderNo',
     width: 190,
     render: (row) =>
@@ -179,27 +182,27 @@ const columns: DataTableColumns<RefundRow> = [
       }),
   },
   {
-    title: '申请金额',
+    title: t("申请金额"),
     key: 'amountCents',
     width: 110,
     render: (row) => `¥${formatCents(row.amountCents)}`,
   },
   {
-    title: '建议金额',
+    title: t("建议金额"),
     key: 'suggestedAmountCents',
     width: 110,
     render: (row) =>
       h(NText, { strong: true }, { default: () => `¥${formatCents(row.suggestedAmountCents)}` }),
   },
   {
-    title: '原因',
+    title: t("原因"),
     key: 'reason',
     minWidth: 180,
     ellipsis: { tooltip: true },
     render: (row) => row.reason || '—',
   },
   {
-    title: '通道',
+    title: t("通道"),
     key: 'method',
     width: 130,
     render: (row) => {
@@ -208,14 +211,14 @@ const columns: DataTableColumns<RefundRow> = [
         default: () => [
           h('span', method),
           h(NTag, { size: 'small', bordered: false, type: isOnlineChannel(row) ? 'info' : 'default' }, {
-            default: () => (isOnlineChannel(row) ? '线上' : '线下'),
+            default: () => (isOnlineChannel(row) ? t("线上") : t("线下")),
           }),
         ],
       })
     },
   },
   {
-    title: '状态',
+    title: t("状态"),
     key: 'status',
     width: 100,
     render: (row) => {
@@ -224,7 +227,7 @@ const columns: DataTableColumns<RefundRow> = [
     },
   },
   {
-    title: '操作',
+    title: t("操作"),
     key: 'actions',
     width: 150,
     render: (row) =>
@@ -233,10 +236,10 @@ const columns: DataTableColumns<RefundRow> = [
         : h(NSpace, { size: 'small' }, {
             default: () => [
               h(NButton, { size: 'tiny', type: 'primary', onClick: () => openApprove(row) }, {
-                default: () => '审批',
+                default: () => t("审批"),
               }),
               h(NButton, { size: 'tiny', type: 'warning', onClick: () => openReject(row) }, {
-                default: () => '驳回',
+                default: () => t("驳回"),
               }),
             ],
           }),
@@ -246,13 +249,13 @@ const columns: DataTableColumns<RefundRow> = [
 
 <template>
   <div>
-    <PageHeader title="退款管理" subtitle="客户退款申请的审批工作台（建议金额 = 系统按可退口径计算）" />
+    <PageHeader :title="t('退款管理')" :subtitle="t('客户退款申请的审批工作台（建议金额 = 系统按可退口径计算）')" />
 
     <NSpace justify="space-between" align="center" style="margin-bottom: 16px">
       <NSelect
         v-model:value="statusFilter"
         :options="statusOptions"
-        placeholder="全部状态"
+        :placeholder="t('全部状态')"
         style="width: 180px"
         @update:value="handleSearch"
       />
@@ -282,44 +285,40 @@ const columns: DataTableColumns<RefundRow> = [
     <NModal
       v-model:show="showApproveModal"
       preset="card"
-      title="退款审批"
+      :title="t('退款审批')"
       style="width: 520px"
       :mask-closable="false"
     >
       <NDescriptions v-if="approveRow" :column="2" label-placement="left" size="small" style="margin-bottom: 12px">
-        <NDescriptionsItem label="订单号">{{ approveRow.order?.orderNo }}</NDescriptionsItem>
-        <NDescriptionsItem label="申请金额">¥{{ formatCents(approveRow.amountCents) }}</NDescriptionsItem>
-        <NDescriptionsItem label="系统建议额">¥{{ formatCents(approveRow.suggestedAmountCents) }}</NDescriptionsItem>
-        <NDescriptionsItem label="原支付通道">{{ paymentMethodLabel(approveRow.payment?.method) }}</NDescriptionsItem>
+        <NDescriptionsItem :label="t('订单号')">{{ approveRow.order?.orderNo }}</NDescriptionsItem>
+        <NDescriptionsItem :label="t('申请金额')">¥{{ formatCents(approveRow.amountCents) }}</NDescriptionsItem>
+        <NDescriptionsItem :label="t('系统建议额')">¥{{ formatCents(approveRow.suggestedAmountCents) }}</NDescriptionsItem>
+        <NDescriptionsItem :label="t('原支付通道')">{{ paymentMethodLabel(approveRow.payment?.method) }}</NDescriptionsItem>
       </NDescriptions>
       <NForm label-placement="left" label-width="110">
-        <NFormItem label="执行金额" required>
+        <NFormItem :label="t('执行金额')" required>
           <NSpace vertical :size="4">
             <NInputNumber v-model:value="executeYuan" :min="0.01" :precision="2" style="width: 200px">
-              <template #suffix>元</template>
+              <template #suffix>{{ t('元') }}</template>
             </NInputNumber>
-            <NText depth="3" style="font-size: 12px">
-              默认取系统建议额（当前可退总额），可在上限内酌减：执行金额等于建议额即全额退款，低于建议额则为部分退款。
-            </NText>
+            <NText depth="3" style="font-size: 12px"> {{ t('默认取系统建议额（当前可退总额），可在上限内酌减：执行金额等于建议额即全额退款，低于建议额则为部分退款。') }} </NText>
           </NSpace>
         </NFormItem>
       </NForm>
       <div style="font-size: 12px; color: var(--text-color-3)">
         {{
           approveRow && isOnlineChannel(approveRow)
-            ? '线上渠道（微信/支付宝）：提交后自动发起渠道退款。'
-            : '线下通道（对公转账/合同账期）：请先完成打款，再在此登记执行。'
+            ? t('线上渠道（微信/支付宝）：提交后自动发起渠道退款。')
+            : t('线下通道（对公转账/合同账期）：请先完成打款，再在此登记执行。')
         }}
       </div>
       <template #footer>
         <NSpace justify="end">
-          <NButton @click="showApproveModal = false">取消</NButton>
+          <NButton @click="showApproveModal = false">{{ t('取消') }}</NButton>
           <NPopconfirm @positive-click="handleApprove">
             <template #trigger>
-              <NButton type="primary" :loading="approving">确认执行</NButton>
-            </template>
-            确认按 ¥{{ formatCents(Math.round((executeYuan ?? 0) * 100)) }} 执行退款？提交后不可撤销。
-          </NPopconfirm>
+              <NButton type="primary" :loading="approving">{{ t('确认执行') }}</NButton>
+            </template> {{ t('确认按 ¥') }}{{ formatCents(Math.round((executeYuan ?? 0) * 100)) }} {{ t('执行退款？提交后不可撤销。') }} </NPopconfirm>
         </NSpace>
       </template>
     </NModal>
@@ -328,31 +327,29 @@ const columns: DataTableColumns<RefundRow> = [
     <NModal
       v-model:show="showRejectModal"
       preset="card"
-      title="驳回退款申请"
+      :title="t('驳回退款申请')"
       style="width: 480px"
       :mask-closable="false"
     >
       <NForm label-placement="left" label-width="90">
-        <NFormItem label="订单">
-          <NText>{{ rejectRow?.order?.orderNo }}（申请 ¥{{ formatCents(rejectRow?.amountCents ?? null) }}）</NText>
+        <NFormItem :label="t('订单')">
+          <NText>{{ rejectRow?.order?.orderNo }}{{ t('（申请 ¥') }}{{ formatCents(rejectRow?.amountCents ?? null) }}）</NText>
         </NFormItem>
-        <NFormItem label="驳回原因" required>
+        <NFormItem :label="t('驳回原因')" required>
           <NInput
             v-model:value="rejectReason"
             type="textarea"
-            placeholder="将通知客户（如不符合退款条件 / 超出可退期限），200 字内"
+            :placeholder="t('将通知客户（如不符合退款条件 / 超出可退期限），200 字内')"
             :maxlength="200"
             show-count
           />
         </NFormItem>
       </NForm>
-      <div style="font-size: 12px; color: var(--text-color-3)">
-        驳回后订单回退申请前状态，客户可修正后再次申请。
-      </div>
+      <div style="font-size: 12px; color: var(--text-color-3)"> {{ t('驳回后订单回退申请前状态，客户可修正后再次申请。') }} </div>
       <template #footer>
         <NSpace justify="end">
-          <NButton @click="showRejectModal = false">取消</NButton>
-          <NButton type="warning" :loading="rejecting" @click="handleReject">确认驳回</NButton>
+          <NButton @click="showRejectModal = false">{{ t('取消') }}</NButton>
+          <NButton type="warning" :loading="rejecting" @click="handleReject">{{ t('确认驳回') }}</NButton>
         </NSpace>
       </template>
     </NModal>

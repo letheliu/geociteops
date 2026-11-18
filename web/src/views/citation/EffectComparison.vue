@@ -11,6 +11,9 @@ import { BarChart } from 'echarts/charts'
 import { TitleComponent, TooltipComponent, GridComponent, LegendComponent } from 'echarts/components'
 import PageHeader from '../../components/common/PageHeader.vue'
 import { trpc } from '../../composables/useTrpc'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 use([CanvasRenderer, BarChart, TitleComponent, TooltipComponent, GridComponent, LegendComponent])
 
@@ -27,11 +30,11 @@ const afterRange = ref<[number, number]>([
 ])
 
 const platformOptions = [
-  { label: '全部平台', value: '' },
+  { label: t("全部平台"), value: '' },
   { label: 'DeepSeek', value: 'deepseek' },
-  { label: '豆包', value: 'doubao' },
-  { label: '通义千问', value: 'qwen' },
-  { label: '文心一言', value: 'ernie' },
+  { label: t("豆包"), value: 'doubao' },
+  { label: t("通义千问"), value: 'qwen' },
+  { label: t("文心一言"), value: 'ernie' },
 ]
 const selectedPlatform = ref('')
 
@@ -67,12 +70,12 @@ const chartOption = computed(() => {
   ]
   return {
     tooltip: { trigger: 'axis' },
-    legend: { data: ['优化前', '优化后'] },
-    xAxis: { type: 'category', data: ['SOV 份额', '品牌提及率'] },
+    legend: { data: [t("优化前"), t("优化后")] },
+    xAxis: { type: 'category', data: [t("SOV 份额"), t("品牌提及率")] },
     yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
     series: [
-      { name: '优化前', type: 'bar', data: pick(before), itemStyle: { color: '#909399' } },
-      { name: '优化后', type: 'bar', data: pick(after), itemStyle: { color: '#18a058' } },
+      { name: t("优化前"), type: 'bar', data: pick(before), itemStyle: { color: '#909399' } },
+      { name: t("优化后"), type: 'bar', data: pick(after), itemStyle: { color: '#18a058' } },
     ],
   }
 })
@@ -101,16 +104,16 @@ async function loadData() {
 
 <template>
   <div>
-    <PageHeader title="效果对比" subtitle="对比优化前后的 SOV 变化" />
+    <PageHeader :title="t('效果对比')" :subtitle="t('对比优化前后的 SOV 变化')" />
 
     <NCard style="margin-bottom: 16px">
       <NSpace align="end" :size="16">
         <div>
-          <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 4px">优化前时段</div>
+          <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 4px">{{ t('优化前时段') }}</div>
           <NDatePicker v-model:value="beforeRange" type="daterange" />
         </div>
         <div>
-          <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 4px">优化后时段</div>
+          <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 4px">{{ t('优化后时段') }}</div>
           <NDatePicker v-model:value="afterRange" type="daterange" />
         </div>
         <NSelect
@@ -118,18 +121,18 @@ async function loadData() {
           :options="platformOptions"
           style="width: 140px"
         />
-        <NButton type="primary" :loading="loading" @click="loadData">对比分析</NButton>
+        <NButton type="primary" :loading="loading" @click="loadData">{{ t('对比分析') }}</NButton>
       </NSpace>
     </NCard>
 
     <NSpin :show="loading">
-      <NEmpty v-if="!result && !loading" description="选择时段后点击对比分析" />
+      <NEmpty v-if="!result && !loading" :description="t('选择时段后点击对比分析')" />
 
       <template v-else-if="result">
         <NGrid :cols="3" :x-gap="16" :y-gap="16" style="margin-bottom: 16px">
           <NGridItem>
             <NCard>
-              <NStatistic label="SOV 份额变化">
+              <NStatistic :label="t('SOV 份额变化')">
                 <template #default>
                   <span :style="{ color: deltaColor(result.delta.sovMean), fontSize: '24px', fontWeight: '600' }">
                     {{ deltaText(result.delta.sovMean, '%') }}
@@ -145,24 +148,21 @@ async function loadData() {
           </NGridItem>
           <NGridItem>
             <NCard>
-              <NStatistic label="品牌提及率变化">
+              <NStatistic :label="t('品牌提及率变化')">
                 <template #default>
                   <span :style="{ color: deltaColor(result.delta.brandMentionRate), fontSize: '24px', fontWeight: '600' }">
                     {{ deltaText(result.delta.brandMentionRate, '%') }}
                   </span>
                 </template>
                 <template #suffix>
-                  <div style="font-size: 12px; color: var(--text-color-3)">
-                    优化前 {{ result.before.validSamples }} 个有效采样
-                    优化后 {{ result.after.validSamples }} 个
-                  </div>
+                  <div style="font-size: 12px; color: var(--text-color-3)"> {{ t('优化前') }} {{ result.before.validSamples }} {{ t('个有效采样 优化后') }} {{ result.after.validSamples }} {{ t('个') }} </div>
                 </template>
               </NStatistic>
             </NCard>
           </NGridItem>
           <NGridItem>
             <NCard>
-              <NStatistic label="排名中位数变化">
+              <NStatistic :label="t('排名中位数变化')">
                 <template #default>
                   <span :style="{ color: deltaColor(result.delta.rankMedian === null ? null : -result.delta.rankMedian), fontSize: '24px', fontWeight: '600' }">
                     {{ deltaText(result.delta.rankMedian === null ? null : -result.delta.rankMedian, '') }}
@@ -178,7 +178,7 @@ async function loadData() {
           </NGridItem>
         </NGrid>
 
-        <NCard title="对比图表">
+        <NCard :title="t('对比图表')">
           <VChart :option="chartOption" style="height: 360px" autoresize />
         </NCard>
       </template>

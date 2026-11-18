@@ -6,6 +6,9 @@ import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart } from 'echarts/charts'
 import { TooltipComponent, GridComponent, LegendComponent } from 'echarts/components'
 import { NEmpty, NRadioGroup, NRadioButton } from 'naive-ui'
+import { useI18n } from '@/i18n'
+const { t } = useI18n()
+
 
 // echarts/core 是按需注册制：本组件必须自己注册所需的 renderer/chart/component。
 // 缺了这一步，冷加载直接进 Dashboard（本组件唯一被直接渲染的入口）会因为
@@ -53,9 +56,9 @@ const props = withDefaults(
 )
 
 const METRICS = [
-  { value: 'sovMean' as const, label: '份额 SOV' },
-  { value: 'brandMentionRate' as const, label: '提及率' },
-  { value: 'brandSourceCitationRate' as const, label: '引用率' },
+  { value: 'sovMean' as const, label: t("份额 SOV") },
+  { value: 'brandMentionRate' as const, label: t("提及率") },
+  { value: 'brandSourceCitationRate' as const, label: t("引用率") },
 ]
 
 const metric = ref<'sovMean' | 'brandMentionRate' | 'brandSourceCitationRate'>(props.defaultMetric)
@@ -106,10 +109,10 @@ const option = computed(() => {
   })
 
   const statusText: Record<string, string> = {
-    COMPLETED: '全部成功',
-    PARTIAL: '部分失败（有可用样本）',
-    FAILED: '全部失败（不进趋势）',
-    RUNNING: '运行中',
+    COMPLETED: t("全部成功"),
+    PARTIAL: t("部分失败（有可用样本）"),
+    FAILED: t("全部失败（不进趋势）"),
+    RUNNING: t("运行中"),
   }
 
   return {
@@ -122,15 +125,15 @@ const option = computed(() => {
         const p = points[idx]
         if (!p) return ''
         const rows = [
-          `<div style="font-weight:600">${p.date}${p.legacy ? '（历史日桶）' : ''}</div>`,
+          `<div style="font-weight:600">${p.date}${p.legacy ? t("（历史日桶）") : ''}</div>`,
           `${metricLabel.value}：<b>${pct(p[metric.value])}</b>`,
-          metric.value === 'sovMean' ? `组内离散度：±${pct(p.sovStdDev)}` : '',
-          `有效采样：${p.validSamples}${p.failedSamples > 0 ? ` · 失败 ${p.failedSamples}` : ''}`,
-          `N：${p.sampleCount} 次采样`,
-          `状态：${statusText[p.status] ?? p.status}`,
-          p.trigger === 'HEALTH_CHECK' ? '来源：GEO 体检（引用快照写入这条趋势）' : '',
-          p.slotKey ? `槽位：${p.slotKey}` : '',
-          p.legacy ? '<span style="opacity:.7">历史为事件级聚合口径，与 Run 级口径不保证逐日相等</span>' : '',
+          metric.value === 'sovMean' ? `${t("组内离散度：±")}${pct(p.sovStdDev)}` : '',
+          `${t("有效采样：")}${p.validSamples}${p.failedSamples > 0 ? `${t(" · 失败 ")}${p.failedSamples}` : ''}`,
+          `N：${p.sampleCount}${t(" 次采样")}`,
+          `${t("状态：")}${statusText[p.status] ?? p.status}`,
+          p.trigger === 'HEALTH_CHECK' ? t("来源：GEO 体检（引用快照写入这条趋势）") : '',
+          p.slotKey ? `${t("槽位：")}${p.slotKey}` : '',
+          p.legacy ? t("<span style=\"opacity:.7\">历史为事件级聚合口径，与 Run 级口径不保证逐日相等</span>") : '',
         ].filter(Boolean)
         return rows.join('<br/>')
       },
@@ -179,7 +182,7 @@ const option = computed(() => {
         itemStyle: { color: '#18a058' },
       },
       {
-        name: `${metricLabel.value}（历史日桶）`,
+        name: `${metricLabel.value}${t("（历史日桶）")}`,
         type: 'line',
         data: legacyData,
         lineStyle: { width: 2, type: 'dashed', color: '#909399' },
@@ -204,10 +207,8 @@ const hasHealthCheck = computed(() => props.series.some((p) => p.trigger === 'HE
       </NRadioGroup>
     </div>
 
-    <div v-if="hasHealthCheck" style="font-size: 12px; color: var(--text-color-3); margin-bottom: 6px">
-      蓝菱形来自 GEO 体检的引用快照，不是定时监测的 N 次采样。
-    </div>
-    <NEmpty v-if="!hasData" description="暂无趋势数据，请先触发一次监测" style="padding: 48px 0" />
+    <div v-if="hasHealthCheck" style="font-size: 12px; color: var(--text-color-3); margin-bottom: 6px"> {{ t('蓝菱形来自 GEO 体检的引用快照，不是定时监测的 N 次采样。') }} </div>
+    <NEmpty v-if="!hasData" :description="t('暂无趋势数据，请先触发一次监测')" style="padding: 48px 0" />
     <VChart v-else :option="option" :style="{ height }" autoresize />
   </div>
 </template>
