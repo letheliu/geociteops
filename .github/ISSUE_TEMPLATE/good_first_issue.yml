@@ -1,0 +1,26 @@
+name: 新手任务
+description: 从 docs/good-first-issues.md 领一个小改动
+labels: ["good first issue"]
+body:
+  - type: dropdown
+    id: item
+    attributes:
+      label: 对应哪一条
+      description: 先看 docs/good-first-issues.md。这里的选项是文档里的标题，不是已经派给别人的工作。
+      options:
+        - Wire the Anthropic adapter
+        - Open the latest report when the page loads
+        - Check relative links in the docs
+        - Let DEMO_ACCOUNT_PASSWORD reset an existing demo user
+        - Fill in missing English UI strings
+        - 文档里还没有，我在下面写
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: 你准备怎么做
+      description: 一两句话。如果选了「文档里还没有」，把想法写在这里。
+    validations:
+      required: true

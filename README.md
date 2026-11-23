@@ -17,7 +17,14 @@ English · [简体中文](./README.zh-CN.md)
 [![SDK](https://img.shields.io/npm/v/@geociteops/sdk)](https://www.npmjs.com/package/@geociteops/sdk)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fletheliu%2Fgeociteops--api-blue)](https://github.com/letheliu/geociteops/pkgs/container/geociteops-api)
 
+[![Docker Compose](https://img.shields.io/badge/Deploy-Docker%20Compose-2496ED?logo=docker&logoColor=white)](./docs/deploy.md#docker-compose)
+[![Deploy to Render](https://img.shields.io/badge/Deploy-Render-46E3B7?logo=render&logoColor=white)](https://render.com/deploy?repo=https://github.com/letheliu/geociteops)
+[![Railway](https://img.shields.io/badge/Deploy-Railway-0B0D0E?logo=railway&logoColor=white)](./docs/deploy.md#railway)
+[![Zeabur](https://img.shields.io/badge/Deploy-Zeabur-6300FF)](./docs/deploy.md#zeabur)
+
 </div>
+
+The Render button opens a Blueprint from [`render.yaml`](./render.yaml) once that file is on the default branch. Railway and Zeabur badges go to the install notes: their marketplace buttons need a template code from the owner's account. Compose is the path to run locally. Details, required variables, and the public-demo switch are in [docs/deploy.md](./docs/deploy.md).
 
 ---
 
@@ -46,7 +53,7 @@ The walkthrough brand is **Acme Draw**, a fictional AI image product at `https:/
 | --- | --- | --- |
 | [![Share of voice trend for the fictional Acme Draw workspace](./docs/assets/dashboard.webp)](./docs/assets/dashboard.webp) | [![GEO health report: score, four pillars, and share of voice](./docs/assets/geo-health.webp)](./docs/assets/geo-health.webp) | [![Agent Readiness audit: score, category cards, and prioritized fixes](./docs/assets/agent-readiness.webp)](./docs/assets/agent-readiness.webp) |
 
-A read-only deployment of this project is at <https://geo.gsgroup.club>. Standing up your own is [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
+Public demo: `https://YOUR_DEMO_HOST` — placeholder, replace it after you host an instance with `DEMO_MODE=on`. This repository does not publish a live URL. Standing up your own is [docs/deploy.md](./docs/deploy.md). `DEMO_MODE=on` seeds Acme Draw, rejects writes, and does not call model APIs or crawl sites. The sign-in page names `demo-viewer` and does not show the password unless you set `DEMO_PUBLIC_PASSWORD_HINT`.
 
 ## Get your GEO score in 5 minutes
 
@@ -106,7 +113,7 @@ Illustrative only. This is how the work is shaped, not a benchmark and not a pri
 | --- | --- |
 | GEO health check | One form. Four pillars, at most ten actions, a branded PDF, a daily/weekly/monthly rerun, and the score on a trend chart. The citation snapshot also shows up on the share-of-voice chart, marked as a health check. See [docs/geo-health.md](./docs/geo-health.md). |
 | Agent Readiness | Score one public URL for AI crawlers and answer engines: robots.txt per crawler, `llms.txt`, sitemap, page signals, markdown, and whether a bot user-agent is blocked. See [docs/agent-readiness.md](./docs/agent-readiness.md). |
-| Citation monitoring | The adapters mounted in `src/server.ts`: DeepSeek, Doubao, Qwen, ERNIE, Perplexity, ChatGPT Search, and Gemini. Share of voice, mention rate, citation rate, rank, and a trend of runs. |
+| Citation monitoring | The adapters mounted in `src/server.ts`: DeepSeek, Doubao, Qwen, ERNIE, Perplexity, ChatGPT Search, and Gemini. Share of voice, mention rate, citation rate, rank, and a trend of runs. Kimi and Yuanbao are not adapters in this repo. |
 | Content optimization | Atomize a page, score how citable it is, rewrite weak passages, generate FAQ-style answers, and check E-E-A-T. |
 | Structured signals | Schema.org JSON-LD (`SoftwareApplication`, `Organization`, `FAQPage`, and others) and `llms.txt`. |
 | Knowledge graph | Extract entities and relations. Export JSON or RDF. |
@@ -204,7 +211,7 @@ The session cookie is named `__Host-geo_sid` by default (`src/platform/identity/
 | --- | --- |
 | `http://localhost:5170` | Works as-is. Browsers treat localhost as a secure context. |
 | Bare IP over HTTP, e.g. `http://203.0.113.10:5170` | **Set `GEO_COOKIE_NAME=geo_sid`** in `.env` (drop the `__Host-` prefix), or put the deployment behind HTTPS. |
-| HTTPS (e.g. `geo.gsgroup.club`) | Keep the default `__Host-geo_sid` — it is strictly more protective. |
+| HTTPS (e.g. `https://geo.example`) | Keep the default `__Host-geo_sid` — it is strictly more protective. |
 
 ### Option B — Local development with pnpm
 
@@ -387,6 +394,7 @@ All runtime settings live in `.env`; use [.env.example](./.env.example) as the t
 | Monitored platforms | `DEEPSEEK_*`, `DOUBAO_*`, `QWEN_*`, `ERNIE_*`, `PERPLEXITY_*`, `GEMINI_*`, `OPENAI_SEARCH_MODEL` |
 | Matching | `FUZZY_MATCH_THRESHOLD` |
 | Platform security | `CREDENTIAL_MASTER_KEY` (required), `CORS_ORIGINS`, `GEO_COOKIE_NAME`, `SESSION_IDLE_PLATFORM_HOURS`, `BILLING_ENFORCEMENT` |
+| Public demo | `DEMO_MODE`, `DEMO_USERNAME`, `DEMO_ACCOUNT_PASSWORD`, `DEMO_PUBLIC_PASSWORD_HINT` |
 | Commerce & billing (P2) | `PAY_MOCK_SECRET` (required), `PAYMENT_BANK_INFO`, `SUBSCRIPTION_GRACE_DAYS` |
 
 Per-workspace platform credentials are stored in `workspace.platformConfig` with envelope encryption (master key: `CREDENTIAL_MASTER_KEY`) and read by adapters at runtime.
@@ -448,7 +456,7 @@ Generative Engine Optimization. The goal is to be mentioned and cited inside an 
 <details>
 <summary>Which engines does it call?</summary>
 
-The process in `src/server.ts` registers seven adapters: DeepSeek, Doubao (Volcengine), Qwen, ERNIE, Perplexity, ChatGPT Search, and Gemini. A run only calls the ones whose workspace credentials are set. The health check lists the rest as skipped, with the reason “No credentials configured for this engine.” An Anthropic adapter file exists and is not registered.
+The process in `src/server.ts` registers seven adapters: DeepSeek, Doubao (Volcengine), Qwen, ERNIE, Perplexity, ChatGPT Search, and Gemini. A run only calls the ones whose workspace credentials are set. The health check lists the rest as skipped, with the reason “No credentials configured for this engine.” An Anthropic adapter file exists and is not registered. Kimi and Yuanbao are not in the tree.
 
 </details>
 
@@ -462,7 +470,7 @@ Yes. Docker Compose is the primary install: Postgres, migrations, the API, and t
 <details>
 <summary>What does it cost?</summary>
 
-The repo is MIT. You pay for the computer it runs on and for any engine or LLM API you connect. The health check's readiness, citability, and structured-signal pillars do not need those keys. The citation snapshot and scheduled monitoring do, for each engine you want in the score. Billing inside the app (plans, orders, mock payments) is for people who run GeoCiteOps as a multi-tenant service. It is off unless `BILLING_ENFORCEMENT=on`.
+The repo is MIT. You pay for the computer it runs on and for any engine or LLM API you connect. The health check's readiness, citability, and structured-signal pillars do not need those keys. The citation snapshot and scheduled monitoring do, for each engine you want in the score. Billing inside the app (plans, orders, mock payments) is for people who run GeoCiteOps as a multi-tenant service. It is off unless `BILLING_ENFORCEMENT=on`. Hosted and services editions, with prices left as TBD, are described in [docs/pricing.md](./docs/pricing.md).
 
 </details>
 
@@ -475,13 +483,17 @@ The repo is MIT. You pay for the computer it runs on and for any engine or LLM A
 - [x] One-click GEO health check (readiness + citations + citability + structured signals, PDF, schedule, score trend)
 - [x] Knowledge graph extraction and export
 - [x] Containerized one-command deployment (Docker Compose, four services)
+- [x] Render Blueprint, Railway Compose import, and a Zeabur template ([docs/deploy.md](./docs/deploy.md))
+- [x] Public read-only demo switch (`DEMO_MODE`)
 - [x] MCP server for Claude Code, Cursor, and other clients (`@geociteops/mcp`)
 - [x] Closed loop: a weak query → a rewrite suggestion → a human publish → the next run fills in the delta
-- [ ] Register the adapters that are not mounted yet, and richer share-of-voice views
+- [ ] Publish `@geociteops/mcp` and submit the registry packet in `integrations/mcp-registry/`
+- [ ] Hosted Cloud edition (price TBD, see [docs/pricing.md](./docs/pricing.md))
+- [ ] Register the adapters that are not mounted yet (including Kimi and Yuanbao, which are not registered today), and richer share-of-voice views
 
 ## Contributing
 
-Issues and pull requests are welcome. Please open an issue first to discuss large changes. Branch names, commit style, and the test bar are in [CONTRIBUTING.md](./CONTRIBUTING.md). Starter tasks that are not filed as issues yet are listed in [docs/good-first-issues.md](./docs/good-first-issues.md). By contributing, you agree that your contributions are licensed under the MIT License.
+Issues and pull requests are welcome. Please open an issue first to discuss large changes. Branch names, commit style, and the test bar are in [CONTRIBUTING.md](./CONTRIBUTING.md). The community standard is the [Code of Conduct](./CODE_OF_CONDUCT.md). Starter tasks that are not filed as issues yet are listed in [docs/good-first-issues.md](./docs/good-first-issues.md). By contributing, you agree that your contributions are licensed under the MIT License.
 
 ## License
 

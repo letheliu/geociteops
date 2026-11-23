@@ -26,6 +26,12 @@ README files and `docs/` link to each other by relative path. A small script (or
 
 When the env var is set, update that user's password hash (and leave `mustChangePassword` false). When it is unset, keep today's behavior: do not invent a new password for an account that already exists.
 
-## A first slice of English UI copy
+## Fill in missing English UI strings
 
-The console has no i18n library. Report strings are already `{ en, zh }` and the pages read `zh`. A small first slice is the login card and the dashboard empty state ("先做一次 GEO 体检"), behind a dictionary the session can switch, not a project-wide framework. Leave the report objects alone. They already carry both languages.
+The console already has a dictionary. Chinese source strings are the keys, and `web/src/i18n/en-US.ts` holds the English. A string that is missing from that file stays Chinese when the locale is English.
+
+A first change is to find `t("...")` calls whose key is absent from `en-US.ts` and add the English line. Leave report objects that already carry `{ en, zh }` alone.
+
+## Document one deploy path you actually tried
+
+[docs/deploy.md](./deploy.md) covers Compose, Render, Railway, and Zeabur. Compose is the path exercised in development. The hosted blueprints are templates. If you deploy one of them and a step is wrong (private DNS, the database plan slug, the Zeabur Dockerfile path), correct that section and say which host you used. Do not add a second deploy guide.

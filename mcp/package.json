@@ -1,6 +1,7 @@
 {
   "name": "@geociteops/mcp",
   "version": "0.1.0",
+  "mcpName": "io.github.letheliu/geociteops",
   "description": "MCP server for GeoCiteOps — GEO health checks, agent readiness, citations, content optimization, schema, llms.txt, and knowledge graph inside Claude Code, Cursor, and other MCP clients.",
   "license": "MIT",
   "type": "module",

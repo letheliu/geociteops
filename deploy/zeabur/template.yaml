@@ -1,0 +1,142 @@
+# Zeabur template. Deploy with: npx zeabur template deploy -f deploy/zeabur/template.yaml
+# The marketplace button is minted in the Zeabur dashboard after you publish.
+# See docs/deploy.md. Do not put real secrets in this file.
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+  name: GeoCiteOps
+spec:
+  description: Self-hosted GEO console. See how AI answer engines cite a brand, then fix the pages they quote.
+  icon: https://raw.githubusercontent.com/letheliu/geociteops/main/docs/assets/geociteops-logo.svg
+  tags:
+    - Tool
+  readme: |-
+    GeoCiteOps tracks citations in the engines this repo actually calls
+    (DeepSeek, Doubao, Qwen, ERNIE, Perplexity, ChatGPT Search, Gemini)
+    and scores a public URL for AI crawlers.
+
+    Set CREDENTIAL_MASTER_KEY to 64 hex characters (`openssl rand -hex 32`)
+    and PAY_MOCK_SECRET to a long random string. Leave DEMO_MODE as `off`
+    for a normal install. Set it to `on` only for a public read-only Acme Draw demo.
+
+    The web service must build with `web/Dockerfile` and a repository-root context.
+    The API service uses the root Dockerfile. If the web build produces the API
+    image, set the Dockerfile path in the service settings and redeploy.
+  variables:
+    - key: CREDENTIAL_MASTER_KEY
+      type: STRING
+      name: Credential master key
+      description: 64 hex characters from `openssl rand -hex 32`. The API will not start without it.
+    - key: PAY_MOCK_SECRET
+      type: STRING
+      name: Mock payment secret
+      description: Long random string. The API refuses to start if this is empty.
+    - key: DEMO_MODE
+      type: STRING
+      name: Demo mode
+      description: off for a normal install. on seeds the fictional Acme Draw workspace and rejects writes.
+    - key: PUBLIC_DOMAIN
+      type: DOMAIN
+      name: Console domain
+      description: Hostname for the web console.
+  services:
+    - name: db
+      template: PREBUILT
+      spec:
+        source:
+          image: pgvector/pgvector:pg16
+        ports:
+          - id: database
+            port: 5432
+            type: TCP
+        volumes:
+          - id: pgdata
+            dir: /var/lib/postgresql/data
+        env:
+          POSTGRES_USER:
+            default: geo
+            expose: true
+          POSTGRES_PASSWORD:
+            default: ${PASSWORD}
+            expose: true
+          POSTGRES_DB:
+            default: geo
+            expose: true
+          DB_HOST:
+            default: ${CONTAINER_HOSTNAME}
+            expose: true
+            readonly: true
+    - name: app
+      template: GIT
+      dependencies:
+        - db
+      spec:
+        source:
+          type: GITHUB
+          repoID: 1423810956
+          branch: main
+          rootDirectory: /
+          dockerfileName: Dockerfile
+        ports:
+          - id: http
+            port: 4000
+            type: HTTP
+        volumes:
+          - id: data
+            dir: /app/data
+        env:
+          NODE_ENV:
+            default: production
+          PORT:
+            default: "4000"
+          GEO_RUN_MIGRATIONS:
+            default: "1"
+          GEO_DB_HOST:
+            default: ${DB_HOST}
+          POSTGRES_USER:
+            default: ${POSTGRES_USER}
+          POSTGRES_PASSWORD:
+            default: ${POSTGRES_PASSWORD}
+          POSTGRES_DB:
+            default: ${POSTGRES_DB}
+          DATABASE_URL:
+            default: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:5432/${POSTGRES_DB}?schema=public
+          CREDENTIAL_MASTER_KEY:
+            default: ${CREDENTIAL_MASTER_KEY}
+          PAY_MOCK_SECRET:
+            default: ${PAY_MOCK_SECRET}
+          DEMO_MODE:
+            default: ${DEMO_MODE}
+          ZVEC_DATA_PATH:
+            default: /app/data/zvec
+          GEO_UPLOAD_DIR:
+            default: /app/data/uploads
+          BILLING_ENFORCEMENT:
+            default: "off"
+          REGISTRATION_ENABLED:
+            default: "off"
+          APP_HOST:
+            default: ${CONTAINER_HOSTNAME}
+            expose: true
+            readonly: true
+    - name: web
+      template: GIT
+      domainKey: PUBLIC_DOMAIN
+      dependencies:
+        - app
+      spec:
+        source:
+          type: GITHUB
+          repoID: 1423810956
+          branch: main
+          rootDirectory: /
+          dockerfileName: web/Dockerfile
+        ports:
+          - id: web
+            port: 80
+            type: HTTP
+        env:
+          GEO_API_UPSTREAM:
+            default: ${APP_HOST}:4000
+          PORT:
+            default: "80"

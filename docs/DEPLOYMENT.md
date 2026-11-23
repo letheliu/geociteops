@@ -5,7 +5,8 @@ steps that require a remote machine, a real GitHub repository, or an npm account
 belongs in an automated pipeline.
 
 Related: the acceptance criteria this runbook serves live in the M1 spec; the day-to-day dev
-workflow is in [CONTRIBUTING.md](../CONTRIBUTING.md).
+workflow is in [CONTRIBUTING.md](../CONTRIBUTING.md). One-click install (Compose, Render,
+Railway, Zeabur) and `DEMO_MODE` are in [deploy.md](./deploy.md).
 
 ---
 

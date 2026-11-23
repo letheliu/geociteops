@@ -652,3 +652,45 @@ describe('protectedProcedure：BILLING_ENFORCEMENT 未开启 → 服务状态列
     expect(calls).toEqual([]) // off：服务状态列不查，直接被 VIEW 拒
   })
 })
+
+describe('DEMO_MODE 写闸（publicProcedure 挂载，全部 procedure 家族继承）', () => {
+  const demoRouter = router({
+    auth: router({
+      login: publicProcedure.mutation(() => 'in'),
+      logout: publicProcedure.mutation(() => 'out'),
+      changePassword: publicProcedure.mutation(() => 'changed'),
+    }),
+    citation: router({
+      trend: publicProcedure.query(() => 'trend'),
+      run: publicProcedure.mutation(() => 'run'),
+    }),
+  })
+
+  afterEach(() => {
+    delete process.env.DEMO_MODE
+  })
+
+  it('关闭时写操作仍按 csrf 放行', async () => {
+    delete process.env.DEMO_MODE
+    const caller = demoRouter.createCaller(makeCtx())
+    expect(await caller.citation.run()).toBe('run')
+  })
+
+  it('开启时查询和登录放行，其他 mutation 拒绝', async () => {
+    process.env.DEMO_MODE = 'on'
+    const caller = demoRouter.createCaller(makeCtx())
+    expect(await caller.citation.trend()).toBe('trend')
+    expect(await caller.auth.login()).toBe('in')
+    expect(await caller.auth.logout()).toBe('out')
+    await expectTrpcError(() => caller.auth.changePassword(), 'FORBIDDEN', 'DEMO_MODE')
+    await expectTrpcError(() => caller.citation.run(), 'FORBIDDEN', 'DEMO_MODE')
+  })
+
+  it('开启时缺 csrf 仍先报 CSRF，不改原有文案', async () => {
+    process.env.DEMO_MODE = 'on'
+    const caller = demoRouter.createCaller(
+      makeCtx({ requestMeta: { ip: '1', requestId: 'r', headers: {} } }),
+    )
+    await expectTrpcError(() => caller.citation.run(), 'FORBIDDEN', 'CSRF')
+  })
+})

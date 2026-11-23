@@ -1,0 +1,13 @@
+# API service only. This file does not create Postgres or the console.
+# For the full stack, import the repository docker-compose.yml onto a Railway
+# canvas and set CREDENTIAL_MASTER_KEY plus PAY_MOCK_SECRET. See docs/deploy.md.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+dockerTarget = "runtime"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"

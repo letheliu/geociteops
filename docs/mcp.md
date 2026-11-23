@@ -144,6 +144,8 @@ pnpm exec vitest run mcp sdk/src/client.test.ts
 
 `npx @geociteops/mcp` runs `dist/cli.js`. The package is not published from CI. Dry-run is in the typecheck job. Publish steps are in [DEPLOYMENT.md](./DEPLOYMENT.md).
 
+The files for a later MCP Registry and Smithery listing are in [integrations/mcp-registry/](../integrations/mcp-registry/CHECKLIST.md). They are not submitted from this repo.
+
 ## Follow-ups
 
 - Publish `@geociteops/mcp` to npm (manual, same as the SDK).

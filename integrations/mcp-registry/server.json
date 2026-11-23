@@ -1,0 +1,53 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.letheliu/geociteops",
+  "title": "GeoCiteOps",
+  "description": "GEO health checks, agent readiness audits, citation checks, share of voice, content optimization, JSON-LD, llms.txt, and knowledge-graph extraction. Agent readiness, llms.txt, and JSON-LD also run in-process with no API key. Citation and health checks call a GeoCiteOps API you host.",
+  "websiteUrl": "https://github.com/letheliu/geociteops",
+  "repository": {
+    "url": "https://github.com/letheliu/geociteops",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@geociteops/mcp",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "GEOCITEOPS_API_URL",
+          "description": "Base URL of a GeoCiteOps API. Default http://localhost:4000.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "GEOCITEOPS_API_KEY",
+          "description": "Workspace API key (x-api-key). Omit it to use the in-process readiness, llms.txt, and JSON-LD tools only.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "GEOCITEOPS_WORKSPACE_ID",
+          "description": "Sent as x-workspace-id. The API ignores it on the API-key channel.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "GEOCITEOPS_PREFER_LOCAL",
+          "description": "Set to 1 or true to force in-process readiness, llms.txt, and JSON-LD even when an API key is set.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}
