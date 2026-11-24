@@ -356,13 +356,18 @@ export const orgRouter = router({
       ),
 
     issue: orgProcedure('credential.write')
-      .input(z.object({ workspaceId: workspaceIdSchema, name: z.string().min(1).max(100) }))
+      .input(z.object({
+        workspaceId: workspaceIdSchema,
+        name: z.string().min(1).max(100),
+        scopes: z.array(z.enum(['read', 'run-checks'])).min(1).max(2).optional(),
+      }))
       .mutation(async ({ ctx, input }) =>
         getOrgService(ctx).issueCredential(
           actorOrgId(ctx),
           input.workspaceId,
           input.name,
           actorUserId(ctx),
+          input.scopes,
         ),
       ),
 

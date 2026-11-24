@@ -18,6 +18,7 @@ import { createIdentityService } from './platform/identity/service.js'
 import { createLoginRateLimiter } from './platform/identity/rate-limiter.js'
 import { createRegistrationService } from './platform/identity/registration-service.js'
 import { createApiCredentialService } from './platform/tenancy/api-credentials.js'
+import { registerMcpTokenRoute } from './platform/tenancy/mcp-token-http.js'
 import { createMemberService } from './platform/tenancy/member-service.js'
 import { createWorkspaceAdminService } from './platform/tenancy/workspace-admin.js'
 import { createOrgService } from './platform/org/service.js'
@@ -416,6 +417,12 @@ async function main() {
   })
 
   // 轻量存活探针：不主动 ping DB，避免 DB 抖动导致容器误杀
+  registerMcpTokenRoute(fastify, {
+    findByKey: (key) => apiCredentialService.findByKey(key),
+    demoMode,
+    limit: Number(process.env.MCP_TOKEN_RATE_LIMIT) || undefined,
+  })
+
   fastify.get('/health', async () => ({
     status: 'ok',
     demoMode,

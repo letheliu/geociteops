@@ -16,7 +16,7 @@ function render(summary: string, data: unknown, isError?: boolean): ToolOutput {
     brand,
     isError,
     data,
-    text: `${summary.trim()}\n\n${JSON.stringify(data, null, 2)}`,
+    text: summary.trim(),
   }
 }
 

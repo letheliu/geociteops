@@ -1,0 +1,48 @@
+{
+  "name": "geo-advisor",
+  "version": "1.0.0",
+  "description": "Advises a brand on generative-engine citation readiness, health scores, and the files to publish.",
+  "author": {
+    "name": "GeoCiteOps",
+    "email": "maintainers@geociteops.example"
+  },
+  "homepage": "https://github.com/letheliu/geociteops",
+  "license": "MIT",
+  "keywords": ["geo", "llms.txt", "json-ld", "ai-search"],
+  "agents": ["./agents/geo-advisor.md"],
+  "expertType": "agent",
+  "agentName": "geo-advisor",
+  "skills": ["./skills/geo-health", "./skills/geo-audit", "./skills/geo-llms-schema"],
+  "displayName": {
+    "en": "GEO Advisor",
+    "zh": "GEO 顾问"
+  },
+  "profession": {
+    "en": "Generative engine optimization advisor",
+    "zh": "生成式引擎优化顾问"
+  },
+  "displayDescription": {
+    "en": "Checks whether a brand site can be cited by AI answer engines, then returns a health score and the fixes to publish first.",
+    "zh": "检查品牌官网在 AI 搜索中的引用准备度，并给出健康分、优先修复项与结构化内容。"
+  },
+  "avatar": "avatars/expert.png",
+  "categoryId": "05-MarketingGrowth",
+  "defaultInitPrompt": {
+    "zh": "帮我做一次 GEO 健康检查",
+    "en": "Run a GEO health check for my site"
+  },
+  "plugin": "geo-advisor",
+  "tags": [
+    { "en": "GEO", "zh": "GEO" },
+    { "en": "AI search", "zh": "AI 搜索" },
+    { "en": "llms.txt", "zh": "llms.txt" }
+  ],
+  "quickPrompts": [
+    { "en": "Run a GEO health check for my site", "zh": "帮我做一次 GEO 健康检查" },
+    { "en": "Audit this URL for AI crawlers", "zh": "审计这个 URL 对 AI 爬虫是否就绪" },
+    { "en": "Draft llms.txt and JSON-LD", "zh": "起草 llms.txt 和 JSON-LD" }
+  ],
+  "dependencies": {
+    "mcpServers": "./.mcp.json"
+  }
+}

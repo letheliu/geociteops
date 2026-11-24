@@ -57,24 +57,34 @@ Restart Claude Desktop after saving.
 
 Use the stdio command `npx -y @geociteops/mcp`. A generic `mcpServers` snippet is in [integrations/mcp/client.example.json](../integrations/mcp/client.example.json).
 
-Optional Streamable HTTP, bound to localhost:
+Streamable HTTP requires `Authorization: Bearer <workspace token>` on every request. stdio does not. The token is a workspace API credential created in the console. It is stored as a SHA-256 hash, shown once, and carries `read` and/or `run-checks` (`run-checks` includes read). `*` remains the full-access scope used by the key created with a new workspace.
 
 ```bash
-npx @geociteops/mcp --http --port 3333
+npx @geociteops/mcp --http --port 3333 --host 127.0.0.1
 ```
 
-Point the client at `http://127.0.0.1:3333/mcp`. The Host header must match the bind address. `--host 0.0.0.0` turns that check off; do not expose that port.
+Point a local client at `http://127.0.0.1:3333/mcp` and send the bearer token. The Host header must match the bind address. For WorkBuddy, put TLS in front of this process and set the connector URL to `https://<your-host>/mcp`. `--host 0.0.0.0` turns the Host check off; only do that behind the proxy.
+
+The MCP process checks the token by calling `GET {GEOCITEOPS_API_URL}/mcp/token`. That route never returns the token. A missing, unknown, or revoked token is `401` with `{"error":"invalid_token"}`. More than the per-token limit is `429`. The default is 60 requests per minute per token (30 when `DEMO_MODE` is on), overridable with `GEOCITEOPS_MCP_RATE_LIMIT` on the MCP process and `MCP_TOKEN_RATE_LIMIT` on the API (default 120, or 30 in demo mode).
+
+`read` can list queries, fetch reports, read share of voice, and generate `llms.txt` or JSON-LD without storing them. `run-checks` can start health checks, citation checks, rewrites, and knowledge-graph extraction. Those write to the workspace. Health checks, citation checks, rewrites, and extraction call a paid model. `optimize_content` and `extract_knowledge_graph` are marked destructive because they can replace stored page content.
+
+`DEMO_MODE=on` keeps both the API and this server read-only. A `run-checks` token still cannot start those tools.
+
+stdio keeps using `GEOCITEOPS_API_KEY` from the environment. It does not require a bearer header. In demo mode the same read-only rule applies.
 
 ## Environment
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `GEOCITEOPS_API_URL` | no | API base URL. Default `http://localhost:4000`. |
-| `GEOCITEOPS_API_KEY` | no | Workspace API key (`x-api-key`). The key already selects its workspace. |
+| `GEOCITEOPS_API_KEY` | stdio only | Workspace API key (`x-api-key`). HTTP ignores this and uses the caller's bearer token. |
 | `GEOCITEOPS_WORKSPACE_ID` | no | Sent as `x-workspace-id`. The API ignores it on the API-key channel. |
 | `GEOCITEOPS_PREFER_LOCAL` | no | `1` or `true` forces in-process readiness, `llms.txt`, and JSON-LD even when a key is set. |
+| `GEOCITEOPS_MCP_RATE_LIMIT` | no | HTTP requests allowed per token per minute. Default 60, or 30 in `DEMO_MODE`. |
+| `DEMO_MODE` | no | `on` makes this process refuse tools that write, call a model, or fetch a site. |
 
-Create the key in the console when the workspace is created. It is shown once.
+Create tokens under API credentials in the console. Pick `read`, `run-checks`, or both. The full token is shown once. The key created with a new workspace is still scope `*`.
 
 ## What runs without a server
 
@@ -146,11 +156,22 @@ pnpm exec vitest run mcp sdk/src/client.test.ts
 
 The files for a later MCP Registry and Smithery listing are in [integrations/mcp-registry/](../integrations/mcp-registry/CHECKLIST.md). They are not submitted from this repo.
 
+## WorkBuddy
+
+The listing packet is in [integrations/workbuddy/](../integrations/workbuddy/README.md). It uses WorkBuddy's user-supplied token mode (`auth_mode: "token"`), not OAuth. Nothing in that directory is submitted from this repo.
+
 ## Follow-ups
 
 - Publish `@geociteops/mcp` to npm (manual, same as the SDK).
 - Score and rewrite content in-process. That needs an LLM path that does not boot the API.
 - Extract a knowledge graph in-process, same constraint.
 - Publish the audit / `llms.txt` / JSON-LD engines as their own package if a second consumer appears.
-- Put an auth layer on Streamable HTTP before binding it anywhere but localhost.
 - List this plugin in a marketplace other than this repository.
+- OAuth 2.1 for WorkBuddy's `auth_mode: "server-side"` / `auth_type: "mcp_oauth"`. The current session-and-API-key stack has no authorization server, so this was not added. A later change needs, on HTTPS:
+  - `GET /.well-known/oauth-protected-resource` (RFC 9728), and `401` responses with `WWW-Authenticate` pointing at `resource_metadata`
+  - `GET /.well-known/oauth-authorization-server`
+  - `POST /oauth/register` (RFC 7591), allowing `client_name` `WorkBuddy Connector` and `CodeBuddy`, and redirect hosts `*.workbuddy.cn`, `*.codebuddy.cn`, `*.workbuddy.ai`, `copilot.tencent.com`, `staging-codebuddy.tencent.com`
+  - `GET /oauth/authorize` with PKCE S256
+  - `POST /oauth/token` issuing an access token and a refresh token
+  - scopes `read` and `run-checks`, and a refresh lifetime of at least 30 days
+  - a second connector `source`, because one WorkBuddy connector has one `auth_mode`

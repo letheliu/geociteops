@@ -36,6 +36,10 @@ export interface HandlerDeps {
   clocks?: Clocks
   signal?: AbortSignal
   onProgress?: (progress: number, total: number, message: string) => Promise<void>
+  /** DEMO_MODE or a read-only deployment. Handlers must not persist. */
+  readOnly?: boolean
+  /** False when the HTTP token lacks run-checks. stdio leaves this true. */
+  allowWrite?: boolean
   runAudit?: (url: string) => Promise<AgentReadinessReport>
   fetchUrl?: (url: string) => Promise<FetchedPage>
 }
@@ -132,7 +136,7 @@ function needApi(deps: HandlerDeps): GeoApi | ToolOutput {
 }
 
 function localSignals(deps: HandlerDeps): boolean {
-  return deps.preferLocal || deps.api == null
+  return deps.preferLocal || deps.api == null || deps.readOnly === true || deps.allowWrite === false
 }
 
 function waitMs(value: number | undefined): number {
@@ -271,7 +275,8 @@ export async function getGeoHealthReport(input: ReportInput, deps: HandlerDeps):
       const exported = asRecord(await api.geoHealth.export.query({ id: input.id, format: input.format }))
       const content = asString(exported?.content)
       if (!exported || content == null) return fail('GEO health export was empty.', { code: 'API_ERROR', id: input.id })
-      return ok(`GEO health report ${input.id} (${input.format}).`, {
+      const clipped = content.length > 8_000 ? `${content.slice(0, 8_000)}\n…(truncated)` : content
+      return ok(`GEO health report ${input.id} (${input.format}).\n\n${clipped}`, {
         id: input.id,
         format: input.format,
         filename: exported.filename ?? null,
@@ -282,7 +287,7 @@ export async function getGeoHealthReport(input: ReportInput, deps: HandlerDeps):
     const row = healthView(await api.geoHealth.get.query({ id: input.id }))
     if (!row) return fail('GEO health report returned an unexpected payload.', { code: 'API_ERROR' })
     const view = compactHealth(row, false)
-    return ok(healthSummary(view), { ...view, report: row.report ?? null })
+    return ok(healthSummary(view), view)
   } catch (err) {
     return fail(errorMessage(err), { code: 'API_ERROR', id: input.id })
   }
@@ -666,7 +671,6 @@ function compactOptimization(raw: unknown) {
     }),
     faqCount: faqs.length,
     faqs: faqs.slice(0, 8),
-    report: row.report ?? null,
     truncated: atoms.length > 12 || faqs.length > 8,
   }
 }
@@ -709,7 +713,10 @@ export async function generateSchema(input: SchemaToolInput, deps: HandlerDeps):
         : input.pageUrl
           ? `${input.schemaType} is not stored by the API. Generated in-process.`
           : 'No pageUrl, so the document was not stored. Generated in-process.'
-      return ok(`${why} ${built.valid ? 'Validation passed.' : 'Validation reported errors.'}`, {
+      const problems = built.valid
+        ? 'Validation passed.'
+        : `Validation reported errors: ${built.errors.slice(0, 5).map((item) => item.message).join('; ')}`
+      return ok(`${why} ${problems}\n${JSON.stringify(built.jsonld)}`, {
         mode: 'local',
         persisted: false,
         ...built,
@@ -726,7 +733,7 @@ export async function generateSchema(input: SchemaToolInput, deps: HandlerDeps):
       schemaType: input.schemaType as 'Organization',
       fields: input.fields,
     }))
-    return ok('Stored JSON-LD on the workspace.', {
+    return ok(`Stored JSON-LD on the workspace.\n${JSON.stringify(result?.jsonld ?? result)}`, {
       mode: 'remote',
       persisted: true,
       jsonld: result?.jsonld ?? result,
@@ -749,7 +756,7 @@ export async function generateLlmsTxt(input: LlmsToolInput, deps: HandlerDeps): 
       updateFrequency: input.updateFrequency,
     })
     if (localSignals(deps)) {
-      return ok('Generated llms.txt in-process. Nothing was stored.', {
+      return ok(`Generated llms.txt in-process. Nothing was stored.\n\n${built.content}`, {
         mode: 'local',
         persisted: false,
         content: built.content,
@@ -766,14 +773,14 @@ export async function generateLlmsTxt(input: LlmsToolInput, deps: HandlerDeps): 
         sections: input.sections,
         updateFrequency: input.updateFrequency,
       })
-      return ok('Generated llms.txt and stored it on the workspace.', {
+      return ok(`Generated llms.txt and stored it on the workspace.\n\n${built.content}`, {
         mode: 'remote',
         persisted: true,
         content: built.content,
         warnings: built.warnings,
       })
     } catch (err) {
-      return ok('Generated llms.txt in-process. Storing it failed.', {
+      return ok(`Generated llms.txt in-process. Storing it failed.\n\n${built.content}`, {
         mode: 'local',
         persisted: false,
         content: built.content,

@@ -166,6 +166,28 @@ describe('createApiCredentialService.issue', () => {
     expect(credential.id).toBe('cred-9')
   })
 
+  it('显式 scopes 入库，明文只出现在返回值里，不进 keyHash 以外的字段', async () => {
+    const { prisma, create } = makeIssuePrisma()
+    const service = createApiCredentialService(prisma)
+    const { plaintext } = await service.issue('ws-1', 'MCP', 'user-op', ['read', 'run-checks'])
+    const data = create.mock.calls[0][0].data
+    expect(data.scopes).toEqual(['read', 'run-checks'])
+    expect(data.keyHash).toBe(sha256Hex(plaintext))
+    expect(JSON.stringify({ ...data, keyHash: 'hash' })).not.toContain(plaintext)
+  })
+
+  it('未知 scope 拒绝，错误文案不含调用方传入的字符串', async () => {
+    const { prisma } = makeIssuePrisma()
+    const service = createApiCredentialService(prisma)
+    const secret = 'geo_should_not_leak_in_the_error'
+    await expect(service.issue('ws-1', 'MCP', 'user-op', [secret])).rejects.toThrow(/不支持的凭证范围/)
+    try {
+      await service.issue('ws-1', 'MCP', 'user-op', [secret])
+    } catch (err) {
+      expect(err instanceof Error ? err.message : '').not.toContain(secret)
+    }
+  })
+
   it('两次签发产生不同明文（随机性）', async () => {
     const { prisma } = makeIssuePrisma()
     const service = createApiCredentialService(prisma)

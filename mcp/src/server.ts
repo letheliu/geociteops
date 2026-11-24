@@ -20,6 +20,9 @@ import {
   type HandlerDeps,
 } from './handlers.js'
 import { isToolOutput, type ToolOutput } from './result.js'
+import { redactSecret } from './redact.js'
+import { toolDenial, type McpPrincipal } from './scopes.js'
+import { credentialAllows } from '../../src/platform/tenancy/credential-scopes.js'
 
 type Extra = RequestHandlerExtra<ServerRequest, ServerNotification>
 
@@ -27,6 +30,12 @@ export interface GeoMcpOptions {
   api: GeoApi | null
   preferLocal: boolean
   version: string
+  /** Set on HTTP after the bearer token is accepted. stdio leaves this empty. */
+  principal?: McpPrincipal | null
+  /** Process-level demo switch. Also true when the token's API is in DEMO_MODE. */
+  readOnly?: boolean
+  /** HTTP bearer, used only to scrub error text. Never log it. */
+  secret?: string | null
 }
 
 const querySource = z.enum(['manual', 'google_suggest', 'llm_generated', 'paa', 'competitor'])
@@ -49,6 +58,10 @@ function depsFrom(options: GeoMcpOptions, extra: Extra): HandlerDeps {
     api: options.api,
     preferLocal: options.preferLocal,
     signal: extra.signal,
+    readOnly: options.readOnly || options.principal?.readOnly === true,
+    allowWrite: options.principal
+      ? credentialAllows(options.principal.scopes, 'run-checks')
+      : true,
     onProgress: async (progress, total, message) => {
       const token = extra._meta?.progressToken
       if (token === undefined) return
@@ -77,16 +90,29 @@ async function run(extra: Extra, options: GeoMcpOptions, task: (deps: HandlerDep
     if (!isToolOutput(output)) throw new Error('Tool returned an unexpected value')
     return toResult(output)
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unexpected error'
+    const message = redactSecret(err instanceof Error ? err.message : 'Unexpected error', options.secret)
     return { content: [{ type: 'text', text: message }], isError: true }
+  }
+}
+
+function guarded(
+  options: GeoMcpOptions,
+  name: string,
+  handler: (args: any, deps: HandlerDeps) => Promise<ToolOutput>,
+) {
+  return async (args: any, extra: Extra): Promise<CallToolResult> => {
+    const denial = toolDenial(name, { principal: options.principal ?? null, readOnly: options.readOnly === true }, args)
+    if (denial) return { content: [{ type: 'text', text: denial }], isError: true }
+    return run(extra, options, (deps) => handler(args, deps))
   }
 }
 
 const instructions = [
   'GeoCiteOps tools for generative engine optimization.',
-  'With no API key, run_agent_readiness_audit, generate_llms_txt, and generate_schema run in-process.',
-  'GEO health, citation checks, share of voice, content rewrite, and knowledge graph extraction need GEOCITEOPS_API_URL and GEOCITEOPS_API_KEY.',
-  'Long jobs return a job id when the wait ends. Fetch them with the matching get tool.',
+  'Use run_geo_health_check for a full score, run_agent_readiness_audit for crawler access, and generate_llms_txt or generate_schema when the user wants those files.',
+  'stdio with no API key runs readiness, llms.txt, and JSON-LD in-process.',
+  'HTTP requires Authorization: Bearer with a workspace token. read can fetch reports. run-checks starts jobs, writes, and can call paid models.',
+  'DEMO_MODE is read-only. Long jobs return a job id when the wait ends.',
 ].join(' ')
 
 export function createGeoMcpServer(options: GeoMcpOptions): McpServer {
@@ -97,7 +123,7 @@ export function createGeoMcpServer(options: GeoMcpOptions): McpServer {
 
   server.registerTool('run_geo_health_check', {
     title: 'Run GEO health check',
-    description: 'Start a GEO health check (agent readiness, citation snapshot, citability, structured signals) and poll until it finishes or waitMs elapses. Returns the score, pillar scores, top actions, and a job id. Requires GEOCITEOPS_API_KEY. Default wait is 45 seconds. Pass waitMs 0 to return the job id immediately.',
+    description: 'Use when the user wants one GEO score for a brand and its official site. Starts the check and polls. Writes a workspace job and can call paid AI engines. Returns the score, pillar scores, top actions, and a job id. Needs the run-checks scope. Default wait is 45 seconds. Pass waitMs 0 to return the job id immediately.',
     inputSchema: {
       brandName: z.string().trim().min(1).max(80).describe('Brand name'),
       siteUrl: z.string().trim().min(1).max(2048).describe('Official http(s) URL'),
@@ -108,54 +134,54 @@ export function createGeoMcpServer(options: GeoMcpOptions): McpServer {
       waitMs: z.number().int().min(0).max(180000).optional().describe('How long to poll before returning the job id'),
     },
     annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
-  }, async (args, extra) => run(extra, options, (deps) => runGeoHealthCheck(args, deps)))
+  }, guarded(options, 'run_geo_health_check', (args, deps) => runGeoHealthCheck(args, deps)))
 
   server.registerTool('get_geo_health_report', {
     title: 'Get GEO health report',
-    description: 'Fetch a GEO health check by id. Pass format markdown or json to export the stored report. Requires GEOCITEOPS_API_KEY.',
+    description: 'Use when a GEO health job id is already known. Fetches that check. Pass format markdown or json to export the stored report. Read-only. Needs the read scope.',
     inputSchema: {
       id: z.string().min(1),
       format: z.enum(['markdown', 'json']).optional(),
     },
-    annotations: { readOnlyHint: true, openWorldHint: true },
-  }, async (args, extra) => run(extra, options, (deps) => getGeoHealthReport(args, deps)))
+    annotations: { readOnlyHint: true, openWorldHint: true, destructiveHint: false },
+  }, guarded(options, 'get_geo_health_report', (args, deps) => getGeoHealthReport(args, deps)))
 
   server.registerTool('run_agent_readiness_audit', {
     title: 'Run agent readiness audit',
-    description: 'Score a public URL for AI crawlers: robots.txt, llms.txt, sitemap, page signals, markdown, and bot access. Runs in-process when no API key is set (or GEOCITEOPS_PREFER_LOCAL=1). With an API key, queues the audit and polls. Returns score, grade, and the highest-impact fixes.',
+    description: 'Use when the user asks if AI crawlers can read one public URL. Scores robots.txt, llms.txt, sitemap, page signals, markdown, and bot access. stdio with no key runs in-process and does not store the audit. With an API token it writes a job and polls. Needs run-checks on HTTP. Not a paid model call.',
     inputSchema: {
       url: z.string().trim().min(1).max(2048).describe('Public http(s) URL'),
       waitMs: z.number().int().min(0).max(180000).optional(),
     },
     annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
-  }, async (args, extra) => run(extra, options, (deps) => runAgentReadinessAuditTool(args, deps)))
+  }, guarded(options, 'run_agent_readiness_audit', (args, deps) => runAgentReadinessAuditTool(args, deps)))
 
   server.registerTool('get_agent_readiness_report', {
     title: 'Get agent readiness report',
-    description: 'Fetch a stored agent readiness audit by id. Local audits are not stored; this needs GEOCITEOPS_API_KEY.',
+    description: 'Use when an agent-readiness job id is already known. Fetches that stored audit. Local audits are not stored. Read-only. Needs the read scope.',
     inputSchema: { id: z.string().min(1) },
-    annotations: { readOnlyHint: true, openWorldHint: true },
-  }, async (args, extra) => run(extra, options, (deps) => getAgentReadinessReport(args, deps)))
+    annotations: { readOnlyHint: true, openWorldHint: true, destructiveHint: false },
+  }, guarded(options, 'get_agent_readiness_report', (args, deps) => getAgentReadinessReport(args, deps)))
 
   server.registerTool('list_queries', {
     title: 'List citation queries',
-    description: 'List active queries in the workspace query library. Requires GEOCITEOPS_API_KEY. The API currently returns active queries only.',
+    description: 'Use when the user wants the workspace question list before a citation check. Returns active queries only. Read-only. Needs the read scope.',
     inputSchema: {},
-    annotations: { readOnlyHint: true, openWorldHint: true },
-  }, async (_args, extra) => run(extra, options, (deps) => listQueries(deps)))
+    annotations: { readOnlyHint: true, openWorldHint: true, destructiveHint: false },
+  }, guarded(options, 'list_queries', (_args, deps) => listQueries(deps)))
 
   server.registerTool('add_queries', {
     title: 'Add citation queries',
-    description: 'Add one or more queries to the workspace query library. Each item is a string or { queryText, source, pageId }. Source defaults to manual. Requires GEOCITEOPS_API_KEY.',
+    description: 'Use when the user wants new questions saved in the query library. Each item is a string or { queryText, source, pageId }. Source defaults to manual. Writes the library. Needs the run-checks scope. Not a paid model call.',
     inputSchema: {
       queries: z.array(queryItem).min(1).max(20),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-  }, async (args, extra) => run(extra, options, (deps) => addQueries({ queries: normalizeQueries(args.queries) }, deps)))
+  }, guarded(options, 'add_queries', (args, deps) => addQueries({ queries: normalizeQueries(args.queries) }, deps)))
 
   server.registerTool('run_citation_check', {
     title: 'Run citation check',
-    description: 'Run one query across the workspace AI engines (or the platforms you pass). Adds the query to the library when query text is new. Polls the run and returns mention counts. Omits raw model answers. On timeout, returns the run id. Requires GEOCITEOPS_API_KEY.',
+    description: 'Use when the user wants mention counts for one question. Runs it on the workspace AI engines, or on platforms you pass. Adds new query text to the library. Writes a run and calls paid models. Omits raw answers. On timeout, returns the run id. Needs the run-checks scope.',
     inputSchema: {
       query: z.string().trim().min(1).max(500).optional().describe('Question text. Added to the library if it is not already there.'),
       queryId: z.string().min(1).optional(),
@@ -164,46 +190,46 @@ export function createGeoMcpServer(options: GeoMcpOptions): McpServer {
       waitMs: z.number().int().min(0).max(180000).optional(),
     },
     annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
-  }, async (args, extra) => run(extra, options, (deps) => runCitationCheck(args, deps)))
+  }, guarded(options, 'run_citation_check', (args, deps) => runCitationCheck(args, deps)))
 
   server.registerTool('get_share_of_voice', {
     title: 'Get share of voice',
-    description: 'Share of voice, mention rate, and citation rate for a date range. Defaults to the last 30 days and the workspace competitor list. Requires GEOCITEOPS_API_KEY.',
+    description: 'Use when the user wants share of voice for a date range. Defaults to the last 30 days and the workspace competitor list. Read-only. Needs the read scope.',
     inputSchema: {
       competitors: z.array(z.string()).max(20).optional(),
       start: z.string().optional().describe('Range start, ISO date'),
       end: z.string().optional().describe('Range end, ISO date'),
       platform: z.string().optional(),
     },
-    annotations: { readOnlyHint: true, openWorldHint: true },
-  }, async (args, extra) => run(extra, options, (deps) => getShareOfVoice(args, deps)))
+    annotations: { readOnlyHint: true, openWorldHint: true, destructiveHint: false },
+  }, guarded(options, 'get_share_of_voice', (args, deps) => getShareOfVoice(args, deps)))
 
   server.registerTool('optimize_content', {
     title: 'Optimize content',
-    description: 'Atomize, score, and rewrite a page. Pass text, a public url (fetched then sent to the API), or a stored pageId. Requires GEOCITEOPS_API_KEY. Rewrite uses the workspace LLM.',
+    description: 'Use when the user wants a page split into claims, scored, and rewritten. Pass text, a public url, or a stored pageId. Writes the workspace and calls a paid model. Destructive: the rewrite can replace stored page content. Needs the run-checks scope.',
     inputSchema: {
       url: z.string().optional(),
       text: z.string().max(100000).optional(),
       pageId: z.string().optional(),
       pageType: z.string().optional(),
     },
-    annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
-  }, async (args, extra) => run(extra, options, (deps) => optimizeContent(args, deps)))
+    annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: true },
+  }, guarded(options, 'optimize_content', (args, deps) => optimizeContent(args, deps)))
 
   server.registerTool('generate_schema', {
     title: 'Generate JSON-LD',
-    description: `Build Schema.org JSON-LD and validate it. Registry types: ${SCHEMA_TYPES.join(', ')}. With an API key and pageUrl, SoftwareApplication, Organization, Product, FAQPage, Article, and BreadcrumbList are stored. Other types, or no API key, are generated in-process and not stored.`,
+    description: `Use when the user wants Schema.org JSON-LD for a page. Registry types: ${SCHEMA_TYPES.join(', ')}. Validates the document. A read token generates it and does not store it. Storing SoftwareApplication, Organization, Product, FAQPage, Article, or BreadcrumbList needs pageUrl and the run-checks scope. Not a paid model call.`,
     inputSchema: {
       schemaType: z.string().min(1),
       fields: z.record(z.string(), z.unknown()).describe('Properties for that schema type'),
       pageUrl: z.string().optional().describe('Page URL. Required only when storing on the workspace.'),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  }, async (args, extra) => run(extra, options, (deps) => generateSchema(args, deps)))
+  }, guarded(options, 'generate_schema', (args, deps) => generateSchema(args, deps)))
 
   server.registerTool('generate_llms_txt', {
     title: 'Generate or validate llms.txt',
-    description: 'Generate llms.txt from brandName, tagline, and sections, or validate existing markdown (text) or a live /llms.txt (url). Generation runs in-process. With an API key it is also stored, unless GEOCITEOPS_PREFER_LOCAL=1.',
+    description: 'Use when the user wants llms.txt written or checked. Generate from brandName, tagline, and sections, or validate markdown (text) or a live file (url). A read token does not store the file. Storing needs the run-checks scope, unless GEOCITEOPS_PREFER_LOCAL=1. Not a paid model call. Fetching url contacts that site.',
     inputSchema: {
       brandName: z.string().min(1).max(200).optional(),
       tagline: z.string().min(1).max(500).optional(),
@@ -224,19 +250,19 @@ export function createGeoMcpServer(options: GeoMcpOptions): McpServer {
       url: z.string().optional().describe('Site or llms.txt URL to fetch and validate'),
     },
     annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
-  }, async (args, extra) => run(extra, options, (deps) => generateLlmsTxt(args, deps)))
+  }, guarded(options, 'generate_llms_txt', (args, deps) => generateLlmsTxt(args, deps)))
 
   server.registerTool('extract_knowledge_graph', {
     title: 'Extract knowledge graph',
-    description: 'Extract entities and relations from a stored pageId, from text, or from a public url. Text and url are saved as a content page first. Requires GEOCITEOPS_API_KEY and the workspace LLM.',
+    description: 'Use when the user wants entities and relations from a page. Pass a stored pageId, text, or a public url. Text and url are saved as a content page first. Writes the workspace and calls a paid model. Destructive: saving text or a url overwrites that page. Needs the run-checks scope.',
     inputSchema: {
       pageId: z.string().optional(),
       url: z.string().optional(),
       text: z.string().max(100000).optional(),
       pageType: z.string().optional(),
     },
-    annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
-  }, async (args, extra) => run(extra, options, (deps) => extractKnowledgeGraph(args, deps)))
+    annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: true },
+  }, guarded(options, 'extract_knowledge_graph', (args, deps) => extractKnowledgeGraph(args, deps)))
 
   server.registerPrompt('geo-audit', {
     title: 'GEO audit',
@@ -290,13 +316,20 @@ export function createGeoMcpServer(options: GeoMcpOptions): McpServer {
       description: 'Latest GEO health check for the workspace API key. Explains local mode when no key is set.',
       mimeType: 'application/json',
     },
-    async (uri) => ({
-      contents: [{
-        uri: uri.href,
-        mimeType: 'application/json',
-        text: JSON.stringify(await latest(options, 'geo-health')),
-      }],
-    }),
+    async (uri) => {
+      const denial = toolDenial('get_geo_health_report', {
+        principal: options.principal ?? null,
+        readOnly: options.readOnly === true,
+      })
+      const payload = denial ? { available: false, reason: denial } : await latest(options, 'geo-health')
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: 'application/json',
+          text: JSON.stringify(payload),
+        }],
+      }
+    },
   )
 
   server.registerResource(
@@ -306,13 +339,20 @@ export function createGeoMcpServer(options: GeoMcpOptions): McpServer {
       description: 'Latest stored agent readiness audit. Local audits are not listed here.',
       mimeType: 'application/json',
     },
-    async (uri) => ({
-      contents: [{
-        uri: uri.href,
-        mimeType: 'application/json',
-        text: JSON.stringify(await latest(options, 'agent-readiness')),
-      }],
-    }),
+    async (uri) => {
+      const denial = toolDenial('get_agent_readiness_report', {
+        principal: options.principal ?? null,
+        readOnly: options.readOnly === true,
+      })
+      const payload = denial ? { available: false, reason: denial } : await latest(options, 'agent-readiness')
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: 'application/json',
+          text: JSON.stringify(payload),
+        }],
+      }
+    },
   )
 
   return server
