@@ -591,6 +591,9 @@ const enUS: Record<string, string> = {
   "请输入要审计的 URL": "Please enter the URL to be audited",
   "请输入页面 URL": "Please enter the page URL",
   "请输入用户名和密码": "Please enter your username and password",
+  "这是公开只读演示。用户名是 {username}。密码由部署这套实例的人设置，仓库里没有保存密码。":
+    "This is a public read-only demo. The username is {username}. The person who deployed this instance sets the password. The repository does not contain it.",
+  "部署者留下的登录说明：{hint}": "Note from the operator: {hint}",
   "请输入主题": "Please enter the subject",
   "请说明退款原因（必填，500 字内）": "Please explain the reason for the refund (required, within 500 characters)",
   "请填写 ": "Please fill in ",

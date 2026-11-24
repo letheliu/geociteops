@@ -94,11 +94,27 @@ import { createKgRepository } from './modules/knowledge-graph/repository.js'
 import { createKgExtractor } from './modules/knowledge-graph/extractor.js'
 import { createGraphExporter } from './modules/knowledge-graph/exporter.js'
 import { createKgService } from './modules/knowledge-graph/service.js'
+import { createDemoBlockedLlm } from './core/demo/blocked-llm.js'
+import {
+  DEMO_SKIPPED_WORKERS,
+  demoRejectsPaymentWebhook,
+  httpRateLimit,
+  isDemoMode,
+  loginAttemptLimit,
+  outboundJobsEnabled,
+} from './core/demo/mode.js'
+import { ensureDemoSeed } from './core/demo/seed.js'
 
 async function main() {
   const port = Number(process.env.PORT || 4000)
   const prisma = getPrismaClient()
-  const llm = getLlmProvider()
+  const demoMode = isDemoMode()
+  if (demoMode) {
+    await ensureDemoSeed((domain) =>
+      prisma.citationQuery.count({ where: { workspace: { domain } } }),
+    )
+  }
+  const llm = demoMode ? createDemoBlockedLlm() : getLlmProvider()
   const vector = getVectorStore()
 
   // 组装 adapter registry（国内平台）
@@ -221,7 +237,7 @@ async function main() {
   // pg-boss 前移：order service 依赖它投递 order.activate（收款确认/账期开通）
   const boss = await createQueue()
   const sessionService = createSessionService(prisma)
-  const loginRateLimiter = createLoginRateLimiter()
+  const loginRateLimiter = createLoginRateLimiter(loginAttemptLimit(demoMode))
   const memberService = createMemberService(prisma)
   const identityService = createIdentityService({
     prisma,
@@ -376,7 +392,7 @@ async function main() {
   // 安全响应头（默认配置）
   await fastify.register(helmet)
   // 全局粗粒度兜底限流（细粒度如登录限流在 identity service 内）
-  await fastify.register(rateLimit, { max: 300, timeWindow: '1 minute' })
+  await fastify.register(rateLimit, httpRateLimit(demoMode))
   // CORS：CORS_ORIGINS（逗号分隔）非空才启用；空 = 同源部署，不注册
   const corsOrigins = (process.env.CORS_ORIGINS ?? '')
     .split(',')
@@ -402,6 +418,7 @@ async function main() {
   // 轻量存活探针：不主动 ping DB，避免 DB 抖动导致容器误杀
   fastify.get('/health', async () => ({
     status: 'ok',
+    demoMode,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   }))
@@ -453,6 +470,9 @@ async function main() {
   // 为准（mock 渠道按同规范生成签名）；真实 SDK 对接时改为真 raw body，
   // PaymentChannel.verifyCallback 接口不变。
   fastify.post('/webhooks/pay/:channel', async (req, reply) => {
+    if (demoRejectsPaymentWebhook(demoMode)) {
+      return reply.code(403).send({ ok: false, error: 'DEMO_MODE rejects payment callbacks' })
+    }
     const channelName = (req.params as { channel?: string }).channel ?? ''
     const method = parseWebhookChannelParam(channelName)
     if (!method) {
@@ -545,24 +565,31 @@ async function main() {
     logger: fastify.log,
   })
 
-  await startCitationScheduler({
-    boss,
-    prisma,
-    monitor,
-    resolveActivePlatforms: resolver.listActivePlatforms,
-  })
-  await startDiagnosticWorkers({ boss, prisma, registry, analyzeCitation, getCredentials: resolver.getCredentials })
-  await startAgentReadinessWorker({
-    boss,
-    execute: (auditId) => services.agentReadiness.execute(auditId),
-  })
-  await startGeoHealthWorker({
-    boss,
-    dispatch: (checkId) => services.geoHealth.dispatch(checkId),
-    runPillar: (checkId, pillar) => services.geoHealth.runPillarJob(checkId, pillar),
-    finalize: (checkId) => services.geoHealth.finalize(checkId),
-    runDue: () => services.geoHealth.runDueSchedules().then(() => undefined),
-  })
+  if (outboundJobsEnabled(demoMode)) {
+    await startCitationScheduler({
+      boss,
+      prisma,
+      monitor,
+      resolveActivePlatforms: resolver.listActivePlatforms,
+    })
+    await startDiagnosticWorkers({ boss, prisma, registry, analyzeCitation, getCredentials: resolver.getCredentials })
+    await startAgentReadinessWorker({
+      boss,
+      execute: (auditId) => services.agentReadiness.execute(auditId),
+    })
+    await startGeoHealthWorker({
+      boss,
+      dispatch: (checkId) => services.geoHealth.dispatch(checkId),
+      runPillar: (checkId, pillar) => services.geoHealth.runPillarJob(checkId, pillar),
+      finalize: (checkId) => services.geoHealth.finalize(checkId),
+      runDue: () => services.geoHealth.runDueSchedules().then(() => undefined),
+    })
+  } else {
+    fastify.log.warn(
+      `[demo] DEMO_MODE is on. Not starting ${DEMO_SKIPPED_WORKERS.join(', ')}. ` +
+        'Stored schedules stay in the database and do not run.',
+    )
+  }
 
   await fastify.listen({ port, host: '0.0.0.0' })
   fastify.log.info(`geo-service listening on :${port}`)

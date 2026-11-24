@@ -1,6 +1,6 @@
 # Contributing to GeoCiteOps
 
-Thanks for your interest. This document covers the conventions that keep the codebase reviewable and the CI green.
+Thanks for your interest. This document covers the conventions that keep the codebase reviewable and the CI green. By participating you agree to the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
 ## Before you start
 

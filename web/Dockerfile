@@ -39,9 +39,19 @@ COPY src ./src
 RUN pnpm --filter geociteops-web build
 
 # ---------- runtime：nginx 托管 dist + 反代 /trpc /files /health /webhooks ----------
+# 反代目标默认 app:4000（compose 的服务名）。Railway / Zeabur / Render 用
+# GEO_API_UPSTREAM 改成它们的内网地址。PORT 默认 80，平台注入时改监听端口。
 FROM ${NGINX_IMAGE} AS runtime
 
-COPY web/nginx.conf /etc/nginx/conf.d/default.conf
+ENV GEO_API_UPSTREAM=app:4000
+ENV PORT=80
+
+COPY web/nginx.conf /etc/nginx/default.conf.template
+COPY web/docker-entrypoint.sh /usr/local/bin/render-nginx-conf.sh
+RUN sed -i 's/\r$//' /usr/local/bin/render-nginx-conf.sh \
+  && chmod +x /usr/local/bin/render-nginx-conf.sh
 COPY --from=build /app/web/dist /usr/share/nginx/html
 
 EXPOSE 80
+ENTRYPOINT ["/usr/local/bin/render-nginx-conf.sh"]
+CMD ["nginx", "-g", "daemon off;"]

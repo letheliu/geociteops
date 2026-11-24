@@ -18,6 +18,7 @@ import { createMemberService } from '../tenancy/member-service.js'
 import { clearSessionCookie, serializeSessionCookie } from './cookie.js'
 import { usernameSchema } from './username-schema.js'
 import { createRegistrationService, registrationEnabled } from './registration-service.js'
+import { demoPublicStatus, isDemoMode } from '../../core/demo/mode.js'
 import type { RegistrationService } from './registration-service.js'
 
 let defaultService: IdentityService | undefined
@@ -100,7 +101,13 @@ export const authRouter = router({
    * 自助注册开关（public query）：登录页据此显隐"注册试用"入口，/register 也据此
    * 显示关闭文案。判定含双开关联动（REGISTRATION_ENABLED × BILLING_ENFORCEMENT）。
    */
-  registrationEnabled: publicProcedure.query(async () => registrationEnabled()),
+  registrationEnabled: publicProcedure.query(async () => (isDemoMode() ? false : registrationEnabled())),
+
+  /**
+   * 公开演示提示（public query）。只返回用户名和运营者主动发布的说明，
+   * 不读 DEMO_ACCOUNT_PASSWORD。
+   */
+  demoStatus: publicProcedure.query(() => demoPublicStatus()),
 
   /**
    * 自助注册（publicProcedure 已挂 csrfGuard）：访客注册即得 7 天试用租户。

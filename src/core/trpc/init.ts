@@ -12,6 +12,7 @@ import type {
 import type { AuthDiag } from './context.js'
 import { getPrismaClient } from '../db/client.js'
 import { billingEnforcementEnabled } from '../../platform/billing/enforcement.js'
+import { demoMutationAllowed, isDemoMode } from '../demo/mode.js'
 import {
   createServiceStateResolver,
   type ServiceStateResolver,
@@ -136,8 +137,22 @@ const csrfGuard = t.middleware(async ({ ctx, type, next }) => {
   return next()
 })
 
+/**
+ * DEMO_MODE 写闸：公开演示只放行登录和退出。查询仍可读已种下的 Acme Draw 数据。
+ * 挂在 csrf 之后，缺 csrf 头时文案保持原来的 CSRF 提示。
+ */
+const demoWriteGuard = t.middleware(async ({ type, path, next }) => {
+  if (!demoMutationAllowed({ demoMode: isDemoMode(), type, path })) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'DEMO_MODE 只读：公开演示拒绝写操作，也不会发起会花钱的模型调用或站点抓取',
+    })
+  }
+  return next()
+})
+
 /** 公开过程：不做身份判定，仅挂 csrf 守卫（写操作仍需 csrf 头，如 auth.login） */
-export const publicProcedure = t.procedure.use(csrfGuard)
+export const publicProcedure = t.procedure.use(csrfGuard).use(demoWriteGuard)
 
 /** requireUser：要求已登录会话；mustChangePassword 用户仅放行 auth.* */
 const requireUser = t.middleware(async ({ ctx, path, next }) => {

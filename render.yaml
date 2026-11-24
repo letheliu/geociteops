@@ -1,0 +1,60 @@
+# Render Blueprint. The button works once this file is on the default branch:
+# https://render.com/deploy?repo=https://github.com/letheliu/geociteops
+#
+# Embeddings are stored in zvec on the app disk, not in a pgvector column.
+# A managed Postgres 16 database is enough. Change `plan` if your account
+# uses a different database plan slug. See docs/deploy.md.
+
+databases:
+  - name: geociteops-db
+    plan: basic-256mb
+    databaseName: geo
+    user: geo
+    postgresMajorVersion: "16"
+
+services:
+  - type: pserv
+    name: app
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    disk:
+      name: app-data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4000"
+      - key: GEO_RUN_MIGRATIONS
+        value: "1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: geociteops-db
+          property: connectionString
+      - key: CREDENTIAL_MASTER_KEY
+        sync: false
+      - key: PAY_MOCK_SECRET
+        sync: false
+      - key: ZVEC_DATA_PATH
+        value: /app/data/zvec
+      - key: GEO_UPLOAD_DIR
+        value: /app/data/uploads
+      - key: BILLING_ENFORCEMENT
+        value: "off"
+      - key: REGISTRATION_ENABLED
+        value: "off"
+      - key: DEMO_MODE
+        value: "off"
+
+  - type: web
+    name: web
+    runtime: docker
+    dockerfilePath: ./web/Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: GEO_API_UPSTREAM
+        value: app:4000

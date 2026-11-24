@@ -1,0 +1,36 @@
+# Smithery reads this file from the repository root.
+# integrations/mcp-registry/smithery.yaml must stay identical. Do not submit from CI.
+# https://smithery.ai/docs/build/project-config
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    description: GeoCiteOps MCP. Leave the API key empty to use the in-process tools only.
+    properties:
+      geociteopsApiUrl:
+        type: string
+        title: API URL
+        description: Base URL of a GeoCiteOps API. Ignored by the in-process tools.
+        default: http://localhost:4000
+      geociteopsApiKey:
+        type: string
+        title: Workspace API key
+        description: Optional x-api-key. Empty selects local agent readiness, llms.txt, and JSON-LD.
+      preferLocal:
+        type: boolean
+        title: Prefer local tools
+        description: Run readiness, llms.txt, and JSON-LD in-process even when an API key is set.
+        default: false
+  exampleConfig:
+    geociteopsApiUrl: http://localhost:4000
+    preferLocal: false
+  commandFunction: |-
+    (config) => ({
+      command: 'npx',
+      args: ['-y', '@geociteops/mcp'],
+      env: {
+        ...(config.geociteopsApiUrl ? { GEOCITEOPS_API_URL: config.geociteopsApiUrl } : {}),
+        ...(config.geociteopsApiKey ? { GEOCITEOPS_API_KEY: config.geociteopsApiKey } : {}),
+        ...(config.preferLocal ? { GEOCITEOPS_PREFER_LOCAL: '1' } : {}),
+      },
+    })

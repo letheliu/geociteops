@@ -10,6 +10,10 @@
 #   cp .env.example .env   # 至少改 CREDENTIAL_MASTER_KEY 与 PAY_MOCK_SECRET
 #   docker compose up -d
 #   → http://localhost:5170/login
+#
+# Railway can import this file onto a project canvas. The web container proxies
+# to app:4000. Override GEO_API_UPSTREAM if the platform's private DNS differs.
+# Public read-only demo: set DEMO_MODE=on (see docs/deploy.md). Default is off.
 
 services:
   # ---------- db：Postgres + pgvector ----------
@@ -96,6 +100,14 @@ services:
       PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}
       PERPLEXITY_MODEL: ${PERPLEXITY_MODEL:-sonar}
       FUZZY_MATCH_THRESHOLD: ${FUZZY_MATCH_THRESHOLD:--50}
+
+      # 公开只读演示。默认 off，避免把日常自托管锁成只读。
+      # on / true / 1 / yes 才会种入 Acme Draw 并拒绝写操作与出站任务。
+      DEMO_MODE: ${DEMO_MODE:-off}
+      DEMO_USERNAME: ${DEMO_USERNAME:-demo-viewer}
+      DEMO_ACCOUNT_PASSWORD: ${DEMO_ACCOUNT_PASSWORD:-}
+      DEMO_PUBLIC_PASSWORD_HINT: ${DEMO_PUBLIC_PASSWORD_HINT:-}
+      DEMO_WORKSPACE_DOMAIN: ${DEMO_WORKSPACE_DOMAIN:-acmedraw.example}
     volumes:
       # zvec 是进程内嵌入式库，落盘目录不挂卷 → 容器重建向量库清零
       - zvec-data:/app/data/zvec
@@ -111,6 +123,9 @@ services:
     restart: unless-stopped
     depends_on:
       - app
+    environment:
+      GEO_API_UPSTREAM: ${GEO_API_UPSTREAM:-app:4000}
+      PORT: '80'
     ports:
       - '${WEB_PORT:-5170}:80'
     mem_limit: 128m
