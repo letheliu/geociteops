@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { OpenAiAdapter } from './openai.js'
 import { ChatGptSearchAdapter } from './chatgpt.js'
 import { DeepSeekAdapter } from './deepseek.js'
@@ -7,6 +7,8 @@ import { QwenAdapter } from './qwen.js'
 import { ErnieAdapter } from './ernie.js'
 import { PerplexityAdapter } from './perplexity.js'
 import { GeminiAdapter } from './gemini.js'
+import { KimiAdapter } from './kimi.js'
+import { YuanbaoAdapter } from './yuanbao.js'
 import { AnthropicAdapter } from './anthropic.js'
 import type { PlatformAdapter } from './types.js'
 
@@ -25,6 +27,8 @@ const ADAPTERS: Array<{ name: string; make: () => PlatformAdapter; creds: Record
   { name: 'ernie', make: () => new ErnieAdapter(), creds: { ERNIE_API_KEY: 'e1', ERNIE_SECRET_KEY: 's1' } },
   { name: 'perplexity', make: () => new PerplexityAdapter(), creds: { PERPLEXITY_API_KEY: 'px-test' } },
   { name: 'gemini', make: () => new GeminiAdapter(), creds: { GEMINI_API_KEY: 'gm-test' } },
+  { name: 'kimi', make: () => new KimiAdapter(), creds: { MOONSHOT_API_KEY: 'km-test' } },
+  { name: 'yuanbao', make: () => new YuanbaoAdapter(), creds: { HUNYUAN_API_KEY: 'hy-test' } },
   { name: 'anthropic', make: () => new AnthropicAdapter(), creds: { ANTHROPIC_API_KEY: 'an-test' } },
 ]
 
@@ -39,6 +43,8 @@ function okResponse(adapterName: string): Response {
     perplexity: { choices: [{ message: { content: 'a' } }] },
     anthropic: { content: [{ type: 'text', text: 'a' }] },
     gemini: { candidates: [{ content: { parts: [{ text: 'a' }] } }] },
+    kimi: { output_text: 'a', output: [{ type: 'message', content: [{ type: 'output_text', text: 'a' }] }] },
+    yuanbao: { choices: [{ message: { content: 'a' } }] },
     ernie: { result: 'a' }, // 第二次调用（第一次是取 token）
   }
   return new Response(JSON.stringify(bodies[adapterName]), {
@@ -48,9 +54,13 @@ function okResponse(adapterName: string): Response {
 }
 
 describe('adapter fetch 契约', () => {
+  beforeEach(() => {
+    vi.stubEnv('DEMO_MODE', 'off')
+  })
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
     delete process.env.CITATION_FETCH_TIMEOUT_MS
   })
 

@@ -82,4 +82,22 @@ export const DEFAULT_PLATFORMS: PlatformDef[] = [
       { envKey: 'GEMINI_MODEL', label: 'Model（可选）' },
     ],
   },
+  {
+    key: 'kimi',
+    label: 'Kimi（月之暗面）',
+    fields: [
+      { envKey: 'MOONSHOT_API_KEY', label: 'API Key', required: true },
+      { envKey: 'MOONSHOT_BASE_URL', label: 'Base URL（可选）' },
+      { envKey: 'MOONSHOT_MODEL', label: 'Model（可选）' },
+    ],
+  },
+  {
+    key: 'yuanbao',
+    label: '腾讯元宝（混元 API）',
+    fields: [
+      { envKey: 'HUNYUAN_API_KEY', label: 'API Key', required: true },
+      { envKey: 'HUNYUAN_BASE_URL', label: 'Base URL（可选）' },
+      { envKey: 'HUNYUAN_MODEL', label: 'Model（可选）' },
+    ],
+  },
 ]

@@ -113,7 +113,7 @@ Illustrative only. This is how the work is shaped, not a benchmark and not a pri
 | --- | --- |
 | GEO health check | One form. Four pillars, at most ten actions, a branded PDF, a daily/weekly/monthly rerun, and the score on a trend chart. The citation snapshot also shows up on the share-of-voice chart, marked as a health check. See [docs/geo-health.md](./docs/geo-health.md). |
 | Agent Readiness | Score one public URL for AI crawlers and answer engines: robots.txt per crawler, `llms.txt`, sitemap, page signals, markdown, and whether a bot user-agent is blocked. See [docs/agent-readiness.md](./docs/agent-readiness.md). |
-| Citation monitoring | The adapters mounted in `src/server.ts`: DeepSeek, Doubao, Qwen, ERNIE, Perplexity, ChatGPT Search, and Gemini. Share of voice, mention rate, citation rate, rank, and a trend of runs. Kimi and Yuanbao are not adapters in this repo. |
+| Citation monitoring | The adapters mounted in `src/server.ts`: DeepSeek, Doubao, Qwen, ERNIE, Perplexity, ChatGPT Search, Gemini, Kimi (Moonshot), and Tencent Yuanbao (Hunyuan API). Share of voice, mention rate, citation rate, rank, and a trend of runs. |
 | Content optimization | Atomize a page, score how citable it is, rewrite weak passages, generate FAQ-style answers, and check E-E-A-T. |
 | Structured signals | Schema.org JSON-LD (`SoftwareApplication`, `Organization`, `FAQPage`, and others) and `llms.txt`. |
 | Knowledge graph | Extract entities and relations. Export JSON or RDF. |
@@ -391,7 +391,7 @@ All runtime settings live in `.env`; use [.env.example](./.env.example) as the t
 | Service | `PORT` |
 | Internal LLM | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `EMBEDDING_MODEL`, `CHAT_MODEL` |
 | Vector store | `ZVEC_DATA_PATH`, `ZVEC_DIM`, `VECTOR_SIMILARITY_THRESHOLD` |
-| Monitored platforms | `DEEPSEEK_*`, `DOUBAO_*`, `QWEN_*`, `ERNIE_*`, `PERPLEXITY_*`, `GEMINI_*`, `OPENAI_SEARCH_MODEL` |
+| Monitored platforms | `DEEPSEEK_*`, `DOUBAO_*`, `QWEN_*`, `ERNIE_*`, `PERPLEXITY_*`, `GEMINI_*`, `OPENAI_SEARCH_MODEL`, `MOONSHOT_*`, `HUNYUAN_*` |
 | Matching | `FUZZY_MATCH_THRESHOLD` |
 | Platform security | `CREDENTIAL_MASTER_KEY` (required), `CORS_ORIGINS`, `GEO_COOKIE_NAME`, `SESSION_IDLE_PLATFORM_HOURS`, `BILLING_ENFORCEMENT` |
 | Public demo | `DEMO_MODE`, `DEMO_USERNAME`, `DEMO_ACCOUNT_PASSWORD`, `DEMO_PUBLIC_PASSWORD_HINT` |
@@ -456,7 +456,7 @@ Generative Engine Optimization. The goal is to be mentioned and cited inside an 
 <details>
 <summary>Which engines does it call?</summary>
 
-The process in `src/server.ts` registers seven adapters: DeepSeek, Doubao (Volcengine), Qwen, ERNIE, Perplexity, ChatGPT Search, and Gemini. A run only calls the ones whose workspace credentials are set. The health check lists the rest as skipped, with the reason “No credentials configured for this engine.” An Anthropic adapter file exists and is not registered. Kimi and Yuanbao are not in the tree.
+The process in `src/server.ts` registers nine adapters: DeepSeek, Doubao (Volcengine), Qwen, ERNIE, Perplexity, ChatGPT Search, Gemini, Kimi (Moonshot, `MOONSHOT_API_KEY`), and Tencent Yuanbao (`HUNYUAN_API_KEY`). Yuanbao calls Tencent's Hunyuan OpenAI-compatible API, not the Yuanbao consumer app. A run only calls the ones whose workspace credentials are set. The health check lists the rest as skipped, with the reason “No credentials configured for this engine.” An Anthropic adapter file exists and is not registered. `DEMO_MODE=on` makes the Kimi and Yuanbao adapters refuse before any outbound call.
 
 </details>
 
@@ -476,7 +476,7 @@ The repo is MIT. You pay for the computer it runs on and for any engine or LLM A
 
 ## Roadmap
 
-- [x] Citation monitoring on the seven registered engines (DeepSeek, Doubao, Qwen, ERNIE, Perplexity, ChatGPT Search, Gemini)
+- [x] Citation monitoring on the nine registered engines (DeepSeek, Doubao, Qwen, ERNIE, Perplexity, ChatGPT Search, Gemini, Kimi, Yuanbao via Hunyuan)
 - [x] Content atomization, scoring, and rewriting
 - [x] JSON-LD and `llms.txt` generation
 - [x] Agent Readiness audit (robots, llms.txt, sitemap, page signals, markdown, bot access)
@@ -489,7 +489,7 @@ The repo is MIT. You pay for the computer it runs on and for any engine or LLM A
 - [x] Closed loop: a weak query → a rewrite suggestion → a human publish → the next run fills in the delta
 - [ ] Publish `@geociteops/mcp` and submit the registry packet in `integrations/mcp-registry/`
 - [ ] Hosted Cloud edition (price TBD, see [docs/pricing.md](./docs/pricing.md))
-- [ ] Register the adapters that are not mounted yet (including Kimi and Yuanbao, which are not registered today), and richer share-of-voice views
+- [ ] Register the adapters that are not mounted yet (Anthropic is implemented and not registered), and richer share-of-voice views
 
 ## Contributing
 

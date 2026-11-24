@@ -17,6 +17,8 @@ export const REQUIRED_KEYS: Record<string, string[]> = {
   perplexity: ['PERPLEXITY_API_KEY'],
   chatgpt: ['OPENAI_API_KEY'],
   gemini: ['GEMINI_API_KEY'],
+  kimi: ['MOONSHOT_API_KEY'],
+  yuanbao: ['HUNYUAN_API_KEY'],
 }
 
 export interface CredentialResolverDeps {

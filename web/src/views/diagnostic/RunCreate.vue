@@ -40,7 +40,7 @@ onMounted(async () => {
 })
 
 const confirmedQueries = computed(() => queries.value.filter((q: any) => q.status === 'CONFIRMED'))
-const platforms = ['deepseek', 'doubao', 'qwen', 'ernie', 'perplexity', 'chatgpt', 'gemini']
+const platforms = ['deepseek', 'doubao', 'qwen', 'ernie', 'perplexity', 'chatgpt', 'gemini', 'kimi', 'yuanbao']
 
 async function handleCreateDraft() {
   loading.value = true
