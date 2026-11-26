@@ -26,7 +26,7 @@ const props = withDefaults(
     workspaceId: string
     /** 服务端脱敏概况：platformSummary[key] = { configured, hint } */
     platformSummary: Record<string, { configured: boolean; hint: string }>
-    /** 平台定义列表，缺省用内置 7 平台 */
+    /** 平台定义列表，缺省用内置已注册平台 */
     platforms?: PlatformDef[]
     /** 保存端点分叉：admin.workspace.*（默认）或 org.workspaces.*（客户侧） */
     endpoint?: 'admin' | 'org'
@@ -67,7 +67,7 @@ async function handleSave() {
   for (const f of p.fields) {
     const v = (fieldValues.value[f.envKey] ?? '').trim()
     if (f.required && !v) {
-      message.warning(`${t("请填写 ")}${p.label}${t(" 的")}${f.label}`)
+      message.warning(`${t("请填写 ")}${t(p.label)}${t(" 的")}${f.label}`)
       return
     }
     if (v) values[f.envKey] = v
@@ -88,7 +88,7 @@ async function handleSave() {
       platform: p.key,
       values,
     })
-    message.success(`${p.label}${t(" 凭证已保存")}`)
+    message.success(`${t(p.label)}${t(" 凭证已保存")}`)
     showModal.value = false
     emit('saved', p.key)
   } catch (e: any) {
@@ -106,7 +106,7 @@ async function handleSave() {
       :key="p.key"
       style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap"
     >
-      <span style="font-size: 14px; font-weight: 600; min-width: 200px">{{ p.label }}</span>
+      <span style="font-size: 14px; font-weight: 600; min-width: 200px">{{ t(p.label) }}</span>
       <NTag
         :type="summaryOf(p.key).configured ? 'success' : 'default'"
         :bordered="false"

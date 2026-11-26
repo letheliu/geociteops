@@ -185,7 +185,7 @@ export function createGeoMcpServer(options: GeoMcpOptions): McpServer {
     inputSchema: {
       query: z.string().trim().min(1).max(500).optional().describe('Question text. Added to the library if it is not already there.'),
       queryId: z.string().min(1).optional(),
-      platforms: z.array(z.string().min(1)).min(1).max(12).optional().describe('Engine ids. Defaults to engines with credentials.'),
+      platforms: z.array(z.string().min(1)).min(1).max(12).optional().describe('Engine ids: deepseek, doubao, qwen, ernie, perplexity, chatgpt, gemini, kimi, yuanbao. Defaults to engines with credentials. kimi is Moonshot; yuanbao is the Hunyuan API.'),
       sampleCount: z.number().int().min(1).max(20).optional(),
       waitMs: z.number().int().min(0).max(180000).optional(),
     },

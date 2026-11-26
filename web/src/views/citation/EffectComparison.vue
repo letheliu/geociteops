@@ -35,6 +35,8 @@ const platformOptions = [
   { label: t("豆包"), value: 'doubao' },
   { label: t("通义千问"), value: 'qwen' },
   { label: t("文心一言"), value: 'ernie' },
+  { label: t("Kimi（月之暗面）"), value: 'kimi' },
+  { label: t("腾讯元宝（混元 API）"), value: 'yuanbao' },
 ]
 const selectedPlatform = ref('')
 

@@ -106,7 +106,7 @@ flowchart LR
 | --- | --- |
 | GEO 体检 | 一张表单。四根支柱、最多十条行动、一份带品牌的 PDF、按天/周/月复跑，以及分数趋势。引用快照会出现在声量趋势上，并标明来自体检。见 [docs/geo-health.md](./docs/geo-health.md)。 |
 | Agent 就绪 | 给一个公开 URL 打分：按爬虫看 robots.txt、`llms.txt`、站点地图、页面信号、Markdown，以及机器人 User-Agent 是否被拦。见 [docs/agent-readiness.md](./docs/agent-readiness.md)。 |
-| 引用监测 | `src/server.ts` 里挂上的适配器：DeepSeek、豆包、通义千问、文心一言、Perplexity、ChatGPT Search、Gemini。声量份额、提及率、引用率、排名，以及按运行画出的趋势。 |
+| 引用监测 | `src/server.ts` 里挂上的适配器：DeepSeek、豆包、通义千问、文心一言、Perplexity、ChatGPT Search、Gemini、Kimi（月之暗面）、腾讯元宝（混元 API）。声量份额、提及率、引用率、排名，以及按运行画出的趋势。 |
 | 内容优化 | 把页面拆成原子、给可引用性打分、改写薄弱段落、生成 FAQ 风格答案，并做 E-E-A-T 检查。 |
 | 结构化信号 | Schema.org JSON-LD（`SoftwareApplication`、`Organization`、`FAQPage` 等）和 `llms.txt`。 |
 | 知识图谱 | 抽取实体和关系。导出 JSON 或 RDF。 |
@@ -383,7 +383,7 @@ npx prisma migrate deploy
 | 服务 | `PORT` |
 | 内部 LLM | `OPENAI_API_KEY`、`OPENAI_BASE_URL`、`EMBEDDING_MODEL`、`CHAT_MODEL` |
 | 向量库 | `ZVEC_DATA_PATH`、`ZVEC_DIM`、`VECTOR_SIMILARITY_THRESHOLD` |
-| 被监测平台 | `DEEPSEEK_*`、`DOUBAO_*`、`QWEN_*`、`ERNIE_*`、`PERPLEXITY_*`、`GEMINI_*`、`OPENAI_SEARCH_MODEL` |
+| 被监测平台 | `DEEPSEEK_*`、`DOUBAO_*`、`QWEN_*`、`ERNIE_*`、`PERPLEXITY_*`、`GEMINI_*`、`OPENAI_SEARCH_MODEL`、`MOONSHOT_*`、`HUNYUAN_*` |
 | 匹配 | `FUZZY_MATCH_THRESHOLD` |
 | 平台安全 | `CREDENTIAL_MASTER_KEY`（必配）、`CORS_ORIGINS`、`GEO_COOKIE_NAME`、`SESSION_IDLE_PLATFORM_HOURS`、`BILLING_ENFORCEMENT` |
 | 商业化计费（P2） | `PAY_MOCK_SECRET`（必配）、`PAYMENT_BANK_INFO`、`SUBSCRIPTION_GRACE_DAYS` |
@@ -447,7 +447,7 @@ pnpm test:watch
 <details>
 <summary>它会调用哪些引擎？</summary>
 
-`src/server.ts` 里注册了七个适配器：DeepSeek、豆包（火山引擎）、通义千问、文心一言、Perplexity、ChatGPT Search、Gemini。一次运行只调用工作区里已经配了凭证的那些。体检会把其余的标成跳过，原因是「这个引擎还没有配置凭证」。仓库里有 Anthropic 适配器文件，但没有注册进进程。
+`src/server.ts` 里注册了九个适配器：DeepSeek、豆包（火山引擎）、通义千问、文心一言、Perplexity、ChatGPT Search、Gemini、Kimi（月之暗面，`MOONSHOT_API_KEY`）、腾讯元宝（`HUNYUAN_API_KEY`）。元宝走的是腾讯混元的 OpenAI 兼容接口，不是元宝 App。一次运行只调用工作区里已经配了凭证的那些。体检会把其余的标成跳过，原因是「这个引擎还没有配置凭证」。仓库里有 Anthropic 适配器文件，但没有注册进进程。`DEMO_MODE=on` 时 Kimi 和元宝适配器在发出请求前就拒绝。
 
 </details>
 
@@ -467,7 +467,7 @@ pnpm test:watch
 
 ## 路线图
 
-- [x] 七个已注册引擎的引用监测（DeepSeek、豆包、通义千问、文心一言、Perplexity、ChatGPT Search、Gemini）
+- [x] 九个已注册引擎的引用监测（DeepSeek、豆包、通义千问、文心一言、Perplexity、ChatGPT Search、Gemini、Kimi、腾讯元宝/混元）
 - [x] 内容原子化、评分与改写
 - [x] JSON-LD 与 `llms.txt` 生成
 - [x] Agent 就绪审计（robots、llms.txt、站点地图、页面信号、Markdown、爬虫可访问性）
@@ -476,7 +476,7 @@ pnpm test:watch
 - [x] 容器化一键部署（Docker Compose 四服务）
 - [x] 给 Claude Code、Cursor 和其他客户端用的 MCP 服务（`@geociteops/mcp`）
 - [x] 闭环：监测发现薄弱点 → 改写建议 → 人工发布 → 下一次运行回填 Δ
-- [ ] 把尚未注册的适配器接上，以及更细的声量分析
+- [ ] 把尚未注册的适配器接上（Anthropic 有实现、未注册），以及更细的声量分析
 
 ## 参与贡献
 

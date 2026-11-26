@@ -39,7 +39,7 @@ describe('demo health snapshot', () => {
     expect(health.grade).toBe(gradeFor(health.score))
     expect(health.pillars.citations.enginesRun).toEqual(['deepseek', 'doubao'])
     expect(health.pillars.citations.enginesSkipped.map((item) => item.platform)).toEqual([
-      'qwen', 'ernie', 'perplexity', 'chatgpt', 'gemini',
+      'qwen', 'ernie', 'perplexity', 'chatgpt', 'gemini', 'kimi', 'yuanbao',
     ])
     expect(health.pillars.citations.note?.zh).toContain('虚构')
     expect(health.pillars.citations.mentionRate).toBeCloseTo(3 / 8)

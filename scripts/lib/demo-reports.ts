@@ -368,7 +368,7 @@ function citationPillar(queries) {
   const ranks = samples.map((sample) => sample.rankInAnswer).filter((rank) => rank != null && rank > 0)
   const meanRank = ranks.reduce((sum, rank) => sum + rank, 0) / ranks.length
   const shareOfVoice = samples.reduce((sum, sample) => sum + sample.sovScore, 0) / samples.length
-  const skipped = ['qwen', 'ernie', 'perplexity', 'chatgpt', 'gemini'].map((platform) => ({
+  const skipped = ['qwen', 'ernie', 'perplexity', 'chatgpt', 'gemini', 'kimi', 'yuanbao'].map((platform) => ({
     platform,
     reason: tx(
       'No credentials configured for this engine.',

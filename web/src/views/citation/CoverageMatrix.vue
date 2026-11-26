@@ -42,6 +42,8 @@ const platformLabels: Record<string, string> = {
   perplexity: 'Perplexity',
   gemini: 'Gemini',
   claude: 'Claude',
+  kimi: t("Kimi（月之暗面）"),
+  yuanbao: t("腾讯元宝（混元 API）"),
 }
 
 const tierTag = (cell: any) => {

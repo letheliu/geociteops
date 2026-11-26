@@ -28,7 +28,7 @@ openssl rand -hex 32
 | `DEMO_PUBLIC_PASSWORD_HINT` | no | Text shown on the sign-in page. Not filled from the password. |
 | `GEO_RUN_MIGRATIONS` | platforms | Set to `1` when the API container is the only process (no Compose `migrate` service). |
 | `GEO_API_UPSTREAM` | platforms | `host:port` the web container proxies to. Default `app:4000`. |
-| `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `DOUBAO_API_KEY`, `QWEN_API_KEY`, `ERNIE_API_KEY`, `ERNIE_SECRET_KEY`, `PERPLEXITY_API_KEY`, `GEMINI_API_KEY` | no | Empty means that engine is not called. A demo host should leave them empty. |
+| `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `DOUBAO_API_KEY`, `QWEN_API_KEY`, `ERNIE_API_KEY`, `ERNIE_SECRET_KEY`, `PERPLEXITY_API_KEY`, `GEMINI_API_KEY`, `MOONSHOT_API_KEY`, `HUNYUAN_API_KEY` | no | Empty means that engine is not called. A demo host should leave them empty. |
 | `MCP_TOKEN_RATE_LIMIT` | no | Requests per minute for `GET /mcp/token`, per token hash. Default 120, or 30 when `DEMO_MODE` is on. |
 
 The full commented list is [`.env.example`](../.env.example). Day-2 operations (image publish, npm publish, upgrading an old database) stay in [DEPLOYMENT.md](./DEPLOYMENT.md).
@@ -146,7 +146,9 @@ DEMO_ACCOUNT_PASSWORD='<choose-a-password-of-at-least-10-characters>'
 DEMO_PUBLIC_PASSWORD_HINT='<same password, or "ask the host">'
 ```
 
-Leave `BILLING_ENFORCEMENT=off`. With enforcement on, an organization that has no subscription cannot read its workspace, and the demo would look empty. Leave the engine API keys empty.
+Leave `BILLING_ENFORCEMENT=off`. With enforcement on, an organization that has no subscription cannot read its workspace, and the demo would look empty. Leave the engine API keys empty. `DEMO_MODE` also makes the Kimi and Yuanbao adapters throw before any socket is opened, the same way the demo LLM client does.
+
+Kimi (`MOONSHOT_API_KEY`) calls Moonshot at `https://api.moonshot.cn/v1/responses` with the `web_search` tool. The older `$web_search` builtin is not what current K3 models accept. Yuanbao (`HUNYUAN_API_KEY`, engine id `yuanbao`) calls Tencent's Hunyuan OpenAI-compatible API at `https://api.hunyuan.cloud.tencent.com/v1/chat/completions` with search enhancement and citation fields on. That is the Hunyuan API, not the Yuanbao consumer app. Both stay out of a run until the workspace credential with that key is set. Details and the optional model overrides are in [`.env.example`](../.env.example).
 
 Accepted on-values are `on`, `true`, `1`, and `yes`. `off` and an unset variable keep the normal install.
 

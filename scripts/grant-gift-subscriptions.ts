@@ -37,9 +37,9 @@ export const GIFT_GRANT_DAYS = 90
 const DAY_MS = 86_400_000
 
 /**
- * 赠送配额（Ruling 10 从宽值）：7 平台 key 与 citation-monitor
+ * 赠送配额（Ruling 10 从宽值）：平台 key 与 citation-monitor
  * platform-adapters 的 adapter name 一致（deepseek/doubao/qwen/ernie/
- * perplexity/chatgpt/gemini）。
+ * perplexity/chatgpt/gemini/kimi/yuanbao）。已发出的订阅快照不会被这条常量改写。
  */
 export const GIFT_ENTITLEMENTS = {
   maxWorkspaces: 5,
@@ -52,6 +52,8 @@ export const GIFT_ENTITLEMENTS = {
     'perplexity',
     'chatgpt',
     'gemini',
+    'kimi',
+    'yuanbao',
   ],
   diagnosticRunsPerMonth: 30,
   samplesPerRun: 200,
