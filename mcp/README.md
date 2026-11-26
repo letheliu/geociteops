@@ -4,6 +4,8 @@ MCP server for [GeoCiteOps](https://github.com/letheliu/geociteops). Claude Code
 
 The remote tools call your GeoCiteOps API through `@geociteops/sdk`. Agent readiness, `llms.txt`, and JSON-LD also run in-process when `GEOCITEOPS_API_KEY` is unset.
 
+HTTP mode is different: every request needs `Authorization: Bearer` with a workspace token. Create that token in the console (`read` or `run-checks`). stdio still reads `GEOCITEOPS_API_KEY` from the environment. See [docs/mcp.md](../docs/mcp.md).
+
 Requires Node.js 22+.
 
 ## Install

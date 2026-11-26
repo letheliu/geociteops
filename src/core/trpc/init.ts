@@ -14,6 +14,11 @@ import { getPrismaClient } from '../db/client.js'
 import { billingEnforcementEnabled } from '../../platform/billing/enforcement.js'
 import { demoMutationAllowed, isDemoMode } from '../demo/mode.js'
 import {
+  CREDENTIAL_SCOPE_ALL,
+  credentialAllows,
+  parseCredentialScopes,
+} from '../../platform/tenancy/credential-scopes.js'
+import {
   createServiceStateResolver,
   type ServiceStateResolver,
 } from '../../platform/billing/service-state.js'
@@ -106,7 +111,7 @@ export interface Context {
   /**
    * 授权分治解析出的请求级访问级（§2.2 权限合成快照）：VIEW → 业务写被拒
    * （ORG_VIEWER 恒只读；成员被降级为 VIEW 后在途会话下一请求即生效）。
-   * apiKey 通道无此概念（工作区凭证即全权），undefined 不设限。
+   * apiKey 通道不使用访问级：范围由凭证 scopes 决定（`*` 为存量全权）。
    */
   workspaceAccess?: WorkspaceAccess
   services?: any
@@ -124,11 +129,14 @@ const t = initTRPC.context<Context>().create()
 
 export const router = t.router
 
-/** csrf 守卫：写操作要求 x-geo-csrf 请求头（query 放行） */
+/**
+ * csrf 守卫：浏览器写操作要求 x-geo-csrf。
+ * API 令牌不是 Cookie 会话，跨站请求伪造不成立，故 apiKey 通道放行。
+ */
 const csrfGuard = t.middleware(async ({ ctx, type, next }) => {
   // tRPC v10 middleware 原生提供 opts.type（'query' | 'mutation' | 'subscription'），
   // 已用运行时探针验证（见任务 9 报告）；回退方案为 ctx.requestMeta.method（GET 视为 query）。
-  if (type === 'mutation' && !ctx.requestMeta?.headers?.['x-geo-csrf']) {
+  if (type === 'mutation' && ctx.actor?.kind !== 'apiKey' && !ctx.requestMeta?.headers?.['x-geo-csrf']) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: '缺少 x-geo-csrf 请求头：写操作被 CSRF 守卫拒绝（浏览器端请随 mutation 携带该头）',
@@ -259,7 +267,8 @@ function getServiceStateResolver(ctx: Context): ServiceStateResolver | undefined
  *
  * P1 追加（授权分治，§2.2 权限合成）：ctx.workspaceAccess === 'VIEW' 时
  * mutation 同样 FORBIDDEN（ORG_VIEWER 只读 / 成员降级 VIEW 实时生效）；
- * apiKey 通道无 workspaceAccess（凭证即全权），行为与 P0 一致。
+ * apiKey 通道无 workspaceAccess。scopes 含 `*` 时与 P0 全权一致；
+ * 仅 `read` 时 mutation 拒绝；`run-checks` 含读。
  *
  * P2 任务 10 追加（§3.3 服务状态列，BILLING_ENFORCEMENT=on 时生效）：
  * 按 workspace.organizationId 解析企业服务状态（进程内 60s TTL 缓存）：
@@ -285,6 +294,19 @@ const requireWorkspace = t.middleware(async ({ ctx, type, next }) => {
       code: 'FORBIDDEN',
       message: '首次登录（或密码被重置）须先完成修改密码（auth.changePassword）才能访问其他接口',
     })
+  }
+
+  if (ctx.actor?.kind === 'apiKey' && type !== 'subscription') {
+    // 缺省（非数组）按存量全权 `*`。显式 [] 或只有 read 才会拒绝写。
+    const rawScopes = ctx.actor.credential.scopes
+    const scopes = Array.isArray(rawScopes) ? parseCredentialScopes(rawScopes) : [CREDENTIAL_SCOPE_ALL]
+    const needed = type === 'mutation' ? 'run-checks' : 'read'
+    if (!credentialAllows(scopes, needed)) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'API 令牌权限不足：当前范围不能执行该操作。令牌本身不会出现在本错误中。',
+      })
+    }
   }
 
   const workspace = ctx.workspace

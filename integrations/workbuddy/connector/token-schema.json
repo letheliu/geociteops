@@ -1,0 +1,31 @@
+{
+  "title": "连接 GeoCiteOps",
+  "title_en": "Connect GeoCiteOps",
+  "description": "填写工作区 API 令牌和部署地址。令牌只保存在本机 ~/.workbuddy，不会写进连接器包。",
+  "description_en": "Enter the workspace API token and the deployment URL. The token stays in ~/.workbuddy on this machine.",
+  "docUrl": "https://github.com/letheliu/geociteops/blob/main/docs/mcp.md",
+  "docLabel": "如何创建 API 令牌？",
+  "docLabel_en": "How do I create an API token?",
+  "fields": [
+    {
+      "key": "API_BASE_URL",
+      "label": "API 地址",
+      "label_en": "API base URL",
+      "type": "text",
+      "required": true,
+      "placeholder": "https://geo.example.com",
+      "description": "GeoCiteOps API 的 HTTPS 源站，不要带末尾斜杠。MCP 路径是 /mcp。",
+      "description_en": "HTTPS origin of the GeoCiteOps API, with no trailing slash. The MCP path is /mcp."
+    },
+    {
+      "key": "API_KEY",
+      "label": "API 令牌",
+      "label_en": "API token",
+      "type": "password",
+      "required": true,
+      "placeholder": "geo_…",
+      "description": "控制台「API 凭证」里创建。只读令牌只能查报告。运行检查才会启动体检和付费模型调用。",
+      "description_en": "Create it under API credentials in the console. A read token can only fetch reports. Run checks starts health checks and paid model calls."
+    }
+  ]
+}

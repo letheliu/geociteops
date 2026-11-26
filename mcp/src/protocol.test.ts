@@ -68,10 +68,11 @@ describe('MCP protocol', () => {
     }
   })
 
-  it('answers initialize on the local HTTP endpoint', async () => {
+  it('answers initialize on the local HTTP endpoint when a bearer token is accepted', async () => {
     const http = await startHttpServer({
       port: 0,
       host: '127.0.0.1',
+      authenticate: async () => ({ credentialId: 'c', workspaceId: 'w', scopes: ['read'], readOnly: false }),
       createServer: () => createGeoMcpServer({ api: null, preferLocal: false, version: '0.0.0-test' }),
     })
     try {
@@ -80,6 +81,7 @@ describe('MCP protocol', () => {
         headers: {
           'content-type': 'application/json',
           accept: 'application/json, text/event-stream',
+          authorization: 'Bearer geo_test_token',
         },
         body: JSON.stringify({
           jsonrpc: '2.0',

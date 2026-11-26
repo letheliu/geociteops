@@ -1,0 +1,40 @@
+{
+  "mcpServers": {
+    "geociteops": {
+      "type": "http",
+      "url": "https://mcp.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${API_KEY}"
+      },
+      "x-workbuddy": {
+        "displayName": { "zh": "GeoCiteOps", "en": "GeoCiteOps" },
+        "description": {
+          "zh": "连接后可做 GEO 健康检查、抓取就绪审计，以及 llms.txt / JSON-LD 生成。",
+          "en": "Connect to run GEO health checks, crawler audits, and llms.txt or JSON-LD generation."
+        },
+        "auth": {
+          "type": "token",
+          "tokenSchema": {
+            "title": { "zh": "连接 GeoCiteOps", "en": "Connect GeoCiteOps" },
+            "description": {
+              "zh": "填写只显示一次的工作区令牌。令牌保存在本机。上传前把上面的 url 换成你的 HTTPS 地址。",
+              "en": "Enter the one-time workspace token. It stays on this machine. Replace the url above with your HTTPS endpoint before upload."
+            },
+            "docUrl": "https://github.com/letheliu/geociteops/blob/main/docs/mcp.md",
+            "docLabel": { "zh": "如何创建令牌？", "en": "How do I create a token?" },
+            "fields": [
+              {
+                "key": "API_KEY",
+                "label": { "zh": "API 令牌", "en": "API token" },
+                "placeholder": { "zh": "在控制台创建后粘贴", "en": "Paste the token from the console" },
+                "type": "password",
+                "required": true,
+                "description": { "zh": "控制台创建。不要把真实令牌写进这个文件。", "en": "Create it in the console. Do not put a real token in this file." }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

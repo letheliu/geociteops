@@ -178,6 +178,7 @@ export interface OrgService {
     workspaceId: string,
     name: string,
     actorId: string,
+    scopes?: readonly string[],
   ): Promise<OrgIssuedCredential>
   /** 吊销凭证（credential 所属 workspace 须属本企业，越权在吊销动作前拦截） */
   revokeCredential(
@@ -467,9 +468,10 @@ export function createOrgService(deps: OrgServiceDeps): OrgService {
     workspaceId: string,
     name: string,
     actorId: string,
+    scopes?: readonly string[],
   ): Promise<OrgIssuedCredential> {
     await requireOrgWorkspace(organizationId, workspaceId)
-    const { credential, plaintext } = await credentials.issue(workspaceId, name, actorId)
+    const { credential, plaintext } = await credentials.issue(workspaceId, name, actorId, scopes)
     // P1 遗留 2a：签发补审计（形状照同文件 revoke——organizationId/workspaceId 齐全）
     await audit.record({
       actorId,

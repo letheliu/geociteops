@@ -306,7 +306,7 @@ describe('org service credentials.issue 审计（P1 遗留 2a）', () => {
 
     const result = await service.issueCredential('org-1', 'ws-1', '备份 Key', 'user-1')
 
-    expect(credentials.issue).toHaveBeenCalledWith('ws-1', '备份 Key', 'user-1')
+    expect(credentials.issue).toHaveBeenCalledWith('ws-1', '备份 Key', 'user-1', undefined)
     expect(audit.record).toHaveBeenCalledWith({
       actorId: 'user-1',
       actorType: 'USER',

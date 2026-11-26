@@ -1,0 +1,23 @@
+{
+  "name": "GeoCiteOps",
+  "name_zh": "GeoCiteOps",
+  "name_en": "GeoCiteOps",
+  "description": "Check GEO health, AI crawler readiness, and generate llms.txt plus JSON-LD.",
+  "description_zh": "用自然语言检查 GEO 健康度、AI 抓取就绪，并生成 llms.txt 与 JSON-LD。",
+  "description_en": "Check GEO health, AI crawler readiness, and generate llms.txt plus JSON-LD.",
+  "source": "geociteops",
+  "type": "mcp",
+  "auth_mode": "token",
+  "version": "1.0.0",
+  "minWorkbuddyVersion": "4.23.0",
+  "examples_zh": [
+    "给 acmedraw.example 做一次 GEO 健康检查",
+    "审计这个官网对 AI 爬虫是否就绪",
+    "为 Acme Draw 生成 llms.txt 和 Organization JSON-LD"
+  ],
+  "examples_en": [
+    "Run a GEO health check for acmedraw.example",
+    "Audit whether AI crawlers can read this site",
+    "Generate llms.txt and Organization JSON-LD for Acme Draw"
+  ]
+}

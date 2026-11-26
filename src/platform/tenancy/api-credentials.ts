@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { ApiCredential, Prisma, PrismaClient, Workspace } from '@prisma/client'
+import { normalizeIssuedScopes } from './credential-scopes.js'
 
 /** lastUsedAt 更新节流阈值：距上次使用 ≤60s 不触发 update（与会话 lastSeenAt 同规则） */
 const LAST_USED_THROTTLE_MS = 60 * 1000
@@ -50,9 +51,15 @@ export interface ApiCredentialService {
   findByKey(key: string): Promise<ApiCredentialHit | null>
   /**
    * 签发新凭证：明文 `geo_` + 24 字节随机 hex；库内只存 sha256(key)、
-   * keyPrefix 取明文前 8 字符（展示 `geo_ab12••••`）、scopes ["*"]。
+   * keyPrefix 取明文前 8 字符（展示 `geo_ab12••••`）。
+   * scopes 省略时为 ["*"]（存量 SDK 全权）；显式传入 read / run-checks。
    */
-  issue(workspaceId: string, name: string, createdById: string): Promise<IssuedCredential>
+  issue(
+    workspaceId: string,
+    name: string,
+    createdById: string,
+    scopes?: readonly string[],
+  ): Promise<IssuedCredential>
   /** 按工作区列出凭证（脱敏视图，不含 keyHash），createdAt 倒序 */
   list(workspaceId: string): Promise<ApiCredentialSummary[]>
   /**
@@ -100,7 +107,7 @@ export function createApiCredentialService(prisma: PrismaClient): ApiCredentialS
       return { credential, workspace }
     },
 
-    async issue(workspaceId, name, createdById) {
+    async issue(workspaceId, name, createdById, scopes) {
       const plaintext = KEY_HEADER + randomBytes(KEY_RANDOM_BYTES).toString('hex')
       const credential = await prisma.apiCredential.create({
         data: {
@@ -108,7 +115,7 @@ export function createApiCredentialService(prisma: PrismaClient): ApiCredentialS
           name,
           keyHash: sha256Hex(plaintext),
           keyPrefix: plaintext.slice(0, KEY_PREFIX_DISPLAY_LENGTH),
-          scopes: ['*'] as unknown as Prisma.InputJsonValue,
+          scopes: normalizeIssuedScopes(scopes) as unknown as Prisma.InputJsonValue,
           createdById,
         },
       })

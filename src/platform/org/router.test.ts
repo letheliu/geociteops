@@ -1027,7 +1027,7 @@ describe('orgRouter.credentials.issue', () => {
 
     const result = await caller.credentials.issue({ workspaceId: 'ws-1', name: '备份 Key' })
 
-    expect(credentials.issue).toHaveBeenCalledWith('ws-1', '备份 Key', 'user-1')
+    expect(credentials.issue).toHaveBeenCalledWith('ws-1', '备份 Key', 'user-1', undefined)
     expect(result.plaintext).toBe('geo_once_plaintext')
     expect(result.credential).toEqual(credentialSummary({ name: '备份 Key' }))
     // 红线：keyHash 不出 service 边界
@@ -1054,6 +1054,18 @@ describe('orgRouter.credentials.issue', () => {
     ).rejects.toThrow()
     expect(prisma.workspace.findUnique).not.toHaveBeenCalled()
     expect(credentials.issue).not.toHaveBeenCalled()
+  })
+
+  it('显式 scopes 原样传给 credentials.issue，不把明文写进审计', async () => {
+    prisma.workspace.findUnique.mockResolvedValue(wsRef('org-1'))
+    credentials.issue.mockResolvedValue({
+      credential: credentialRow({ name: 'MCP', scopes: ['read'] }),
+      plaintext: 'geo_once_plaintext',
+    })
+    const caller = orgRouter.createCaller(makeCtx())
+    await caller.credentials.issue({ workspaceId: 'ws-1', name: 'MCP', scopes: ['read'] })
+    expect(credentials.issue).toHaveBeenCalledWith('ws-1', 'MCP', 'user-1', ['read'])
+    expect(JSON.stringify(audit.record.mock.calls)).not.toContain('geo_once_plaintext')
   })
 })
 

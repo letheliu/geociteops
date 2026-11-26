@@ -1,10 +1,21 @@
+import { createHash } from 'node:crypto'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import type { McpPrincipal } from './scopes.js'
+import { redactSecret } from './redact.js'
+import { createSlidingWindowLimiter } from '../../src/core/lib/sliding-window-limiter.js'
 
 export interface HttpServer {
   port: number
   close: () => Promise<void>
+}
+
+export class AuthBackendError extends Error {
+  constructor() {
+    super('Auth service is unavailable')
+    this.name = 'AUTH_BACKEND'
+  }
 }
 
 function readJson(req: IncomingMessage): Promise<unknown> {
@@ -32,42 +43,88 @@ function hostAllowed(header: string | undefined, bindHost: string): boolean {
   return host === bindHost || host === 'localhost' || host === '127.0.0.1' || host === '::1'
 }
 
+export function bearerFromHeader(header: string | string[] | undefined): string | null {
+  const raw = Array.isArray(header) ? header[0] : header
+  if (!raw) return null
+  const match = /^Bearer\s+(\S+)$/i.exec(raw.trim())
+  if (!match) return null
+  const token = match[1]
+  if (token.length < 8 || token.length > 500) return null
+  return token
+}
+
+function sendJson(res: ServerResponse, status: number, body: Record<string, unknown>, www?: string): void {
+  res.statusCode = status
+  res.setHeader('content-type', 'application/json; charset=utf-8')
+  res.setHeader('cache-control', 'no-store')
+  if (www) res.setHeader('www-authenticate', www)
+  res.end(JSON.stringify(body))
+}
+
 /**
  * Stateless Streamable HTTP. Each request gets its own server instance.
- * The default bind is 127.0.0.1, and the Host header must match it.
+ * Every request must carry Authorization: Bearer. The token is a workspace
+ * API credential. stdio does not use this server.
  */
 export function startHttpServer(options: {
   port: number
   host: string
-  createServer: () => McpServer
+  authenticate: (token: string) => Promise<McpPrincipal | null>
+  /** token is the raw bearer. Use it as the API key. Do not log it. */
+  createServer: (principal: McpPrincipal, token: string) => McpServer
+  rateLimit?: { limit: number; windowMs: number; now?: () => number }
 }): Promise<HttpServer> {
+  const limiter = createSlidingWindowLimiter({
+    limit: options.rateLimit?.limit ?? 60,
+    windowMs: options.rateLimit?.windowMs ?? 60_000,
+    now: options.rateLimit?.now,
+    label: 'mcp-http',
+  })
+
   const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    if (!hostAllowed(req.headers.host, options.host)) {
-      res.statusCode = 403
-      res.end('Forbidden host')
-      return
-    }
-    const path = req.url?.split('?')[0]
-    if (path !== '/mcp') {
-      res.statusCode = 404
-      res.end('Not found')
-      return
-    }
-    const server = options.createServer()
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
-    res.on('close', () => {
-      void transport.close()
-      void server.close()
-    })
+    let presented: string | null = null
     try {
+      if (!hostAllowed(req.headers.host, options.host)) {
+        sendJson(res, 403, { error: 'forbidden_host' })
+        return
+      }
+      const path = req.url?.split('?')[0]
+      if (path !== '/mcp') {
+        sendJson(res, 404, { error: 'not_found' })
+        return
+      }
+      presented = bearerFromHeader(req.headers.authorization)
+      if (!presented) {
+        sendJson(res, 401, { error: 'invalid_token' }, 'Bearer error="invalid_token"')
+        return
+      }
+      const bucket = createHash('sha256').update(presented).digest('hex')
+      if (!limiter.check(bucket)) {
+        sendJson(res, 429, { error: 'rate_limited' }, 'Bearer error="rate_limited"')
+        return
+      }
+      const principal = await options.authenticate(presented)
+      if (!principal) {
+        sendJson(res, 401, { error: 'invalid_token' }, 'Bearer error="invalid_token"')
+        return
+      }
+      const server = options.createServer(principal, presented)
+      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
+      res.on('close', () => {
+        void transport.close()
+        void server.close()
+      })
       const body = req.method === 'GET' || req.method === 'HEAD' ? undefined : await readJson(req)
       await server.connect(transport)
       await transport.handleRequest(req, res, body)
     } catch (err) {
+      if (err instanceof AuthBackendError) {
+        if (!res.headersSent) sendJson(res, 503, { error: 'auth_unavailable' })
+        return
+      }
       if (!res.headersSent) {
-        res.statusCode = 500
-        res.setHeader('content-type', 'application/json')
-        res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'MCP request failed' }))
+        const message = redactSecret(err instanceof Error ? err.message : 'MCP request failed', presented)
+        sendJson(res, 500, { error: message || 'MCP request failed' })
       }
     }
   })

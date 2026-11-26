@@ -51,7 +51,7 @@ function makeSession(): Session {
   } as unknown as Session
 }
 
-function makeCredential(): ApiCredential {
+function makeCredential(overrides: Record<string, unknown> = {}): ApiCredential {
   return {
     id: 'cred-1',
     workspaceId: 'ws-1',
@@ -64,6 +64,7 @@ function makeCredential(): ApiCredential {
     revokedAt: null,
     createdById: 'user-1',
     createdAt: NOW,
+    ...overrides,
   } as unknown as ApiCredential
 }
 
@@ -185,6 +186,48 @@ describe('protectedProcedure：P0 矩阵（BILLING_ENFORCEMENT 默认 off，服�
     await expectTrpcError(() => caller.write(), 'FORBIDDEN', '修改密码')
   })
 
+  it('read 范围的 apiKey：query 放行，mutation 拒绝，文案不含令牌', async () => {
+    const token = 'geo_read_only_secret_value'
+    const caller = matrixRouter.createCaller(makeCtx({
+      actor: {
+        kind: 'apiKey',
+        credential: makeCredential({ scopes: ['read'], keyHash: token }),
+      },
+    }))
+    expect(await caller.read()).toBe('ok')
+    await expectTrpcError(() => caller.write(), 'FORBIDDEN', '权限不足')
+    try {
+      await caller.write()
+    } catch (err) {
+      expect(err instanceof Error ? err.message : '').not.toContain(token)
+      expect(err instanceof Error ? err.message : '').not.toContain('geo_')
+    }
+  })
+
+  it('run-checks 范围的 apiKey：读和写都放行', async () => {
+    const caller = matrixRouter.createCaller(makeCtx({
+      actor: { kind: 'apiKey', credential: makeCredential({ scopes: ['run-checks'] }) },
+    }))
+    expect(await caller.read()).toBe('ok')
+    expect(await caller.write()).toBe('ok')
+  })
+
+  it('未带 scopes 字段的旧 apiKey 仍按全权放行', async () => {
+    const caller = matrixRouter.createCaller(makeCtx({
+      actor: { kind: 'apiKey', credential: makeCredential({ scopes: undefined }) },
+    }))
+    expect(await caller.read()).toBe('ok')
+    expect(await caller.write()).toBe('ok')
+  })
+
+  it('空范围的 apiKey：读和写都拒绝', async () => {
+    const caller = matrixRouter.createCaller(makeCtx({
+      actor: { kind: 'apiKey', credential: makeCredential({ scopes: [] }) },
+    }))
+    await expectTrpcError(() => caller.read(), 'FORBIDDEN', '权限不足')
+    await expectTrpcError(() => caller.write(), 'FORBIDDEN', '权限不足')
+  })
+
   it('mustChangePassword 约束不影响 apiKey 通道：read/write 照常放行', async () => {
     // apiKey actor 无 user/mustChangePassword 概念，SDK 直连不受该约束影响
     const caller = matrixRouter.createCaller(makeCtx({ workspace: makeWorkspace('ACTIVE') }))
@@ -203,7 +246,11 @@ const csrfRouter = router({
 describe('csrf 守卫（publicProcedure 挂载，全部 procedure 家族继承）', () => {
   it('mutation 缺 x-geo-csrf：publicProcedure 也拒（auth.login 场景），FORBIDDEN 含 CSRF 提示', async () => {
     const caller = csrfRouter.createCaller(
-      makeCtx({ workspace: undefined, requestMeta: { ip: '1', requestId: 'r', headers: {} } }),
+      makeCtx({
+        actor: { kind: 'anonymous' },
+        workspace: undefined,
+        requestMeta: { ip: '1', requestId: 'r', headers: {} },
+      }),
     )
     await expectTrpcError(() => caller.pubWrite(), 'FORBIDDEN', 'CSRF')
   })
@@ -220,11 +267,21 @@ describe('csrf 守卫（publicProcedure 挂载，全部 procedure 家族继承�
     expect(await caller.pubWrite()).toBe('ok')
   })
 
-  it('protectedProcedure 的 mutation 同样受 csrf 守卫（缺头即拒）', async () => {
+  it('protectedProcedure 的 mutation 同样受 csrf 守卫（用户会话缺头即拒）', async () => {
+    const caller = csrfRouter.createCaller(
+      makeCtx({
+        actor: { kind: 'user', user: makeUser(), session: makeSession() },
+        requestMeta: { ip: '1', requestId: 'r', headers: {} },
+      }),
+    )
+    await expectTrpcError(() => caller.protWrite(), 'FORBIDDEN', 'CSRF')
+  })
+
+  it('apiKey 通道的 mutation 不要求 csrf（不是 Cookie 会话）', async () => {
     const caller = csrfRouter.createCaller(
       makeCtx({ requestMeta: { ip: '1', requestId: 'r', headers: {} } }),
     )
-    await expectTrpcError(() => caller.protWrite(), 'FORBIDDEN', 'CSRF')
+    expect(await caller.protWrite()).toBe('ok')
   })
 })
 
@@ -689,7 +746,10 @@ describe('DEMO_MODE 写闸（publicProcedure 挂载，全部 procedure 家族继
   it('开启时缺 csrf 仍先报 CSRF，不改原有文案', async () => {
     process.env.DEMO_MODE = 'on'
     const caller = demoRouter.createCaller(
-      makeCtx({ requestMeta: { ip: '1', requestId: 'r', headers: {} } }),
+      makeCtx({
+        actor: { kind: 'anonymous' },
+        requestMeta: { ip: '1', requestId: 'r', headers: {} },
+      }),
     )
     await expectTrpcError(() => caller.citation.run(), 'FORBIDDEN', 'CSRF')
   })

@@ -37,12 +37,14 @@ export const HELP = `geociteops-mcp
 stdio (default):
   npx @geociteops/mcp
 
-Streamable HTTP on localhost:
+Streamable HTTP (requires Authorization: Bearer on every request):
   npx @geociteops/mcp --http --port 3333 --host 127.0.0.1
 
 Environment:
   GEOCITEOPS_API_URL       API base URL (default http://localhost:4000)
-  GEOCITEOPS_API_KEY       Workspace API key. Omit it to use local tools only.
+  GEOCITEOPS_API_KEY       stdio only. Workspace API key. Omit it to use local tools only.
   GEOCITEOPS_WORKSPACE_ID  Optional x-workspace-id. API keys already select a workspace.
   GEOCITEOPS_PREFER_LOCAL  1/true to force in-process readiness, llms.txt, and JSON-LD.
+  GEOCITEOPS_MCP_RATE_LIMIT  HTTP requests per token per minute (default 60, or 30 in DEMO_MODE).
+  DEMO_MODE                on keeps HTTP and stdio read-only.
 `

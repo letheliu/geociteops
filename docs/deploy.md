@@ -29,6 +29,7 @@ openssl rand -hex 32
 | `GEO_RUN_MIGRATIONS` | platforms | Set to `1` when the API container is the only process (no Compose `migrate` service). |
 | `GEO_API_UPSTREAM` | platforms | `host:port` the web container proxies to. Default `app:4000`. |
 | `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `DOUBAO_API_KEY`, `QWEN_API_KEY`, `ERNIE_API_KEY`, `ERNIE_SECRET_KEY`, `PERPLEXITY_API_KEY`, `GEMINI_API_KEY`, `MOONSHOT_API_KEY`, `HUNYUAN_API_KEY` | no | Empty means that engine is not called. A demo host should leave them empty. |
+| `MCP_TOKEN_RATE_LIMIT` | no | Requests per minute for `GET /mcp/token`, per token hash. Default 120, or 30 when `DEMO_MODE` is on. |
 
 The full commented list is [`.env.example`](../.env.example). Day-2 operations (image publish, npm publish, upgrading an old database) stay in [DEPLOYMENT.md](./DEPLOYMENT.md).
 
@@ -62,7 +63,9 @@ Sign in as `demo-viewer`. The command prints the password once when it creates t
 
 `docker compose down` keeps the named volumes `pgdata`, `zvec-data`, and `uploads`. `docker compose down -v` deletes them.
 
-The web container proxies `/trpc`, `/files`, `/health`, and `/webhooks` to `app:4000`. That hostname is the Compose service name.
+The web container proxies `/trpc`, `/files`, `/health`, and `/webhooks` to `app:4000`. That hostname is the Compose service name. `GET /mcp/token` is on the API too. It checks the bearer token the MCP HTTP process presents. It does not echo the token.
+
+WorkBuddy does not talk to that route. It talks to `@geociteops/mcp --http`, which you run behind HTTPS. Give that process `GEOCITEOPS_API_URL` pointing at this API. Issue the caller's token in the console (`read` and/or `run-checks`) and have WorkBuddy send it as `Authorization: Bearer`. See [docs/mcp.md](./mcp.md) and [integrations/workbuddy/README.md](../integrations/workbuddy/README.md). In `DEMO_MODE` the MCP tools that write, call a model, or fetch a site stay off.
 
 ## Render
 
@@ -132,6 +135,7 @@ What it does:
 4. Payment callbacks return 403.
 5. The HTTP limit is 60 requests per minute per IP. Login attempts are 5 per minute per IP. Login limiting is in-process, so it is per container.
 6. The sign-in page shows the username (`DEMO_USERNAME`, default `demo-viewer`) and, only if you set it, `DEMO_PUBLIC_PASSWORD_HINT`. The page never receives `DEMO_ACCOUNT_PASSWORD`.
+7. MCP tools that write workspace data, call a model, or fetch a site are refused, including when the bearer token includes `run-checks`. Report reads still work.
 
 Set the password in the host's secret store before the first boot:
 

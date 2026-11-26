@@ -7,7 +7,7 @@
 // - 吊销（仅 OWNER）NPopconfirm；非 OWNER 只读降级——创建/吊销按钮隐藏 + 提示条。
 import { computed, h, onMounted, ref } from 'vue'
 import {
-  NAlert, NButton, NCard, NDataTable, NForm, NFormItem, NInput, NInputGroup, NModal,
+  NAlert, NButton, NCard, NCheckbox, NCheckboxGroup, NDataTable, NForm, NFormItem, NInput, NInputGroup, NModal,
   NPopconfirm, NSelect, NSpace, NTag, NText, useMessage,
 } from 'naive-ui'
 import type { DataTableColumns, SelectOption } from 'naive-ui'
@@ -30,6 +30,7 @@ interface CredentialRow {
   id: string
   name: string
   keyPrefix: string | null
+  scopes: unknown
   /** ISO 字符串（JSON 通道无 Date 反序列化），null = 从未使用 */
   lastUsedAt: string | null
   /** ISO 字符串，非空即已吊销 */
@@ -82,6 +83,7 @@ onMounted(loadWorkspaces)
 const showCreate = ref(false)
 const creating = ref(false)
 const createName = ref('')
+const createScopes = ref<Array<'read' | 'run-checks'>>(['read'])
 
 // 一次性明文 Key（仅展示一次，关闭即清空不可再查）
 const secretModal = ref(false)
@@ -89,7 +91,15 @@ const secretText = ref('')
 
 function openCreate() {
   createName.value = ''
+  createScopes.value = ['read']
   showCreate.value = true
+}
+
+function scopeLabel(scope: string): string {
+  if (scope === 'read') return t('只读（read）')
+  if (scope === 'run-checks') return t('运行检查（run-checks）')
+  if (scope === '*') return t('全部权限')
+  return scope
 }
 
 async function handleCreate() {
@@ -103,9 +113,17 @@ async function handleCreate() {
     message.warning(t("请填写凭证名称"))
     return
   }
+  if (createScopes.value.length === 0) {
+    message.warning(t("至少选择一个权限范围"))
+    return
+  }
   creating.value = true
   try {
-    const result = await trpc.org.credentials.issue.mutate({ workspaceId, name })
+    const result = await trpc.org.credentials.issue.mutate({
+      workspaceId,
+      name,
+      scopes: createScopes.value,
+    })
     showCreate.value = false
     secretText.value = result.plaintext
     secretModal.value = true
@@ -153,6 +171,18 @@ const columns: DataTableColumns<CredentialRow> = [
     render: (row) => (row.keyPrefix ? `${row.keyPrefix}••••` : '—'),
   },
   {
+    title: t("权限范围"),
+    key: 'scopes',
+    minWidth: 180,
+    render: (row) => {
+      const scopes = Array.isArray(row.scopes) ? row.scopes.filter((item): item is string => typeof item === 'string') : []
+      if (scopes.length === 0) return '—'
+      return h(NSpace, { size: 4 }, {
+        default: () => scopes.map((scope) => h(NTag, { size: 'small', bordered: false }, { default: () => scopeLabel(scope) })),
+      })
+    },
+  },
+  {
     title: t("最近使用"),
     key: 'lastUsedAt',
     width: 170,
@@ -185,7 +215,7 @@ const columns: DataTableColumns<CredentialRow> = [
 <template>
   <div style="max-width: 1000px; margin: 0 auto; padding: 24px">
     <NSpace justify="space-between" align="center" style="margin-bottom: 16px">
-      <PageHeader :title="t('API 凭证')" :subtitle="t('工作区 SDK Key 的签发与吊销（服务端接入用）')" />
+      <PageHeader :title="t('API 凭证')" :subtitle="t('工作区 API 令牌：控制台签发后只显示一次，MCP HTTP 用 Authorization: Bearer 发送。')" />
       <NButton
         v-if="isOwner"
         type="primary"
@@ -236,7 +266,17 @@ const columns: DataTableColumns<CredentialRow> = [
         <NFormItem :label="t('名称')">
           <NInput v-model:value="createName" :placeholder="t('凭证用途备注（1-100 字符）')" />
         </NFormItem>
+        <NFormItem :label="t('权限范围')">
+          <NCheckboxGroup v-model:value="createScopes">
+            <NSpace vertical>
+              <NCheckbox value="read" :label="t('只读（read）')" />
+              <NCheckbox value="run-checks" :label="t('运行检查（run-checks）')" />
+            </NSpace>
+          </NCheckboxGroup>
+        </NFormItem>
       </NForm>
+      <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 8px"> {{ t('只读：查询报告、查询库和声量。不启动检查，不写数据，不调用模型。') }} </div>
+      <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 8px"> {{ t('运行检查：包含只读，并可启动 GEO 体检、引用检查、内容改写和知识图谱。这些操作会写入工作区，其中体检、引用检查、改写和知识图谱会调用付费模型。') }} </div>
       <div style="font-size: 12px; color: var(--text-color-3); margin-bottom: 8px"> {{ t('完整 Key 仅在创建成功后展示一次（服务端只存哈希），请立即复制并妥善保管。') }} </div>
       <template #footer>
         <NSpace justify="end">

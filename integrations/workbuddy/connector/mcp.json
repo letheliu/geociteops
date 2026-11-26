@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "geociteops": {
+      "type": "streamableHttp",
+      "url": "${API_BASE_URL}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${API_KEY}"
+      },
+      "timeout": 30000
+    }
+  }
+}
