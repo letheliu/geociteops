@@ -45,6 +45,8 @@ import { ErnieAdapter } from './modules/citation-monitor/platform-adapters/ernie
 import { PerplexityAdapter } from './modules/citation-monitor/platform-adapters/perplexity.js'
 import { ChatGptSearchAdapter } from './modules/citation-monitor/platform-adapters/chatgpt.js'
 import { GeminiAdapter } from './modules/citation-monitor/platform-adapters/gemini.js'
+import { KimiAdapter } from './modules/citation-monitor/platform-adapters/kimi.js'
+import { YuanbaoAdapter } from './modules/citation-monitor/platform-adapters/yuanbao.js'
 import { createQueryLibraryService } from './modules/citation-monitor/query-library.js'
 import { createClosedLoopService } from './modules/citation-monitor/closed-loop-service.js'
 import { createMonitor } from './modules/citation-monitor/monitor.js'
@@ -126,6 +128,8 @@ async function main() {
   registry.register(new PerplexityAdapter())
   registry.register(new ChatGptSearchAdapter())
   registry.register(new GeminiAdapter())
+  registry.register(new KimiAdapter())
+  registry.register(new YuanbaoAdapter())
 
   // 信封主密钥启动即校验：缺失/格式错误直接终止启动
   const credentialMasterKey = loadMasterKey()

@@ -10,7 +10,7 @@ Self-hosted. [MIT licensed](../LICENSE). Docker Compose, the Render Blueprint, a
 
 You pay for the computer it runs on and for any model or search API you connect. The Agent Readiness audit, the citability and structured-signal parts of a GEO health check, `llms.txt`, and JSON-LD do not need those keys. Citation monitoring calls only the engines whose credentials you stored.
 
-The engines registered in `src/server.ts` are DeepSeek, Doubao, Qwen, ERNIE, Perplexity, ChatGPT Search, and Gemini. Kimi and Yuanbao are not adapters here.
+The engines registered in `src/server.ts` are DeepSeek, Doubao, Qwen, ERNIE, Perplexity, ChatGPT Search, Gemini, Kimi (Moonshot), and Tencent Yuanbao (Hunyuan API, not the Yuanbao app).
 
 The in-app catalog, orders, and mock payments exist so someone can run GeoCiteOps as a multi-tenant service. They do nothing until `BILLING_ENFORCEMENT=on`.
 

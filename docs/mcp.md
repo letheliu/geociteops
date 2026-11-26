@@ -102,7 +102,7 @@ Each tool returns a short text summary and a JSON object. Clients that support `
 | `get_agent_readiness_report` | Fetches a stored audit by id. Local audits are not stored. |
 | `list_queries` | Lists active queries in the library. |
 | `add_queries` | Adds up to 20 queries. Each item is a string or `{ queryText, source, pageId }`. |
-| `run_citation_check` | Runs one query on the configured engines, or on `platforms` you pass. Adds unknown query text to the library. |
+| `run_citation_check` | Runs one query on the configured engines, or on `platforms` you pass (`deepseek`, `doubao`, `qwen`, `ernie`, `perplexity`, `chatgpt`, `gemini`, `kimi`, `yuanbao`). Adds unknown query text to the library. `kimi` is Moonshot. `yuanbao` is the Hunyuan API, not the Yuanbao app. |
 | `get_share_of_voice` | Share of voice for a date range. Defaults to the last 30 days. |
 | `optimize_content` | Atomize, score, and rewrite `text`, a public `url`, or a stored `pageId`. |
 | `generate_schema` | JSON-LD for a registry type. Pass `pageUrl` to store the six types the API accepts. |

@@ -21,6 +21,8 @@ const GIFT_ENTITLEMENTS = {
     'perplexity',
     'chatgpt',
     'gemini',
+    'kimi',
+    'yuanbao',
   ],
   diagnosticRunsPerMonth: 30,
   samplesPerRun: 200,

@@ -16,9 +16,11 @@ const ALL_PLATFORMS = [
   'perplexity',
   'chatgpt',
   'gemini',
+  'kimi',
+  'yuanbao',
 ]
 
-/** 7 平台全配齐的明文配置 */
+/** 已注册平台全配齐的明文配置 */
 function fullConfig() {
   return {
     deepseek: { DEEPSEEK_API_KEY: 'sk-deep-ab12' },
@@ -28,6 +30,8 @@ function fullConfig() {
     perplexity: { PERPLEXITY_API_KEY: 'sk-pplx-kl12' },
     chatgpt: { OPENAI_API_KEY: 'sk-oai-mn34' },
     gemini: { GEMINI_API_KEY: 'sk-gem-op56' },
+    kimi: { MOONSHOT_API_KEY: 'sk-moon-qr78' },
+    yuanbao: { HUNYUAN_API_KEY: 'sk-huny-st90' },
   }
 }
 
@@ -50,7 +54,7 @@ function makeResolver(opts: {
 }
 
 describe('REQUIRED_KEYS', () => {
-  it('精确锁定 7 平台必需键', () => {
+  it('精确锁定 9 平台必需键', () => {
     expect(REQUIRED_KEYS).toEqual({
       deepseek: ['DEEPSEEK_API_KEY'],
       doubao: ['DOUBAO_API_KEY'],
@@ -59,6 +63,8 @@ describe('REQUIRED_KEYS', () => {
       perplexity: ['PERPLEXITY_API_KEY'],
       chatgpt: ['OPENAI_API_KEY'],
       gemini: ['GEMINI_API_KEY'],
+      kimi: ['MOONSHOT_API_KEY'],
+      yuanbao: ['HUNYUAN_API_KEY'],
     })
   })
 })
@@ -137,6 +143,8 @@ describe('getSummary', () => {
     expect(summary.platforms.perplexity).toEqual({ configured: false, hint: '' })
     expect(summary.platforms.chatgpt).toEqual({ configured: false, hint: '' })
     expect(summary.platforms.gemini).toEqual({ configured: false, hint: '' })
+    expect(summary.platforms.kimi).toEqual({ configured: false, hint: '' })
+    expect(summary.platforms.yuanbao).toEqual({ configured: false, hint: '' })
   })
 
   it('ernie 双键全齐才 configured，hint 取第一个必需键末 4 位', async () => {
@@ -156,7 +164,7 @@ describe('getSummary', () => {
 })
 
 describe('listActivePlatforms', () => {
-  it('7 平台注册且全配齐 → 全部返回（修复 perplexity/chatgpt/gemini 被漏掉的缺陷）', async () => {
+  it('已注册平台全配齐 → 全部返回（含 kimi / yuanbao）', async () => {
     const sealed = encryptConfig(JSON.stringify(fullConfig()), KEY)
     const { resolver } = makeResolver({ platformConfig: sealed, registered: ALL_PLATFORMS })
     const active = await resolver.listActivePlatforms('w1')

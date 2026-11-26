@@ -99,6 +99,13 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
       PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}
       PERPLEXITY_MODEL: ${PERPLEXITY_MODEL:-sonar}
+      # Kimi / 元宝：留空不调用。运行时读的是工作区凭证里的同名键；DEMO_MODE=on 时适配器不向外请求。
+      MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+      MOONSHOT_BASE_URL: ${MOONSHOT_BASE_URL:-https://api.moonshot.cn/v1}
+      MOONSHOT_MODEL: ${MOONSHOT_MODEL:-kimi-k3}
+      HUNYUAN_API_KEY: ${HUNYUAN_API_KEY:-}
+      HUNYUAN_BASE_URL: ${HUNYUAN_BASE_URL:-https://api.hunyuan.cloud.tencent.com/v1}
+      HUNYUAN_MODEL: ${HUNYUAN_MODEL:-hunyuan-turbos-latest}
       FUZZY_MATCH_THRESHOLD: ${FUZZY_MATCH_THRESHOLD:--50}
 
       # 公开只读演示。默认 off，避免把日常自托管锁成只读。
